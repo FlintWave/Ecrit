@@ -32,7 +32,7 @@
 Écrit guides your screenplay through five distinct phases, each with a focused workspace:
 
 - **Plan** — Prose editor for treatments, logline builder, and story notes
-- **Outline** — Visual node graph with drag-and-drop scene cards, act breaks, and structure templates (Save the Cat, Hero's Journey, Three-Act, and more)
+- **Outline** — Visual node graph with drag-and-drop scene cards, act breaks, and structure templates (Save the Cat, Hero’s Journey, Three-Act, and more)
 - **Manuscript** — Courier Prime script editor with full Fountain syntax highlighting, typewriter scrolling, auto-save, and scene numbering
 - **Proofread** — Read-only view with an issues rail for flagging problems
 - **Deliver** — Preview with PDF/ODT/Fountain export, WGA revision tracking, and contest preset validation
@@ -68,7 +68,7 @@
 ### Export Formats
 
 | Format | Details |
-|--------|---------|
+|--------|--------|
 | **PDF** | QPrinter-based, US Letter or A4, optional title page |
 | **ODT** | ODF-spec compliant for LibreOffice/Word |
 | **Fountain** | Plain `.fountain` text |
@@ -230,7 +230,6 @@ The full feature roadmap is tracked in [`openspec/roadmap.yaml`](openspec/roadma
 
 - Android companion app
 - Real-time collaboration
-- AI-assisted writing tools
 - Plugin marketplace
 - Localization (i18n)
 
