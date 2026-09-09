@@ -8,6 +8,7 @@ swap in real API calls once credentials and SDKs are available.
 
 from __future__ import annotations
 
+import base64
 import json
 import os
 from abc import ABC, abstractmethod
@@ -43,9 +44,10 @@ class CloudConfig:
     # -- serialisation helpers ------------------------------------------------
 
     def to_dict(self) -> dict:
+        token_b64 = base64.b64encode(self.auth_token.encode("utf-8")).decode("ascii") if self.auth_token else ""
         return {
             "provider": self.provider.value,
-            "auth_token": self.auth_token,
+            "auth_token_b64": token_b64,
             "folder_path": self.folder_path,
             "auto_export": self.auto_export,
             "last_export_time": self.last_export_time,
@@ -53,9 +55,14 @@ class CloudConfig:
 
     @classmethod
     def from_dict(cls, data: dict) -> CloudConfig:
+        token_b64 = data.get("auth_token_b64", "")
+        if token_b64:
+            auth_token = base64.b64decode(token_b64.encode("ascii")).decode("utf-8")
+        else:
+            auth_token = data.get("auth_token", "")
         return cls(
             provider=CloudProvider(data["provider"]),
-            auth_token=data.get("auth_token", ""),
+            auth_token=auth_token,
             folder_path=data.get("folder_path", "/"),
             auto_export=data.get("auto_export", False),
             last_export_time=data.get("last_export_time", ""),
@@ -311,8 +318,13 @@ def export_script(
     if not exporter.authenticate():
         return ExportResult(False, f"Authentication failed for {exporter.PROVIDER_NAME}")
 
+    # Sanitize filename to prevent path traversal
+    filename = os.path.basename(filename)
+    if not filename:
+        filename = "export"
+
     # Ensure the filename has an extension
-    if "." not in os.path.basename(filename):
+    if "." not in filename:
         filename = f"{filename}.{fmt}"
 
     # Write content to a staging file
@@ -322,13 +334,13 @@ def export_script(
     with open(local_path, "w", encoding="utf-8") as f:
         f.write(content)
 
-    result = exporter.upload_file(local_path, config.folder_path)
-
-    # Clean up staging file
     try:
-        os.remove(local_path)
-    except OSError:
-        pass
+        result = exporter.upload_file(local_path, config.folder_path)
+    finally:
+        try:
+            os.remove(local_path)
+        except OSError:
+            pass
 
     return result
 

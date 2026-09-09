@@ -13,7 +13,7 @@ from ecrit.ui.styles import theme
 class ShareReviewDialog(QDialog):
     """Generate and manage shareable review links."""
 
-    share_created = Signal(str)  # path to HTML file
+    share_created = Signal(str)  # watermark text
 
     def __init__(self, parent=None):
         super().__init__(parent)

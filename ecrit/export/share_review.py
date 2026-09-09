@@ -116,7 +116,8 @@ def _parse_fountain_to_elements(content: str) -> list[dict]:
                 if j < len(lines) and lines[j].strip():
                     # This looks like a character cue
                     elements.append({"type": "Character", "text": candidate})
-                    i += 1
+                    # Skip to dialogue start (past any blank lines)
+                    i = j
 
                     # Collect dialogue and parentheticals
                     while i < len(lines):
@@ -449,7 +450,13 @@ def list_shares(project_path: str) -> list[dict]:
 
 def delete_share(project_path: str, share_id: str) -> bool:
     """Delete a share by its id. Returns True if the file was removed."""
-    filepath = os.path.join(project_path, ".ecrit", "shares", f"{share_id}.html")
+    safe_id = os.path.basename(share_id)
+    if not safe_id or safe_id != share_id:
+        return False
+    shares_dir = os.path.join(project_path, ".ecrit", "shares")
+    filepath = os.path.join(shares_dir, f"{safe_id}.html")
+    if not os.path.realpath(filepath).startswith(os.path.realpath(shares_dir)):
+        return False
     try:
         os.remove(filepath)
         return True

@@ -147,7 +147,7 @@ class SeriesProject:
         season = self.get_season(season_number)
         if season is None:
             return None
-        num = len(season.episodes) + 1
+        num = max((ep.number for ep in season.episodes), default=0) + 1
         ep = Episode(
             number=num,
             title=title,

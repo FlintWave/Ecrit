@@ -137,7 +137,6 @@ class MainWindow(QMainWindow):
         self.setStyleSheet(generate(t))
 
     def _go_dashboard(self):
-        root = self.centralWidget().layout()
         self._swap_title_bar(show_phases=False)
         self.title_bar.set_context("")
         self.stack.setCurrentWidget(self.dashboard)
@@ -161,6 +160,10 @@ class MainWindow(QMainWindow):
             dialect = data.get("meta", {}).get("format_id", "fountain/core")
             self.editor.status_bar.update_info(dialect=dialect)
             self.editor.load_project(data)
+            try:
+                self.editor.manuscript.editor.content_changed.disconnect(self._on_content_changed)
+            except RuntimeError:
+                pass
             self.editor.manuscript.editor.content_changed.connect(self._on_content_changed)
             self.stack.setCurrentWidget(self.editor)
 
@@ -376,11 +379,14 @@ class MainWindow(QMainWindow):
             auto_sync=config_dict.get("auto_sync", False),
         )
         save_remote_config(STATE.current_project_path, config)
-        if action == "push":
-            result = push_to_remote(STATE.current_project_path, config)
-        else:
-            result = pull_from_remote(STATE.current_project_path, config)
-        self._sync_dialog.set_status(f"{result.status.value}: {result.message}")
+        try:
+            if action == "push":
+                result = push_to_remote(STATE.current_project_path, config)
+            else:
+                result = pull_from_remote(STATE.current_project_path, config)
+            self._sync_dialog.set_status(f"{result.status.value}: {result.message}")
+        except Exception as exc:
+            self._sync_dialog.set_status(f"error: {exc}")
 
     def _show_cloud_export(self):
         self._cloud_export_dialog.exec()
@@ -396,10 +402,13 @@ class MainWindow(QMainWindow):
         except (ValueError, KeyError):
             return
         if STATE.current_project_path:
-            result = export_script(STATE.current_project_path, cp, content, f"{title}.{fmt}", fmt)
-            self._cloud_export_dialog.add_history_entry(
-                f"{'✅' if result.success else '❌'} {result.message}"
-            )
+            try:
+                result = export_script(STATE.current_project_path, cp, content, f"{title}.{fmt}", fmt)
+                self._cloud_export_dialog.add_history_entry(
+                    f"{'✅' if result.success else '❌'} {result.message}"
+                )
+            except Exception as exc:
+                self._cloud_export_dialog.add_history_entry(f"❌ Export failed: {exc}")
 
     def _show_share_review(self):
         if STATE.current_project_path:

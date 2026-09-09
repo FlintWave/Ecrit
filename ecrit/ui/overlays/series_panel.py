@@ -290,7 +290,10 @@ class SeriesPanel(QDialog):
         season_num = self.season_combo.currentData()
         if season_num is None:
             return
-        num = len(self._project.get_season(season_num).episodes) + 1
+        season = self._project.get_season(season_num)
+        if season is None:
+            return
+        num = len(season.episodes) + 1
         self._project.add_episode(season_num, f"Episode {num}")
         self._refresh_episodes()
         self.project_changed.emit()

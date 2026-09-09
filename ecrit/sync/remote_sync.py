@@ -106,10 +106,21 @@ def _credential_url(config: RemoteConfig) -> str:
     from urllib.parse import urlparse, urlunparse
 
     parsed = urlparse(config.remote_url)
+    if not parsed.hostname:
+        return config.remote_url
     netloc = f"{config.username}:{config.token}@{parsed.hostname}"
     if parsed.port:
         netloc += f":{parsed.port}"
     return urlunparse(parsed._replace(netloc=netloc))
+
+
+def _sanitize_stderr(stderr: str, config: RemoteConfig) -> str:
+    """Strip embedded credentials from git stderr before surfacing it."""
+    if config.token and config.token in stderr:
+        stderr = stderr.replace(config.token, "***")
+    if config.username and config.username in stderr:
+        stderr = stderr.replace(f"{config.username}:***@", "***@")
+    return stderr
 
 
 def _obfuscate(token: str) -> str:
@@ -205,7 +216,7 @@ def push_to_remote(
         )
 
         if proc.returncode != 0:
-            stderr = proc.stderr.strip()
+            stderr = _sanitize_stderr(proc.stderr.strip(), config)
             return SyncResult(SyncStatus.ERROR, f"git push failed: {stderr}")
         return SyncResult(SyncStatus.UP_TO_DATE, "Push completed successfully.")
     except subprocess.TimeoutExpired:
@@ -271,7 +282,7 @@ def pull_from_remote(
                     "Pull completed with merge conflicts.",
                     conflicts=conflict_files,
                 )
-            return SyncResult(SyncStatus.ERROR, f"git pull failed: {stderr}")
+            return SyncResult(SyncStatus.ERROR, f"git pull failed: {_sanitize_stderr(stderr, config)}")
         return SyncResult(SyncStatus.UP_TO_DATE, "Pull completed successfully.")
     except subprocess.TimeoutExpired:
         _try_restore_fetch_url(project_path, remote_name, config.remote_url)

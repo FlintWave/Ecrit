@@ -24,3 +24,4 @@ Thumbs.db
 
 # Project data
 *.ecrit-lock
+.ecrit/
