@@ -72,13 +72,13 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y \
             libgl1-mesa-dev libegl1-mesa-dev libxkbcommon0 libdbus-1-3 \
-            libcairo2-dev libfuse2 \
+            libcairo2-dev librsvg2-bin libfuse2 \
             ruby ruby-dev build-essential rpm
           sudo gem install fpm
 
       - name: Install system dependencies (macOS)
         if: runner.os == 'macOS'
-        run: brew install cairo
+        run: brew install librsvg
 
       # ── Python dependencies ────────────────────────────────────────
 
@@ -87,16 +87,16 @@ jobs:
           pip install -e ".[dev]"
           pip install pyinstaller
 
-      - name: Install icon-conversion tools (Linux / macOS)
+      - name: Install Pillow (Linux / macOS)
         if: runner.os != 'Windows'
-        run: pip install cairosvg Pillow
+        run: pip install Pillow
 
       # ── Icon conversion ────────────────────────────────────────────
       #
       # PyInstaller requires .ico on Windows and .icns on macOS.
       # Linux packages use a PNG icon.
       # Windows runners have ImageMagick pre-installed; macOS and Linux
-      # use cairosvg + Pillow for higher-quality rendering.
+      # use rsvg-convert (librsvg) + Pillow for SVG rendering.
 
       - name: Convert icon to ICO (Windows)
         if: runner.os == 'Windows'
@@ -109,41 +109,19 @@ jobs:
       - name: Convert icon to ICNS (macOS)
         if: runner.os == 'macOS'
         run: |
-          python3 - <<'PYEOF'
-          import cairosvg, io, os, subprocess
-          from PIL import Image
-
-          iconset = "public/icon.iconset"
-          os.makedirs(iconset, exist_ok=True)
-
-          for size in [16, 32, 64, 128, 256, 512, 1024]:
-              png = cairosvg.svg2png(
-                  url="public/icon.svg", output_width=size, output_height=size
-              )
-              img = Image.open(io.BytesIO(png))
-              if size <= 512:
-                  img.save(f"{iconset}/icon_{size}x{size}.png")
-              if size >= 32:
-                  img.save(f"{iconset}/icon_{size // 2}x{size // 2}@2x.png")
-
-          subprocess.run(
-              ["iconutil", "-c", "icns", iconset, "-o", "public/icon.icns"],
-              check=True,
-          )
-          PYEOF
+          mkdir -p public/icon.iconset
+          for size in 16 32 64 128 256 512; do
+            rsvg-convert -w $size -h $size public/icon.svg -o "public/icon.iconset/icon_${size}x${size}.png"
+          done
+          for size in 32 64 128 256 512 1024; do
+            half=$((size / 2))
+            rsvg-convert -w $size -h $size public/icon.svg -o "public/icon.iconset/icon_${half}x${half}@2x.png"
+          done
+          iconutil -c icns public/icon.iconset -o public/icon.icns
 
       - name: Convert icon to PNG (Linux)
         if: runner.os == 'Linux'
-        run: |
-          python3 -c "
-          import cairosvg
-          cairosvg.svg2png(
-              url='public/icon.svg',
-              write_to='public/icon.png',
-              output_width=256,
-              output_height=256,
-          )
-          "
+        run: rsvg-convert -w 256 -h 256 public/icon.svg -o public/icon.png
 
       # ── PyInstaller build ──────────────────────────────────────────
 
