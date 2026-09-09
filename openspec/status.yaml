@@ -78,64 +78,85 @@ features:
     notes: "19 built-in formats across 6 categories with dialect plugin interface"
 
   character-sheets:
-    status: planned
+    status: done
+    notes: "Character sheet dialog with name, occupation, wants/needs/flaw, arc, notes, moodboard"
 
   compare-drafts:
-    status: planned
+    status: done
+    notes: "Side-by-side and inline diff viewer with snapshot selector and line stats"
 
   reading-mode:
-    status: planned
+    status: done
+    notes: "Full-screen distraction-free reading with page navigation and Escape to exit"
 
   sprint-timer:
-    status: planned
+    status: done
+    notes: "Countdown timer with 15/25/45/60m presets, start/pause/reset, status bar integration"
 
   command-palette:
-    status: planned
+    status: done
+    notes: "Ctrl+K fuzzy-filter palette dispatching to all app commands across phases, tools, and exports"
 
   scratchpad:
-    status: planned
+    status: done
+    notes: "Right-rail scratch area fed by Ctrl+X cut, with paste-back and clear, Ctrl+Shift+X toggle"
 
   pdf-export:
-    status: planned
+    status: done
+    notes: "QPrinter-based PDF export with US Letter/A4 paper, title page option, element styling"
 
   odt-export:
-    status: planned
+    status: done
+    notes: "ODF-spec compliant ODT export with proper mimetype, content.xml, manifest, styles"
 
   fountain-export:
-    status: planned
+    status: done
+    notes: "Plain text Fountain export with directory creation"
 
   git-snapshots:
-    status: planned
+    status: done
+    notes: "Local git commit snapshots with init, create, list, get content, restore"
 
-  remote-sync:
-    status: planned
+  scene-numbers:
+    status: in_progress
+    notes: "Lock/renumber, A-numbers for inserts"
 
-  cloud-drive-export:
-    status: planned
+  revisions-wga:
+    status: in_progress
+    notes: "WGA color revision system"
+
+  logline-builder:
+    status: in_progress
+    notes: "Madlibs-style logline builder with story shape templates"
+
+  structure-templates:
+    status: in_progress
+    notes: "Three Acts, Save the Cat, Hero's Journey, Story Circle, etc."
+
+  contest-presets:
+    status: in_progress
+    notes: "Nicholl, BBC Writersroom, Austin, PAGE, BlueCat format presets"
+
+  production-reports:
+    status: in_progress
+    notes: "Scene, Cast, Location, Day/Night, Sides reports"
 
   series-projects:
     status: planned
+    notes: "Episode switcher, shared cast/locations/bible"
 
   module-system:
     status: planned
+    notes: "Extensibility via loadable modules"
 
-  production-reports:
+  remote-sync:
     status: planned
+    notes: "GitHub/GitLab/Codeberg OAuth sync"
+
+  cloud-drive-export:
+    status: planned
+    notes: "Google Drive, iCloud, Dropbox, OneDrive, Nextcloud export"
 
   share-for-review:
     status: planned
-
-  contest-presets:
-    status: planned
-
-  logline-builder:
-    status: planned
-
-  structure-templates:
-    status: planned
-
-  revisions-wga:
-    status: planned
-
-  scene-numbers:
-    status: planned
+    notes: "Read-only browser link with watermark"
