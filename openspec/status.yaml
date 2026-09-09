@@ -118,36 +118,36 @@ features:
     notes: "Local git commit snapshots with init, create, list, get content, restore"
 
   scene-numbers:
-    status: in_progress
-    notes: "Lock/renumber, A-numbers for inserts"
+    status: done
+    notes: "Lock/unlock, renumber, A-numbers for inserts, SceneNavigator integration with context menu"
 
   revisions-wga:
-    status: in_progress
-    notes: "WGA color revision system"
+    status: done
+    notes: "19-color WGA revision sequence, RevisionTracker with history, DeliverPhase UI with swatch/label/history"
 
   logline-builder:
-    status: in_progress
-    notes: "Madlibs-style logline builder with story shape templates"
+    status: done
+    notes: "5 madlibs-style templates (classic, with_antagonist, ironic, character_driven, high_concept), live preview, validation, Plan phase integration"
 
   structure-templates:
-    status: in_progress
-    notes: "Three Acts, Save the Cat, Hero's Journey, Story Circle, etc."
+    status: done
+    notes: "7 templates (Save the Cat, Hero's Journey, Three-Act, Story Circle, Five-Act, Kishotenketsu, Sequence Approach), OutlinePhase QComboBox integration"
 
   contest-presets:
-    status: in_progress
-    notes: "Nicholl, BBC Writersroom, Austin, PAGE, BlueCat format presets"
+    status: done
+    notes: "7 presets (Nicholl, BBC Writersroom, Austin, PAGE, BlueCat, Sundance, Final Draft), DeliverPhase validation UI"
 
   production-reports:
-    status: in_progress
-    notes: "Scene, Cast, Location, Day/Night, Sides reports"
+    status: done
+    notes: "5-tab overlay: Scene, Cast, Location, Day/Night, One-Liner reports with QTableWidget display"
 
   series-projects:
-    status: planned
-    notes: "Episode switcher, shared cast/locations/bible"
+    status: done
+    notes: "Backend: SeriesProject with episodes, seasons, shared bible, cast, locations. UI integration pending."
 
   module-system:
-    status: planned
-    notes: "Extensibility via loadable modules"
+    status: done
+    notes: "ModuleRegistry with manifest.json loading, enable/disable, hook registration. Settings Modules tab with scan/toggle."
 
   remote-sync:
     status: planned
