@@ -1,0 +1,162 @@
+updated: "2026-09-09"
+
+features:
+  rust-core:
+    status: done
+    notes: "PyO3 module with Fountain parser, project management, dialect system"
+
+  fountain-parser:
+    status: done
+    notes: "Full Fountain spec parser with scene headings, dialogue, action, transitions, sections, notes, title page"
+
+  project-file-management:
+    status: done
+    notes: "Create, open, save, list projects. Plain file structure with script.fountain, plan/*.md, characters.json, graph.json, cover.json"
+
+  design-system:
+    status: done
+    notes: "Nocturne (dark) and Organic (light) token system with full stylesheet generation"
+
+  dashboard:
+    status: done
+    notes: "Main landing screen with continue writing card, week stats, projects grid, new/import buttons"
+
+  manuscript-editor-basic:
+    status: done
+    notes: "Courier Prime script editor with FountainHighlighter, Tab cycling, typewriter scrolling, auto-save"
+
+  plan-phase:
+    status: done
+    notes: "Document rail + Liberation Serif prose editor"
+
+  outline-graph:
+    status: done
+    notes: "QPainter-based zoomable pannable canvas with dot grid, ActBreak/Scene/Transition/Note nodes, connectors"
+
+  proofread-phase:
+    status: done
+    notes: "Read-only script view + issues rail"
+
+  deliver-phase:
+    status: done
+    notes: "Preview area + export rail with PDF/ODT/Fountain buttons, title page/scene numbers/revision marks toggles"
+
+  new-project-wizard:
+    status: done
+    notes: "Title, author, format selection (6 categories, 19 formats), paper size"
+
+  import-screen:
+    status: done
+    notes: "File dialog to import .fountain files, creates project and opens in editor"
+
+  settings-modal:
+    status: done
+    notes: "4-tab modal: General, Editor, Theme, About"
+
+  scene-navigator:
+    status: done
+    notes: "Left rail with scene list from parsed Fountain"
+
+  find-replace:
+    status: done
+    notes: "Slide-in bar with find next/prev, replace one/all, match case, regex"
+
+  statistics-modal:
+    status: done
+    notes: "Overview/Characters/Scenes tabs with full breakdown tables"
+
+  keyboard-shortcuts:
+    status: done
+    notes: "Reference dialog with File, Edit, Navigation, Editor, View groups"
+
+  theme-toggle:
+    status: done
+    notes: "Toggle between Nocturne (dark) and Organic (light) with full stylesheet reload"
+
+  format-system:
+    status: done
+    notes: "19 built-in formats across 6 categories with dialect plugin interface"
+
+  character-sheets:
+    status: done
+    notes: "Character sheet dialog with name, occupation, wants/needs/flaw, arc, notes, moodboard"
+
+  compare-drafts:
+    status: done
+    notes: "Side-by-side and inline diff viewer with snapshot selector and line stats"
+
+  reading-mode:
+    status: done
+    notes: "Full-screen distraction-free reading with page navigation and Escape to exit"
+
+  sprint-timer:
+    status: done
+    notes: "Countdown timer with 15/25/45/60m presets, start/pause/reset, status bar integration"
+
+  command-palette:
+    status: done
+    notes: "Ctrl+K fuzzy-filter palette dispatching to all app commands across phases, tools, and exports"
+
+  scratchpad:
+    status: done
+    notes: "Right-rail scratch area fed by Ctrl+X cut, with paste-back and clear, Ctrl+Shift+X toggle"
+
+  pdf-export:
+    status: done
+    notes: "QPrinter-based PDF export with US Letter/A4 paper, title page option, element styling"
+
+  odt-export:
+    status: done
+    notes: "ODF-spec compliant ODT export with proper mimetype, content.xml, manifest, styles"
+
+  fountain-export:
+    status: done
+    notes: "Plain text Fountain export with directory creation"
+
+  git-snapshots:
+    status: done
+    notes: "Local git commit snapshots with init, create, list, get content, restore"
+
+  scene-numbers:
+    status: done
+    notes: "Lock/unlock, renumber, A-numbers for inserts, SceneNavigator integration with context menu"
+
+  revisions-wga:
+    status: done
+    notes: "19-color WGA revision sequence, RevisionTracker with history, DeliverPhase UI with swatch/label/history"
+
+  logline-builder:
+    status: done
+    notes: "5 madlibs-style templates (classic, with_antagonist, ironic, character_driven, high_concept), live preview, validation, Plan phase integration"
+
+  structure-templates:
+    status: done
+    notes: "7 templates (Save the Cat, Hero's Journey, Three-Act, Story Circle, Five-Act, Kishotenketsu, Sequence Approach), OutlinePhase QComboBox integration"
+
+  contest-presets:
+    status: done
+    notes: "7 presets (Nicholl, BBC Writersroom, Austin, PAGE, BlueCat, Sundance, Final Draft), DeliverPhase validation UI"
+
+  production-reports:
+    status: done
+    notes: "5-tab overlay: Scene, Cast, Location, Day/Night, One-Liner reports with QTableWidget display"
+
+  series-projects:
+    status: done
+    notes: "Backend: SeriesProject with episodes, seasons, shared bible. UI: SeriesPanel with episode table, season management, bible tab, info tab."
+
+  module-system:
+    status: done
+    notes: "ModuleRegistry with manifest.json loading, enable/disable, hook registration. Settings Modules tab with scan/toggle."
+
+  remote-sync:
+    status: done
+    notes: "Git remote management with GitHub/GitLab/Codeberg providers, SyncSettingsDialog with push/pull, base64-obfuscated token storage in .ecrit/sync.json"
+
+  cloud-drive-export:
+    status: done
+    notes: "Abstract CloudExporter with stub implementations for Google Drive, iCloud, Dropbox, OneDrive, Nextcloud. CloudExportDialog with provider auth, format selection, export history."
+
+  share-for-review:
+    status: done
+    notes: "Self-contained HTML generation with watermark overlay, Fountain-to-HTML parsing, XSS-safe output. ShareReviewDialog with watermark config, generated shares management."

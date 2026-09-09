@@ -1,0 +1,80 @@
+project: ecrit
+version: "0.1.0"
+description: "Screenplay writing app for Fountain and Fountain-derived dialects"
+
+milestones:
+  - id: v0.1
+    title: Foundation
+    status: done
+    target: "2025-Q1"
+    features:
+      - rust-core
+      - fountain-parser
+      - design-system
+      - dashboard
+      - manuscript-editor-basic
+      - project-file-management
+
+  - id: v0.2
+    title: Full Editor
+    status: done
+    target: "2025-Q2"
+    features:
+      - plan-phase
+      - outline-graph
+      - proofread-phase
+      - deliver-phase
+      - character-sheets
+      - scene-navigator
+
+  - id: v0.3
+    title: Project Management
+    status: done
+    target: "2025-Q2"
+    features:
+      - new-project-wizard
+      - import-screen
+      - settings-modal
+      - format-system
+
+  - id: v0.4
+    title: Polish
+    status: done
+    target: "2025-Q3"
+    features:
+      - find-replace
+      - statistics-modal
+      - keyboard-shortcuts
+      - compare-drafts
+      - reading-mode
+      - sprint-timer
+      - theme-toggle
+      - command-palette
+      - scratchpad
+
+  - id: v0.5
+    title: Export & Sync
+    status: done
+    target: "2025-Q3"
+    features:
+      - pdf-export
+      - odt-export
+      - fountain-export
+      - git-snapshots
+      - remote-sync
+      - cloud-drive-export
+
+  - id: v1.0
+    title: Release
+    status: done
+    target: "2025-Q4"
+    features:
+      - series-projects
+      - module-system
+      - production-reports
+      - share-for-review
+      - contest-presets
+      - logline-builder
+      - structure-templates
+      - revisions-wga
+      - scene-numbers
