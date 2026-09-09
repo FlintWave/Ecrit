@@ -102,19 +102,21 @@ class AppState:
         self.notify()
         return {"meta": meta, "script": script}
 
-    def save_script(self):
+    def save_script(self) -> bool:
         if ecrit_core and self.current_project_path:
             try:
                 ecrit_core.save_script(self.current_project_path, self.script_content)
-                return
+                return True
             except Exception:
                 pass
         if self.current_project_path:
             script_file = Path(self.current_project_path) / "script.fountain"
             try:
                 script_file.write_text(self.script_content, encoding="utf-8")
+                return True
             except Exception:
-                pass
+                return False
+        return False
 
     def create_project(self, title: str, author: str, format_id: str, paper: str, kind: str = "Single"):
         if ecrit_core:

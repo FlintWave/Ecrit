@@ -144,7 +144,7 @@ class SettingsDialog(QDialog):
         self.line_numbers_check.setStyleSheet("background: transparent;")
         behavior_group.add_widget(self.line_numbers_check)
 
-        self.auto_save_check = QCheckBox("Auto-save every 60 seconds")
+        self.auto_save_check = QCheckBox("Auto-save on pause (1s debounce)")
         self.auto_save_check.setStyleSheet("background: transparent;")
         self.auto_save_check.setChecked(True)
         behavior_group.add_widget(self.auto_save_check)

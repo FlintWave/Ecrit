@@ -206,8 +206,8 @@ class MainWindow(QMainWindow):
 
     def _on_content_changed(self):
         STATE.script_content = self.editor.manuscript.editor.toPlainText()
-        STATE.save_script()
-        self._editor_title_bar.save_dot.set_saved(True)
+        saved = STATE.save_script()
+        self._editor_title_bar.save_dot.set_saved(saved)
 
     def _on_project_created(self, path: str):
         self._open_project(path)
@@ -525,9 +525,12 @@ class MainWindow(QMainWindow):
         title = self._editor_title_bar.context_label.text() or "Untitled"
         from ecrit.companion.sync_bundle import create_sync_bundle
         path = create_sync_bundle(STATE.current_project_path, content, title)
-        url = self._companion_dialog.get_device_sync().start_transfer_server(path)
+        device_sync = self._companion_dialog.get_device_sync()
+        url = device_sync.start_transfer_server(path)
         self._companion_dialog.set_transfer_url(url)
         self._companion_dialog.set_sync_status(f"Bundle ready: {path}")
+        for device in device_sync._devices:
+            device_sync.mark_synced(device.device_id)
 
     def _on_wifi_transfer(self, path: str):
         if not STATE.current_project_path:
@@ -575,7 +578,7 @@ class MainWindow(QMainWindow):
             export_fountain(content, title=title, parent=self)
 
     def _import_script(self):
-        from PySide6.QtWidgets import QFileDialog
+        from PySide6.QtWidgets import QFileDialog, QMessageBox
         path, _ = QFileDialog.getOpenFileName(
             self, "Import Fountain Script", "",
             "Fountain files (*.fountain *.ftn);;All files (*)"
@@ -591,8 +594,8 @@ class MainWindow(QMainWindow):
                     STATE.script_content = content
                     STATE.save_script()
                     self._open_project(meta.get("path", ""))
-            except Exception:
-                pass
+            except Exception as exc:
+                QMessageBox.warning(self, "Import Failed", f"Could not import script:\n{exc}")
 
     def _swap_title_bar(self, show_phases: bool):
         root = self.centralWidget().layout()
@@ -649,11 +652,19 @@ class MainWindow(QMainWindow):
         STATE.author_name = settings.get("author_name", STATE.author_name)
         STATE.author_email = settings.get("author_email", STATE.author_email)
         font_size = settings.get("font_size", 15)
-        self.editor.manuscript.editor.setStyleSheet(
-            f"font-family: 'Courier Prime', 'Courier New', monospace; font-size: {font_size}pt;"
-        )
+        from PySide6.QtGui import QFont
+        font = QFont("Courier Prime", font_size)
+        font.setStyleHint(QFont.StyleHint.Monospace)
+        self.editor.manuscript.editor.setFont(font)
         word_target = settings.get("word_target", 2500)
         self.editor.status_bar.update_info(target=word_target)
+        auto_save = settings.get("auto_save", True)
+        if auto_save:
+            self.editor.manuscript.editor._save_timer.setInterval(1000)
+        else:
+            self.editor.manuscript.editor._save_timer.setInterval(0)
+            self.editor.manuscript.editor._save_timer.stop()
+        self.editor.manuscript.editor._typewriter = settings.get("typewriter", True)
 
     def _on_plugin_installed(self, plugin_id: str):
         if hasattr(self._settings_dialog, '_module_registry') and self._settings_dialog._module_registry:
