@@ -10,10 +10,27 @@ permissions:
 
 env:
   PYTHON_VERSION: "3.12"
+  QT_QPA_PLATFORM: offscreen
 
 jobs:
-  build-windows:
-    runs-on: windows-latest
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            target: win64
+          - os: macos-13
+            target: macos-x86_64
+            arch: x86_64
+          - os: macos-14
+            target: macos-arm64
+            arch: arm64
+          - os: ubuntu-22.04
+            target: linux-x86_64
+
+    runs-on: ${{ matrix.os }}
+
     steps:
       - uses: actions/checkout@v4
 
@@ -21,223 +38,298 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
 
-      - name: Install dependencies
-        run: |
-          pip install -e ".[dev]"
-          pip install pyinstaller
-
-      - name: Build with PyInstaller
-        run: |
-          pyinstaller --name Ecrit --windowed --icon public/icon.svg --add-data "public;public" ecrit/main.py
-
-      - name: Package zip
+      - name: Extract version from tag
+        id: version
         shell: bash
-        run: |
-          VERSION=${GITHUB_REF#refs/tags/v}
-          cd dist
-          7z a ../Ecrit-${VERSION}-win64.zip Ecrit/
-        env:
-          GITHUB_REF: ${{ github.ref }}
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: windows-build
-          path: Ecrit-*.zip
+      # ── System dependencies ────────────────────────────────────────
 
-  build-macos-intel:
-    runs-on: macos-13
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: Install dependencies
-        run: |
-          pip install -e ".[dev]"
-          pip install pyinstaller
-
-      - name: Build with PyInstaller
-        run: |
-          pyinstaller --name Ecrit --windowed --icon public/icon.svg --add-data "public:public" ecrit/main.py
-
-      - name: Create DMG
-        run: |
-          VERSION=${GITHUB_REF#refs/tags/v}
-          mkdir -p dmg_staging
-          cp -R dist/Ecrit.app dmg_staging/
-          ln -s /Applications dmg_staging/Applications
-          hdiutil create -volname "Ecrit" -srcfolder dmg_staging -ov -format UDZO "Ecrit-${VERSION}-macos-x86_64.dmg"
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: macos-intel-build
-          path: Ecrit-*.dmg
-
-  build-macos-arm:
-    runs-on: macos-14
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: Install dependencies
-        run: |
-          pip install -e ".[dev]"
-          pip install pyinstaller
-
-      - name: Build with PyInstaller
-        run: |
-          pyinstaller --name Ecrit --windowed --icon public/icon.svg --add-data "public:public" ecrit/main.py
-
-      - name: Create DMG
-        run: |
-          VERSION=${GITHUB_REF#refs/tags/v}
-          mkdir -p dmg_staging
-          cp -R dist/Ecrit.app dmg_staging/
-          ln -s /Applications dmg_staging/Applications
-          hdiutil create -volname "Ecrit" -srcfolder dmg_staging -ov -format UDZO "Ecrit-${VERSION}-macos-arm64.dmg"
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: macos-arm-build
-          path: Ecrit-*.dmg
-
-  build-linux:
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: Install system dependencies
+      - name: Install system dependencies (Linux)
+        if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y \
             libgl1-mesa-dev libegl1-mesa-dev libxkbcommon0 libdbus-1-3 \
-            libfuse2 ruby ruby-dev build-essential rpm
+            libcairo2-dev libfuse2 \
+            ruby ruby-dev build-essential rpm
           sudo gem install fpm
+
+      - name: Install system dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: brew install cairo
+
+      # ── Python dependencies ────────────────────────────────────────
 
       - name: Install Python dependencies
         run: |
           pip install -e ".[dev]"
           pip install pyinstaller
 
-      - name: Build with PyInstaller
-        env:
-          QT_QPA_PLATFORM: offscreen
+      - name: Install icon-conversion tools (Linux / macOS)
+        if: runner.os != 'Windows'
+        run: pip install cairosvg Pillow
+
+      # ── Icon conversion ────────────────────────────────────────────
+      #
+      # PyInstaller requires .ico on Windows and .icns on macOS.
+      # Linux packages use a PNG icon.
+      # Windows runners have ImageMagick pre-installed; macOS and Linux
+      # use cairosvg + Pillow for higher-quality rendering.
+
+      - name: Convert icon to ICO (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
         run: |
-          pyinstaller --name ecrit --add-data "public:public" ecrit/main.py
+          magick public/icon.svg \
+            -define icon:auto-resize=256,128,64,48,32,16 \
+            public/icon.ico
 
-      - name: Get version
-        id: version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
-
-      - name: Build AppImage
+      - name: Convert icon to ICNS (macOS)
+        if: runner.os == 'macOS'
         run: |
-          VERSION=${{ steps.version.outputs.VERSION }}
+          python3 - <<'PYEOF'
+          import cairosvg, io, os, subprocess
+          from PIL import Image
 
-          mkdir -p AppDir/usr/bin AppDir/usr/share/applications AppDir/usr/share/icons/hicolor/256x256/apps
-          cp -R dist/ecrit/* AppDir/usr/bin/
-          cp public/icon.svg AppDir/usr/share/icons/hicolor/256x256/apps/ecrit.svg
-          cp public/icon.svg AppDir/ecrit.svg
+          iconset = "public/icon.iconset"
+          os.makedirs(iconset, exist_ok=True)
 
-          cat > AppDir/usr/share/applications/ecrit.desktop << 'DESKTOP'
+          for size in [16, 32, 64, 128, 256, 512, 1024]:
+              png = cairosvg.svg2png(
+                  url="public/icon.svg", output_width=size, output_height=size
+              )
+              img = Image.open(io.BytesIO(png))
+              if size <= 512:
+                  img.save(f"{iconset}/icon_{size}x{size}.png")
+              if size >= 32:
+                  img.save(f"{iconset}/icon_{size // 2}x{size // 2}@2x.png")
+
+          subprocess.run(
+              ["iconutil", "-c", "icns", iconset, "-o", "public/icon.icns"],
+              check=True,
+          )
+          PYEOF
+
+      - name: Convert icon to PNG (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          python3 -c "
+          import cairosvg
+          cairosvg.svg2png(
+              url='public/icon.svg',
+              write_to='public/icon.png',
+              output_width=256,
+              output_height=256,
+          )
+          "
+
+      # ── PyInstaller build ──────────────────────────────────────────
+
+      - name: Build with PyInstaller (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          pyinstaller \
+            --name Ecrit \
+            --windowed \
+            --icon public/icon.ico \
+            --add-data "public;public" \
+            --hidden-import PySide6 \
+            --collect-all PySide6 \
+            ecrit/main.py
+
+      - name: Build with PyInstaller (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          pyinstaller \
+            --name Ecrit \
+            --windowed \
+            --icon public/icon.icns \
+            --add-data "public:public" \
+            --hidden-import PySide6 \
+            --collect-all PySide6 \
+            --osx-bundle-identifier com.ecrit.app \
+            ecrit/main.py
+
+      - name: Build with PyInstaller (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          pyinstaller \
+            --name ecrit \
+            --windowed \
+            --add-data "public:public" \
+            --hidden-import PySide6 \
+            --collect-all PySide6 \
+            ecrit/main.py
+
+      # ── Packaging ──────────────────────────────────────────────────
+
+      - name: Package Windows zip
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          cd dist && 7z a "../Ecrit-${VERSION}-win64.zip" Ecrit/
+
+      - name: Package macOS DMG
+        if: runner.os == 'macOS'
+        run: |
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          ARCH="${{ matrix.arch }}"
+
+          # Stage .app alongside an Applications symlink for drag-install
+          mkdir -p dmg_staging
+          cp -R dist/Ecrit.app dmg_staging/
+          ln -s /Applications dmg_staging/Applications
+
+          hdiutil create \
+            -volname "Ecrit" \
+            -srcfolder dmg_staging \
+            -ov -format UDZO \
+            "Ecrit-${VERSION}-macos-${ARCH}.dmg"
+
+      - name: Package Linux AppImage
+        if: runner.os == 'Linux'
+        run: |
+          VERSION="${{ steps.version.outputs.VERSION }}"
+
+          # Prepare AppDir structure
+          mkdir -p AppDir/usr/bin
+          mkdir -p AppDir/usr/share/applications
+          mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
+          cp -r dist/ecrit/* AppDir/usr/bin/
+          cp public/icon.png AppDir/ecrit.png
+          cp public/icon.png AppDir/usr/share/icons/hicolor/256x256/apps/ecrit.png
+
+          # Desktop entry
+          cat > AppDir/ecrit.desktop <<'DESKTOP'
           [Desktop Entry]
           Name=Ecrit
           Exec=ecrit
           Icon=ecrit
           Type=Application
-          Categories=Office;TextEditor;
-          Comment=Screenplay writing app for Fountain
+          Categories=Office;WordProcessor;
+          Comment=A distraction-free writing app for novelists and screenwriters
           DESKTOP
-          cp AppDir/usr/share/applications/ecrit.desktop AppDir/ecrit.desktop
+          cp AppDir/ecrit.desktop AppDir/usr/share/applications/ecrit.desktop
 
-          cat > AppDir/AppRun << 'APPRUN'
+          # AppRun launcher
+          cat > AppDir/AppRun <<'APPRUN'
           #!/bin/bash
-          HERE="$(dirname "$(readlink -f "${0}")")"
+          HERE="$(dirname "$(readlink -f "$0")")"
+          export PATH="${HERE}/usr/bin:${PATH}"
+          export LD_LIBRARY_PATH="${HERE}/usr/bin:${LD_LIBRARY_PATH}"
           exec "${HERE}/usr/bin/ecrit" "$@"
           APPRUN
           chmod +x AppDir/AppRun
 
-          wget -q https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage -O appimagetool
+          # Build AppImage with appimagetool
+          wget -q "https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage" \
+            -O appimagetool
           chmod +x appimagetool
-          ARCH=x86_64 ./appimagetool AppDir "Ecrit-${VERSION}-linux-x86_64.AppImage"
+          ARCH=x86_64 ./appimagetool --no-appstream AppDir \
+            "Ecrit-${VERSION}-linux-x86_64.AppImage"
 
-      - name: Build .deb package
+      - name: Package Linux deb
+        if: runner.os == 'Linux'
         run: |
-          VERSION=${{ steps.version.outputs.VERSION }}
+          VERSION="${{ steps.version.outputs.VERSION }}"
+
+          # Wrapper so users can run `ecrit` from PATH
+          mkdir -p pkg-bin
+          printf '#!/bin/bash\nexec /opt/ecrit/ecrit "$@"\n' > pkg-bin/ecrit
+          chmod +x pkg-bin/ecrit
+
           fpm -s dir -t deb \
-            -n ecrit \
-            -v "$VERSION" \
-            --description "A cross-platform desktop screenplay writing app" \
+            -p "ecrit_${VERSION}_amd64.deb" \
+            --name ecrit \
+            --version "${VERSION}" \
+            --architecture amd64 \
+            --description "A distraction-free writing app for novelists and screenwriters" \
             --license "GPL-3.0" \
-            --url "https://github.com/FlintWave/Ecrit" \
+            --url "https://github.com/${{ github.repository }}" \
             --maintainer "FlintWave" \
             --category editors \
             --depends libgl1 \
+            --depends libegl1 \
+            --depends libxkbcommon0 \
             --depends libdbus-1-3 \
-            dist/ecrit/=/opt/ecrit \
+            dist/ecrit/=/opt/ecrit/ \
+            pkg-bin/ecrit=/usr/bin/ecrit \
             AppDir/usr/share/applications/ecrit.desktop=/usr/share/applications/ecrit.desktop \
-            public/icon.svg=/usr/share/icons/hicolor/256x256/apps/ecrit.svg
-          mv ecrit_*.deb "ecrit_${VERSION}_amd64.deb"
+            AppDir/usr/share/icons/hicolor/256x256/apps/ecrit.png=/usr/share/icons/hicolor/256x256/apps/ecrit.png
 
-      - name: Build .rpm package
+      - name: Package Linux rpm
+        if: runner.os == 'Linux'
         run: |
-          VERSION=${{ steps.version.outputs.VERSION }}
+          VERSION="${{ steps.version.outputs.VERSION }}"
+
           fpm -s dir -t rpm \
-            -n ecrit \
-            -v "$VERSION" \
-            --description "A cross-platform desktop screenplay writing app" \
+            -p "ecrit-${VERSION}-1.x86_64.rpm" \
+            --name ecrit \
+            --version "${VERSION}" \
+            --iteration 1 \
+            --architecture x86_64 \
+            --description "A distraction-free writing app for novelists and screenwriters" \
             --license "GPL-3.0" \
-            --url "https://github.com/FlintWave/Ecrit" \
+            --url "https://github.com/${{ github.repository }}" \
             --maintainer "FlintWave" \
             --category Editors \
             --depends libGL.so.1 \
+            --depends libEGL.so.1 \
+            --depends libxkbcommon.so.0 \
             --depends libdbus-1.so.3 \
-            dist/ecrit/=/opt/ecrit \
+            dist/ecrit/=/opt/ecrit/ \
+            pkg-bin/ecrit=/usr/bin/ecrit \
             AppDir/usr/share/applications/ecrit.desktop=/usr/share/applications/ecrit.desktop \
-            public/icon.svg=/usr/share/icons/hicolor/256x256/apps/ecrit.svg
-          mv ecrit-*.rpm "ecrit-${VERSION}-1.x86_64.rpm"
+            AppDir/usr/share/icons/hicolor/256x256/apps/ecrit.png=/usr/share/icons/hicolor/256x256/apps/ecrit.png
 
-      - name: Upload AppImage
+      # ── Upload artifacts ───────────────────────────────────────────
+
+      - name: Upload Windows artifact
+        if: runner.os == 'Windows'
         uses: actions/upload-artifact@v4
         with:
-          name: linux-appimage
-          path: Ecrit-*-linux-x86_64.AppImage
+          name: release-win64
+          path: "Ecrit-${{ steps.version.outputs.VERSION }}-win64.zip"
+          if-no-files-found: error
 
-      - name: Upload deb
+      - name: Upload macOS artifact
+        if: runner.os == 'macOS'
         uses: actions/upload-artifact@v4
         with:
-          name: linux-deb
-          path: ecrit_*_amd64.deb
+          name: "release-${{ matrix.target }}"
+          path: "Ecrit-${{ steps.version.outputs.VERSION }}-${{ matrix.target }}.dmg"
+          if-no-files-found: error
 
-      - name: Upload rpm
+      - name: Upload Linux artifacts
+        if: runner.os == 'Linux'
         uses: actions/upload-artifact@v4
         with:
-          name: linux-rpm
-          path: ecrit-*-1.x86_64.rpm
+          name: release-linux
+          path: |
+            Ecrit-${{ steps.version.outputs.VERSION }}-linux-x86_64.AppImage
+            ecrit_${{ steps.version.outputs.VERSION }}_amd64.deb
+            ecrit-${{ steps.version.outputs.VERSION }}-1.x86_64.rpm
+          if-no-files-found: error
 
   release:
-    needs: [build-windows, build-macos-intel, build-macos-arm, build-linux]
+    needs: build
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
     steps:
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
           merge-multiple: true
+
+      - name: List release files
+        run: ls -lh Ecrit-* ecrit_* ecrit-*
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
