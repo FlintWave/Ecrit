@@ -292,3 +292,64 @@ class TestEditorScreen:
         es.go_home.connect(lambda: received.append(True))
         es.go_home.emit()
         assert len(received) == 1
+
+
+class TestProofreadChecks:
+    def test_trailing_whitespace_detected(self, qapp):
+        from ecrit.ui.screens.editor import ProofreadPhase
+        issues = ProofreadPhase._check_script("Hello world  \nClean line\n")
+        trailing = [i for i in issues if i["message"] == "Trailing whitespace"]
+        assert len(trailing) == 1
+        assert trailing[0]["line"] == 1
+
+    def test_double_space_detected(self, qapp):
+        from ecrit.ui.screens.editor import ProofreadPhase
+        issues = ProofreadPhase._check_script("Hello  world\n")
+        double = [i for i in issues if i["message"] == "Double space"]
+        assert len(double) == 1
+
+    def test_consecutive_blank_lines(self, qapp):
+        from ecrit.ui.screens.editor import ProofreadPhase
+        issues = ProofreadPhase._check_script("Line 1\n\n\nLine 4\n")
+        blanks = [i for i in issues if i["message"] == "Consecutive blank lines"]
+        assert len(blanks) == 1
+
+    def test_unclosed_parenthetical(self, qapp):
+        from ecrit.ui.screens.editor import ProofreadPhase
+        issues = ProofreadPhase._check_script("(whispering\nSome dialogue\n")
+        unclosed = [i for i in issues if i["message"] == "Unclosed parenthetical"]
+        assert len(unclosed) == 1
+
+
+class TestSettingsApplied:
+    def test_settings_applied_signal_emitted(self, qapp):
+        from ecrit.ui.overlays.settings import SettingsDialog
+        d = SettingsDialog()
+        received = []
+        d.settings_applied.connect(lambda s: received.append(s))
+        d.author_input.setText("Test Author")
+        d.email_input.setText("test@example.com")
+        d.close()
+        assert len(received) == 1
+        assert received[0]["author_name"] == "Test Author"
+        assert received[0]["author_email"] == "test@example.com"
+
+    def test_settings_has_font_size(self, qapp):
+        from ecrit.ui.overlays.settings import SettingsDialog
+        d = SettingsDialog()
+        received = []
+        d.settings_applied.connect(lambda s: received.append(s))
+        d.close()
+        assert len(received) == 1
+        assert "font_size" in received[0]
+        assert "word_target" in received[0]
+
+
+class TestSyncConfigBug:
+    def test_load_remote_config_returns_tuple(self):
+        from ecrit.sync.remote_sync import load_remote_config
+        result = load_remote_config("/nonexistent/path")
+        assert isinstance(result, tuple)
+        assert len(result) == 2
+        config, sync_result = result
+        assert config is None

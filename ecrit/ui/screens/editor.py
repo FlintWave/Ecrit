@@ -135,24 +135,33 @@ class ScriptEditor(QPlainTextEdit):
         cursor = self.textCursor()
         cursor.select(QTextCursor.SelectionType.BlockUnderCursor)
         line = cursor.selectedText().strip()
+        if not line:
+            return
 
-        types = [
-            ("Scene Heading", "INT. "),
-            ("Action", ""),
-            ("Character", ""),
-            ("Dialogue", ""),
-            ("Parenthetical", "("),
-            ("Transition", "CUT TO:"),
-        ]
+        prefixes = ["INT. ", "EXT. ", ""]
+        transitions = ["CUT TO:", "FADE OUT.", "SMASH CUT TO:", ""]
 
-        if line.startswith(("INT.", "EXT.")):
-            cursor.removeSelectedText()
-            cursor.insertText(line)
+        if line.startswith(("INT.", "EXT.", "INT/EXT")):
+            for i, pfx in enumerate(prefixes):
+                if line.startswith(pfx.strip()) and pfx:
+                    next_pfx = prefixes[(i + 1) % len(prefixes)]
+                    bare = line.split(".", 1)[1].strip() if "." in line else line
+                    cursor.removeSelectedText()
+                    cursor.insertText(f"{next_pfx}{bare}" if next_pfx else bare)
+                    return
         elif line.startswith("(") and line.endswith(")"):
             cursor.removeSelectedText()
             cursor.insertText(line[1:-1] if len(line) > 2 else line)
+        elif line.endswith(("TO:", "OUT.")):
+            for i, tr in enumerate(transitions):
+                if line == tr:
+                    next_tr = transitions[(i + 1) % len(transitions)]
+                    cursor.removeSelectedText()
+                    cursor.insertText(next_tr if next_tr else line)
+                    return
         else:
-            pass
+            cursor.removeSelectedText()
+            cursor.insertText(line.upper())
 
 
 class SceneNavigator(QFrame):
@@ -757,8 +766,6 @@ class ProofreadPhase(QWidget):
             if "  " in line.strip():
                 issues.append({"line": i, "message": "Double space"})
             if line.rstrip() != line:
-                pass
-            if line != line and line.endswith(" "):
                 issues.append({"line": i, "message": "Trailing whitespace"})
             stripped = line.strip()
             is_blank = not stripped

@@ -153,7 +153,11 @@ class AppState:
         (project_dir / "meta.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
         header = f"Title: {title}\nCredit: Written by\nAuthor: {author}\nDraft date: {datetime.now().strftime('%Y-%m-%d')}\n\n"
         (project_dir / "script.fountain").write_text(header, encoding="utf-8")
-        (project_dir / ".git").mkdir(exist_ok=True)
+        import subprocess
+        try:
+            subprocess.run(["git", "init", str(project_dir)], capture_output=True, timeout=10)
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            pass
         self.load_projects()
         return meta
 

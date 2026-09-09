@@ -45,6 +45,7 @@ class SettingsDialog(QDialog):
     theme_changed = Signal()
     project_folder_changed = Signal(str)
     language_changed = Signal(str)
+    settings_applied = Signal(dict)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -406,3 +407,19 @@ class SettingsDialog(QDialog):
             if self.language_combo.itemData(i) == STATE.language:
                 self.language_combo.setCurrentIndex(i)
                 break
+
+    def closeEvent(self, event):
+        try:
+            word_target = int(self.word_target.text())
+        except (ValueError, TypeError):
+            word_target = 2500
+        self.settings_applied.emit({
+            "author_name": self.author_input.text(),
+            "author_email": self.email_input.text(),
+            "font_size": self.font_size.currentData() or 15,
+            "word_target": word_target,
+            "typewriter": self.typewriter_check.isChecked(),
+            "line_numbers": self.line_numbers_check.isChecked(),
+            "auto_save": self.auto_save_check.isChecked(),
+        })
+        super().closeEvent(event)

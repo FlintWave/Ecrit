@@ -69,6 +69,7 @@ class MainWindow(QMainWindow):
         self.dashboard.open_project.connect(self._open_project)
         self.dashboard.new_project.connect(self._show_new_project)
         self.dashboard.import_script.connect(self._import_script)
+        self.dashboard.open_settings.connect(self._open_settings)
         self.stack.addWidget(self.dashboard)
 
         self.new_project_wizard = NewProjectWizard()
@@ -103,6 +104,8 @@ class MainWindow(QMainWindow):
         self._settings_dialog = SettingsDialog(self)
         self._settings_dialog.theme_changed.connect(self._apply_theme)
         self._settings_dialog.language_changed.connect(self._on_language_changed)
+        self._settings_dialog.project_folder_changed.connect(self._on_project_folder_changed)
+        self._settings_dialog.settings_applied.connect(self._on_settings_applied)
 
         self._command_palette = CommandPalette(self)
         self._command_palette.command_selected.connect(self._on_command)
@@ -127,6 +130,7 @@ class MainWindow(QMainWindow):
 
         self._sync_dialog = SyncSettingsDialog(self)
         self._sync_dialog.sync_requested.connect(self._on_sync_requested)
+        self._sync_dialog.config_changed.connect(self._on_sync_config_saved)
 
         self._cloud_export_dialog = CloudExportDialog(self)
         self._cloud_export_dialog.export_requested.connect(self._on_cloud_export)
@@ -135,6 +139,8 @@ class MainWindow(QMainWindow):
         self._share_dialog.share_created.connect(self._on_share_created)
 
         self._marketplace_dialog = MarketplaceDialog(self)
+        self._marketplace_dialog.plugin_installed.connect(self._on_plugin_installed)
+        self._marketplace_dialog.plugin_uninstalled.connect(self._on_plugin_uninstalled)
 
         self._collab_session = CollabSession(user_name=STATE.author_name or "Writer")
         self._collab_dialog = CollaborationDialog(self)
@@ -164,10 +170,14 @@ class MainWindow(QMainWindow):
         self.setStyleSheet(generate(t))
 
     def _go_dashboard(self):
+        if self.stack.currentWidget() is self.editor and STATE.current_project_path:
+            STATE.script_content = self.editor.manuscript.editor.toPlainText()
+            STATE.save_script()
         self._swap_title_bar(show_phases=False)
         self.title_bar.set_context("")
         self.stack.setCurrentWidget(self.dashboard)
         self.dashboard.refresh()
+        self._update_week_stats()
 
     def _show_new_project(self):
         self._swap_title_bar(show_phases=False)
@@ -386,7 +396,7 @@ class MainWindow(QMainWindow):
     def _show_sync_settings(self):
         if STATE.current_project_path:
             from ecrit.sync.remote_sync import load_remote_config
-            config = load_remote_config(STATE.current_project_path)
+            config, _result = load_remote_config(STATE.current_project_path)
             if config:
                 self._sync_dialog.set_config({
                     "provider": config.provider.value if hasattr(config.provider, "value") else config.provider,
@@ -483,6 +493,24 @@ class MainWindow(QMainWindow):
         if STATE.current_project_path and session.role.value == "host":
             content = self.editor.manuscript.editor.toPlainText()
             session._crdt.set_text(content)
+        session.set_callbacks(
+            on_text_change=self._on_collab_text_change,
+            on_participant_change=lambda: self._collab_dialog.update_participants(
+                len(session.participants)
+            ),
+        )
+
+    def _on_collab_text_change(self, text: str):
+        editor = self.editor.manuscript.editor
+        if editor.toPlainText() != text:
+            cursor_pos = editor.textCursor().position()
+            editor.blockSignals(True)
+            editor.setPlainText(text)
+            cursor = editor.textCursor()
+            cursor.setPosition(min(cursor_pos, len(text)))
+            editor.setTextCursor(cursor)
+            editor.blockSignals(False)
+            STATE.script_content = text
 
     def _on_collab_left(self):
         self.editor.status_bar.sprint_label.setText("")
@@ -612,6 +640,56 @@ class MainWindow(QMainWindow):
                 self.showNormal()
             else:
                 self.showMaximized()
+
+    def _on_project_folder_changed(self, folder: str):
+        STATE.project_folder = folder
+        STATE.load_projects()
+
+    def _on_settings_applied(self, settings: dict):
+        STATE.author_name = settings.get("author_name", STATE.author_name)
+        STATE.author_email = settings.get("author_email", STATE.author_email)
+        font_size = settings.get("font_size", 15)
+        self.editor.manuscript.editor.setStyleSheet(
+            f"font-family: 'Courier Prime', 'Courier New', monospace; font-size: {font_size}pt;"
+        )
+        word_target = settings.get("word_target", 2500)
+        self.editor.status_bar.update_info(target=word_target)
+
+    def _on_plugin_installed(self, plugin_id: str):
+        if hasattr(self._settings_dialog, '_module_registry') and self._settings_dialog._module_registry:
+            self._settings_dialog._refresh_modules_list()
+
+    def _on_plugin_uninstalled(self, plugin_id: str):
+        if hasattr(self._settings_dialog, '_module_registry') and self._settings_dialog._module_registry:
+            self._settings_dialog._refresh_modules_list()
+
+    def _on_sync_config_saved(self, config: dict):
+        if not STATE.current_project_path:
+            return
+        from ecrit.sync.remote_sync import (
+            RemoteConfig, RemoteProvider, save_remote_config,
+        )
+        try:
+            provider = RemoteProvider(config.get("provider", "github"))
+        except (ValueError, KeyError):
+            provider = RemoteProvider.GITHUB
+        rc = RemoteConfig(
+            provider=provider,
+            remote_url=config.get("remote_url", ""),
+            username=config.get("username", ""),
+            token=config.get("token", ""),
+            branch=config.get("branch", "main"),
+            auto_sync=config.get("auto_sync", False),
+        )
+        save_remote_config(STATE.current_project_path, rc)
+        self._sync_dialog.set_status("Config saved.")
+
+    def _update_week_stats(self):
+        stats = STATE.get_stats()
+        self.dashboard.week_stats.set_stats(
+            words=stats.get("word_count", 0),
+            pages=stats.get("page_count", 0),
+        )
 
 
 def main():
