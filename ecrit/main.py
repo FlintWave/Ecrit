@@ -24,6 +24,8 @@ from ecrit.ui.overlays.compare_drafts import CompareDrafts
 from ecrit.ui.overlays.snapshots import (
     SnapshotsDialog, list_snapshots, get_snapshot_content, create_snapshot,
 )
+from ecrit.ui.overlays.reports import ReportsDialog
+from ecrit.ui.overlays.logline_builder import LoglineBuilderDialog
 
 
 class MainWindow(QMainWindow):
@@ -96,6 +98,10 @@ class MainWindow(QMainWindow):
 
         self._snapshots_dialog = SnapshotsDialog(self)
         self._snapshots_dialog.snapshot_restored.connect(self._on_snapshot_restored)
+
+        self._reports_dialog = ReportsDialog(self)
+        self._logline_dialog = LoglineBuilderDialog(self)
+        self._logline_dialog.logline_ready.connect(self._on_logline_ready)
 
         self._cmd_palette_shortcut = QShortcut(QKeySequence("Ctrl+K"), self)
         self._cmd_palette_shortcut.activated.connect(self._show_command_palette)
@@ -189,6 +195,8 @@ class MainWindow(QMainWindow):
             "Export PDF": lambda: self._export_script("pdf"),
             "Export ODT": lambda: self._export_script("odt"),
             "Export Fountain": lambda: self._export_script("fountain"),
+            "Production Reports": self._show_reports,
+            "Logline Builder": self._show_logline_builder,
         }
         handler = handlers.get(name)
         if handler:
@@ -286,6 +294,20 @@ class MainWindow(QMainWindow):
         STATE.script_content = content
         STATE.save_script()
         self._editor_title_bar.save_dot.set_saved(True)
+
+    def _show_reports(self):
+        if self.stack.currentWidget() is not self.editor:
+            return
+        script = self.editor.manuscript.editor.toPlainText()
+        self._reports_dialog.set_script(script)
+        self._reports_dialog.exec()
+
+    def _show_logline_builder(self):
+        self._logline_dialog.exec()
+
+    def _on_logline_ready(self, logline: str):
+        if self.stack.currentWidget() is self.editor:
+            self.editor.plan.editor.append(f"\nLogline: {logline}")
 
     def _export_script(self, kind: str):
         if self.stack.currentWidget() is not self.editor:

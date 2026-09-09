@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, replace
-from typing import Iterator
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -389,15 +388,16 @@ def insert_scene_after(
 ) -> list[SceneNumber]:
     """Insert a new unlocked scene immediately after *after_index*.
 
-    The new scene receives an A-number derived from the scene it follows:
+    The new scene receives an A-number derived from the scene it follows
+    and respecting the scene that comes next:
 
     * After ``"5"`` (with ``"6"`` next): ``"5A"``
-    * After ``"5A"`` (with ``"5B"`` next): ``"5AA"``
-    * After ``"5B"`` (with ``"6"`` next): ``"5C"``
+    * After ``"5A"`` (with ``"5B"`` next): ``"5AA"``  (deeper level)
+    * After ``"5A"`` (with ``"6"`` next): ``"5B"``
 
-    If the natural candidate is already taken, the suffix is incremented
-    until a free number is found.  If all siblings at the current depth
-    are occupied, the algorithm descends one level (appends ``"A"``).
+    When no number can be found that sorts correctly between the
+    predecessor and successor (e.g. inserting between ``"5"`` and
+    ``"5A"``), the next available sibling suffix is used.
 
     The new scene's ``line_index`` is set to one past the predecessor's;
     the caller should update it to the actual script position.
@@ -410,9 +410,15 @@ def insert_scene_after(
         return list(scenes)
 
     prev = scenes[after_index]
+    next_number: str | None = None
+    if after_index + 1 < len(scenes):
+        next_number = scenes[after_index + 1].number
+
     existing_numbers = {s.number for s in scenes}
 
-    new_number = _generate_insert_number(prev.number, existing_numbers)
+    new_number = _generate_insert_number(
+        prev.number, next_number, existing_numbers
+    )
 
     new_scene = SceneNumber(
         number=new_number,
@@ -425,45 +431,73 @@ def insert_scene_after(
     return result
 
 
-def _generate_insert_number(prev_number: str, existing: set[str]) -> str:
+def _generate_insert_number(
+    prev_number: str,
+    next_number: str | None,
+    existing: set[str],
+) -> str:
     """Compute the A-number for a scene inserted after *prev_number*.
+
+    The algorithm is position-aware: it considers *next_number* (the
+    scene that currently follows the insertion point) to decide whether
+    to stay at the current suffix level or descend one level deeper.
 
     Strategy:
 
-    1. Try incrementing the suffix at the current level (``"5"`` -> ``"5A"``,
-       ``"5A"`` -> ``"5B"``).
-    2. If that candidate already exists, continue incrementing the suffix.
-    3. If 26 siblings at the current level are exhausted, descend one level
-       deeper by appending ``"A"`` to the previous suffix (``"5A"`` ->
-       ``"5AA"``), then repeat.
+    1. Try incrementing the suffix at the current level
+       (``"5"`` -> ``"5A"``, ``"5A"`` -> ``"5B"``).  Accept the
+       candidate if it is not taken *and* it sorts before
+       *next_number*.
+    2. If the candidate is taken or would overshoot *next_number*,
+       descend one level deeper by appending ``"A"`` to the current
+       suffix (``"5A"`` -> ``"5AA"``).  Accept the first free number
+       at the deeper level that sorts before *next_number*.
+    3. As a final fallback -- when *no* number sorts correctly between
+       the predecessor and successor (the degenerate case of inserting
+       between ``"5"`` and ``"5A"``) -- use the next available sibling
+       suffix regardless of sort position.  Scene numbers are reference
+       labels and the list order is canonical.
 
     This guarantees a unique number can always be found.
     """
     base, suffix = _parse_number(prev_number)
 
-    # -- try siblings at the current level ---------------------------------
+    # -- strategy 1: try siblings at the current level ---------------------
 
     candidate_suffix = _increment_suffix(suffix)
     candidate = f"{base}{candidate_suffix}"
-    if candidate not in existing:
+
+    if candidate not in existing and _fits_before(candidate, next_number):
         return candidate
 
-    # Keep trying at the same level (e.g. 5B, 5C, ... 5Z).
-    for _ in range(25):  # A..Z minus the one we already tried
+    # -- strategy 2: descend one level deeper ------------------------------
+
+    if next_number is not None:
+        deeper_suffix = suffix + "A"
+        candidate = f"{base}{deeper_suffix}"
+        # Walk the deeper level looking for a free slot that fits.
+        for _ in range(702):  # A..ZZ should be more than enough
+            if candidate not in existing and _fits_before(candidate, next_number):
+                return candidate
+            deeper_suffix = _increment_suffix(deeper_suffix)
+            candidate = f"{base}{deeper_suffix}"
+
+    # -- strategy 3: fallback to next available sibling --------------------
+
+    candidate_suffix = _increment_suffix(suffix)
+    candidate = f"{base}{candidate_suffix}"
+    while candidate in existing:
         candidate_suffix = _increment_suffix(candidate_suffix)
         candidate = f"{base}{candidate_suffix}"
-        if candidate not in existing:
-            return candidate
-
-    # -- descend one level deeper ------------------------------------------
-
-    deeper_suffix = suffix + "A"
-    candidate = f"{base}{deeper_suffix}"
-    while candidate in existing:
-        deeper_suffix = _increment_suffix(deeper_suffix)
-        candidate = f"{base}{deeper_suffix}"
 
     return candidate
+
+
+def _fits_before(candidate: str, next_number: str | None) -> bool:
+    """Return ``True`` if *candidate* sorts before *next_number*."""
+    if next_number is None:
+        return True
+    return _scene_number_sort_key(candidate) < _scene_number_sort_key(next_number)
 
 
 # ---------------------------------------------------------------------------

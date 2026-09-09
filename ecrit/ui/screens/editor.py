@@ -4,7 +4,8 @@ import json
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QFrame, QSplitter, QListWidget, QListWidgetItem,
-    QPlainTextEdit, QSizePolicy, QTextEdit, QScrollArea
+    QPlainTextEdit, QSizePolicy, QTextEdit, QScrollArea,
+    QComboBox, QMenu,
 )
 from PySide6.QtCore import Qt, Signal, QTimer
 from PySide6.QtGui import (
@@ -17,6 +18,18 @@ from ecrit.ui.components.status_bar import StatusBar
 from ecrit.ui.overlays.find_replace import FindReplaceBar
 from ecrit.ui.overlays.reading_mode import ReadingMode
 from ecrit.ui.overlays.scratchpad import Scratchpad
+
+from ecrit.screenplay.structure_templates import (
+    TEMPLATES, generate_outline_nodes, list_templates,
+)
+from ecrit.screenplay.scene_numbers import (
+    SceneNumber, assign_scene_numbers, lock_scene, unlock_scene,
+    renumber_scenes, format_scene_heading,
+)
+from ecrit.screenplay.revisions import (
+    RevisionTracker, REVISION_COLORS, get_revision_color_hex,
+)
+from ecrit.screenplay.contest_presets import CONTEST_PRESETS, validate_against_preset
 
 
 class FountainHighlighter(QSyntaxHighlighter):
@@ -143,35 +156,91 @@ class ScriptEditor(QPlainTextEdit):
 
 
 class SceneNavigator(QFrame):
-    """Left rail: scene list from parsed Fountain."""
+    """Left rail: scene list with scene number management."""
 
     scene_selected = Signal(int)
+    scenes_renumbered = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setObjectName("rail")
+        self._scene_numbers: list[SceneNumber] = []
+        self._scenes_data: list[dict] = []
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 8, 0, 0)
         layout.setSpacing(0)
 
+        header_row = QHBoxLayout()
+        header_row.setContentsMargins(12, 0, 8, 4)
         header = QLabel("SCENES")
         header.setObjectName("kicker")
-        header.setStyleSheet("padding: 8px 12px;")
-        layout.addWidget(header)
+        header_row.addWidget(header)
+        header_row.addStretch()
+
+        self.renumber_btn = QPushButton("Renumber")
+        self.renumber_btn.setObjectName("ghost")
+        self.renumber_btn.setFixedHeight(24)
+        self.renumber_btn.clicked.connect(self._renumber_all)
+        header_row.addWidget(self.renumber_btn)
+        layout.addLayout(header_row)
 
         self.scene_list = QListWidget()
         self.scene_list.currentRowChanged.connect(self.scene_selected.emit)
+        self.scene_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.scene_list.customContextMenuRequested.connect(self._show_context_menu)
         layout.addWidget(self.scene_list)
 
+    def set_script(self, script: str):
+        self._scene_numbers = assign_scene_numbers(script)
+
     def update_scenes(self, scenes: list):
+        self._scenes_data = scenes
         self.scene_list.clear()
-        for sc in scenes:
-            num = sc.get("number", str(sc.get("index", 0) + 1))
+        for i, sc in enumerate(scenes):
             heading = sc.get("heading", "")
             page = sc.get("page", 0)
-            item = QListWidgetItem(f"{num}  {heading}  {page}")
+            num_str = ""
+            lock_mark = ""
+            if i < len(self._scene_numbers):
+                sn = self._scene_numbers[i]
+                num_str = f"#{sn.number}  "
+                lock_mark = " \U0001f512" if sn.locked else ""
+            item = QListWidgetItem(f"{num_str}{heading}  p.{page}{lock_mark}")
             self.scene_list.addItem(item)
+
+    def _show_context_menu(self, pos):
+        row = self.scene_list.currentRow()
+        if row < 0 or row >= len(self._scene_numbers):
+            return
+        sn = self._scene_numbers[row]
+        menu = QMenu(self)
+        if sn.locked:
+            action = menu.addAction("Unlock Scene Number")
+            action.triggered.connect(lambda: self._toggle_lock(row, lock=False))
+        else:
+            action = menu.addAction("Lock Scene Number")
+            action.triggered.connect(lambda: self._toggle_lock(row, lock=True))
+        menu.addSeparator()
+        renumber_action = menu.addAction("Renumber All Unlocked")
+        renumber_action.triggered.connect(self._renumber_all)
+        menu.exec(self.scene_list.mapToGlobal(pos))
+
+    def _toggle_lock(self, index: int, lock: bool):
+        if lock:
+            self._scene_numbers = lock_scene(self._scene_numbers, index)
+        else:
+            self._scene_numbers = unlock_scene(self._scene_numbers, index)
+        self.update_scenes(self._scenes_data)
+
+    def _renumber_all(self):
+        if self._scene_numbers:
+            self._scene_numbers = renumber_scenes(self._scene_numbers)
+            self.update_scenes(self._scenes_data)
+            self.scenes_renumbered.emit()
+
+    def get_scene_numbers(self) -> list[SceneNumber]:
+        return list(self._scene_numbers)
 
 
 class CharacterRail(QFrame):
@@ -275,7 +344,7 @@ class PlanPhase(QWidget):
 
 
 class OutlinePhase(QWidget):
-    """Outline phase: node graph placeholder (full graph requires canvas)."""
+    """Outline phase: node graph with structure template support."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -302,6 +371,14 @@ class OutlinePhase(QWidget):
         toolbar.addWidget(layout_v)
 
         toolbar.addStretch()
+
+        self.template_combo = QComboBox()
+        self.template_combo.addItem("— Structure Template —", "")
+        for key, display_name in list_templates():
+            self.template_combo.addItem(display_name, key)
+        self.template_combo.setFixedHeight(30)
+        self.template_combo.currentIndexChanged.connect(self._on_template_selected)
+        toolbar.addWidget(self.template_combo)
 
         add_btn = QPushButton("+ Add node")
         add_btn.setObjectName("primary")
@@ -332,6 +409,23 @@ class OutlinePhase(QWidget):
         info.setStyleSheet(f"color: {theme.current().neutral_500}; font-size: 12px;")
         zoom_bar.addWidget(info)
         layout.addLayout(zoom_bar)
+
+    def _on_template_selected(self, index: int):
+        key = self.template_combo.itemData(index)
+        if not key:
+            return
+        tpl = TEMPLATES.get(key)
+        if tpl:
+            nodes = generate_outline_nodes(tpl)
+            self.canvas.set_nodes(nodes)
+        self.template_combo.setCurrentIndex(0)
+
+    def apply_template(self, key: str):
+        """Programmatically apply a structure template by key."""
+        tpl = TEMPLATES.get(key)
+        if tpl:
+            nodes = generate_outline_nodes(tpl)
+            self.canvas.set_nodes(nodes)
 
 
 class OutlineCanvas(QWidget):
@@ -564,7 +658,7 @@ class ProofreadPhase(QWidget):
 
 
 class DeliverPhase(QWidget):
-    """Deliver phase: print preview + export rail."""
+    """Deliver phase: print preview + export rail with revision tracking and contest validation."""
 
     export_pdf_requested = Signal()
     export_odt_requested = Signal()
@@ -572,6 +666,8 @@ class DeliverPhase(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        self._revision_tracker = RevisionTracker()
+
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
 
@@ -614,12 +710,15 @@ class DeliverPhase(QWidget):
         divider.setFixedWidth(1)
         layout.addWidget(divider)
 
-        rail = QFrame()
-        rail.setObjectName("rail")
-        rail.setFixedWidth(360)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFixedWidth(360)
+        scroll.setObjectName("rail")
+
+        rail = QWidget()
         rail_layout = QVBoxLayout(rail)
         rail_layout.setContentsMargins(16, 16, 16, 16)
-        rail_layout.setSpacing(16)
+        rail_layout.setSpacing(12)
 
         export_title = QLabel("EXPORT")
         export_title.setObjectName("kicker")
@@ -643,6 +742,53 @@ class DeliverPhase(QWidget):
             row.addLayout(seg)
             rail_layout.addLayout(row)
 
+        rev_section = QLabel("REVISIONS")
+        rev_section.setObjectName("kicker")
+        rail_layout.addWidget(rev_section)
+
+        self.revision_color_label = QLabel("Current: White")
+        self.revision_color_label.setStyleSheet("font-size: 13px;")
+        rail_layout.addWidget(self.revision_color_label)
+
+        self.revision_color_swatch = QLabel()
+        self.revision_color_swatch.setFixedSize(120, 20)
+        self._update_revision_swatch()
+        rail_layout.addWidget(self.revision_color_swatch)
+
+        rev_btn_row = QHBoxLayout()
+        self.new_revision_btn = QPushButton("New Revision")
+        self.new_revision_btn.setObjectName("secondary")
+        self.new_revision_btn.setFixedHeight(30)
+        self.new_revision_btn.clicked.connect(self._add_revision)
+        rev_btn_row.addWidget(self.new_revision_btn)
+        rail_layout.addLayout(rev_btn_row)
+
+        self.revision_history_label = QLabel("No revisions yet")
+        self.revision_history_label.setStyleSheet(
+            f"color: {theme.current().neutral_500}; font-size: 12px;"
+        )
+        self.revision_history_label.setWordWrap(True)
+        rail_layout.addWidget(self.revision_history_label)
+
+        contest_section = QLabel("CONTEST VALIDATION")
+        contest_section.setObjectName("kicker")
+        rail_layout.addWidget(contest_section)
+
+        self.contest_combo = QComboBox()
+        self.contest_combo.addItem("-- Select contest --", "")
+        for key, preset in CONTEST_PRESETS.items():
+            self.contest_combo.addItem(preset.name, key)
+        self.contest_combo.setFixedHeight(30)
+        self.contest_combo.currentIndexChanged.connect(self._on_contest_selected)
+        rail_layout.addWidget(self.contest_combo)
+
+        self.contest_result_label = QLabel()
+        self.contest_result_label.setWordWrap(True)
+        self.contest_result_label.setStyleSheet(
+            f"color: {theme.current().neutral_500}; font-size: 12px;"
+        )
+        rail_layout.addWidget(self.contest_result_label)
+
         rail_layout.addStretch()
 
         export_btn = QPushButton("Export PDF")
@@ -663,7 +809,55 @@ class DeliverPhase(QWidget):
         fountain_btn.clicked.connect(self.export_fountain_requested.emit)
         rail_layout.addWidget(fountain_btn)
 
-        layout.addWidget(rail)
+        scroll.setWidget(rail)
+        layout.addWidget(scroll)
+
+    def set_script(self, script: str):
+        self._script = script
+
+    def _update_revision_swatch(self):
+        color_name = self._revision_tracker.current_revision().color
+        hex_color = get_revision_color_hex(color_name)
+        self.revision_color_swatch.setStyleSheet(
+            f"background: {hex_color}; border-radius: 4px; border: 1px solid {theme.current().neutral_700};"
+        )
+        self.revision_color_label.setText(f"Current: {color_name}")
+
+    def _add_revision(self):
+        try:
+            self._revision_tracker.add_revision(pages_changed=[])
+            self._update_revision_swatch()
+            history = self._revision_tracker.get_revision_header()
+            self.revision_history_label.setText(history)
+        except IndexError:
+            self.revision_history_label.setText("All revision colors exhausted.")
+
+    def _on_contest_selected(self, index: int):
+        key = self.contest_combo.itemData(index)
+        if not key:
+            self.contest_result_label.setText("")
+            return
+        script = getattr(self, "_script", "")
+        try:
+            warnings = validate_against_preset(script, key)
+        except KeyError:
+            self.contest_result_label.setText("Unknown contest preset.")
+            return
+        if not warnings:
+            self.contest_result_label.setText("✅ All checks passed!")
+        else:
+            lines = [f"⚠️ {w}" for w in warnings]
+            self.contest_result_label.setText("\n".join(lines))
+
+    def get_revision_tracker(self) -> RevisionTracker:
+        return self._revision_tracker
+
+    def set_revision_tracker(self, tracker: RevisionTracker):
+        self._revision_tracker = tracker
+        self._update_revision_swatch()
+        revisions = tracker.get_revision_history()
+        if len(revisions) > 1:
+            self.revision_history_label.setText(tracker.get_revision_header())
 
 
 class EditorScreen(QWidget):
@@ -781,6 +975,9 @@ class EditorScreen(QWidget):
     def load_project(self, project_data: dict):
         script = project_data.get("script", "")
         self.manuscript.editor.setPlainText(script)
+
+        self.manuscript.scene_nav.set_script(script)
+        self.deliver.set_script(script)
 
         try:
             import ecrit_core

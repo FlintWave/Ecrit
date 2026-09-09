@@ -34,6 +34,8 @@ COMMANDS = [
     ("Export PDF", "export", "Export script as PDF"),
     ("Export ODT", "export", "Export script as ODT"),
     ("Export Fountain", "export", "Export as .fountain file"),
+    ("Production Reports", "tool", "Generate scene, cast, location reports"),
+    ("Logline Builder", "tool", "Build a logline from templates"),
 ]
 
 

@@ -1,9 +1,9 @@
-"""Settings dialog — General, Editor, Theme, About tabs."""
+"""Settings dialog — General, Editor, Theme, About, Modules tabs."""
 
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QLineEdit, QCheckBox, QComboBox, QTabWidget, QWidget,
-    QFrame, QFileDialog
+    QFrame, QFileDialog, QListWidget, QListWidgetItem
 )
 from PySide6.QtCore import Qt, Signal
 
@@ -162,6 +162,89 @@ class SettingsDialog(QDialog):
         a_layout.addStretch()
         tabs.addTab(about, "About")
 
+        # Modules tab
+        modules_tab = QWidget()
+        m_layout = QVBoxLayout(modules_tab)
+        m_layout.setContentsMargins(20, 16, 20, 16)
+        m_layout.setSpacing(12)
+
+        m_layout.addWidget(QLabel("Loaded Modules"))
+
+        self.modules_list = QListWidget()
+        self.modules_list.setFixedHeight(140)
+        self.modules_list.currentRowChanged.connect(self._on_module_selected)
+        m_layout.addWidget(self.modules_list)
+
+        mod_btn_row = QHBoxLayout()
+        self.toggle_module_btn = QPushButton("Enable/Disable")
+        self.toggle_module_btn.setObjectName("secondary")
+        self.toggle_module_btn.setFixedHeight(34)
+        self.toggle_module_btn.setEnabled(False)
+        self.toggle_module_btn.clicked.connect(self._toggle_module)
+        mod_btn_row.addWidget(self.toggle_module_btn)
+
+        self.scan_dir_btn = QPushButton("Scan Directory")
+        self.scan_dir_btn.setObjectName("secondary")
+        self.scan_dir_btn.setFixedHeight(34)
+        self.scan_dir_btn.clicked.connect(self._scan_modules_directory)
+        mod_btn_row.addWidget(self.scan_dir_btn)
+        mod_btn_row.addStretch()
+        m_layout.addLayout(mod_btn_row)
+
+        details_label = QLabel("Module Details")
+        details_label.setStyleSheet("font-weight: 500; margin-top: 4px;")
+        m_layout.addWidget(details_label)
+
+        details_frame = QFrame()
+        details_frame.setStyleSheet(
+            f"QFrame {{ background: {t.neutral_100}; border-radius: 6px; "
+            f"padding: 10px; }}"
+        )
+        d_layout = QVBoxLayout(details_frame)
+        d_layout.setContentsMargins(10, 8, 10, 8)
+        d_layout.setSpacing(4)
+
+        self.mod_detail_name = QLabel("—")
+        self.mod_detail_name.setStyleSheet("font-weight: 500; font-size: 14px;")
+        d_layout.addWidget(self.mod_detail_name)
+
+        self.mod_detail_version = QLabel("")
+        self.mod_detail_version.setStyleSheet(f"color: {t.neutral_500}; font-size: 12px;")
+        d_layout.addWidget(self.mod_detail_version)
+
+        self.mod_detail_author = QLabel("")
+        self.mod_detail_author.setStyleSheet(f"color: {t.neutral_500}; font-size: 12px;")
+        d_layout.addWidget(self.mod_detail_author)
+
+        self.mod_detail_desc = QLabel("")
+        self.mod_detail_desc.setWordWrap(True)
+        self.mod_detail_desc.setStyleSheet("font-size: 13px;")
+        d_layout.addWidget(self.mod_detail_desc)
+
+        self.mod_detail_type = QLabel("")
+        self.mod_detail_type.setStyleSheet(f"color: {t.neutral_500}; font-size: 12px;")
+        d_layout.addWidget(self.mod_detail_type)
+
+        self.mod_detail_path = QLabel("")
+        self.mod_detail_path.setWordWrap(True)
+        self.mod_detail_path.setStyleSheet(
+            f"font-family: ui-monospace, Menlo, monospace; font-size: 11px; "
+            f"color: {t.neutral_500};"
+        )
+        d_layout.addWidget(self.mod_detail_path)
+
+        self.mod_detail_error = QLabel("")
+        self.mod_detail_error.setWordWrap(True)
+        self.mod_detail_error.setStyleSheet("color: #c0392b; font-size: 12px;")
+        self.mod_detail_error.setVisible(False)
+        d_layout.addWidget(self.mod_detail_error)
+
+        m_layout.addWidget(details_frame)
+        m_layout.addStretch()
+        tabs.addTab(modules_tab, "Modules")
+
+        self._module_registry = None
+
         layout.addWidget(tabs, 1)
 
     def _browse_folder(self):
@@ -177,6 +260,88 @@ class SettingsDialog(QDialog):
         else:
             set_theme(ORGANIC)
         self.theme_changed.emit()
+
+    def set_registry(self, registry):
+        """Connect a ModuleRegistry instance to the Modules tab."""
+        from ecrit.screenplay.module_system import ModuleRegistry
+        self._module_registry = registry
+        self._refresh_modules_list()
+
+    def _refresh_modules_list(self):
+        self.modules_list.clear()
+        self._clear_module_details()
+        self.toggle_module_btn.setEnabled(False)
+        if not self._module_registry:
+            return
+        for mod in self._module_registry.list_modules():
+            status = "Enabled" if mod.enabled else "Disabled"
+            text = f"{mod.manifest.name}  v{mod.manifest.version}  [{mod.manifest.module_type}]  ({status})"
+            item = QListWidgetItem(text)
+            item.setData(Qt.UserRole, mod.manifest.name)
+            self.modules_list.addItem(item)
+
+    def _on_module_selected(self, row):
+        if row < 0 or not self._module_registry:
+            self.toggle_module_btn.setEnabled(False)
+            self._clear_module_details()
+            return
+        item = self.modules_list.item(row)
+        if not item:
+            return
+        name = item.data(Qt.UserRole)
+        mod = self._module_registry.get_module(name)
+        if not mod:
+            return
+        self.toggle_module_btn.setEnabled(True)
+        self.toggle_module_btn.setText("Disable" if mod.enabled else "Enable")
+        self.mod_detail_name.setText(mod.manifest.name)
+        self.mod_detail_version.setText(f"Version: {mod.manifest.version}")
+        self.mod_detail_author.setText(f"Author: {mod.manifest.author}" if mod.manifest.author else "")
+        self.mod_detail_desc.setText(mod.manifest.description if mod.manifest.description else "No description.")
+        self.mod_detail_type.setText(f"Type: {mod.manifest.module_type}")
+        self.mod_detail_path.setText(f"Path: {mod.path}")
+        if mod.error:
+            self.mod_detail_error.setText(f"Error: {mod.error}")
+            self.mod_detail_error.setVisible(True)
+        else:
+            self.mod_detail_error.setVisible(False)
+
+    def _clear_module_details(self):
+        self.mod_detail_name.setText("—")
+        self.mod_detail_version.setText("")
+        self.mod_detail_author.setText("")
+        self.mod_detail_desc.setText("")
+        self.mod_detail_type.setText("")
+        self.mod_detail_path.setText("")
+        self.mod_detail_error.setVisible(False)
+
+    def _toggle_module(self):
+        if not self._module_registry:
+            return
+        item = self.modules_list.currentItem()
+        if not item:
+            return
+        name = item.data(Qt.UserRole)
+        mod = self._module_registry.get_module(name)
+        if not mod:
+            return
+        if mod.enabled:
+            self._module_registry.disable_module(name)
+        else:
+            self._module_registry.enable_module(name)
+        current_row = self.modules_list.currentRow()
+        self._refresh_modules_list()
+        if current_row < self.modules_list.count():
+            self.modules_list.setCurrentRow(current_row)
+
+    def _scan_modules_directory(self):
+        if not self._module_registry:
+            return
+        folder = QFileDialog.getExistingDirectory(self, "Select Modules Directory")
+        if folder:
+            self._module_registry.scan_directory(folder)
+            self._module_registry.load_all(folder)
+            self._refresh_modules_list()
 
     def load_state(self):
         from ecrit.stores.app_state import STATE
