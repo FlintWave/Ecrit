@@ -26,6 +26,12 @@ from ecrit.ui.overlays.snapshots import (
 )
 from ecrit.ui.overlays.reports import ReportsDialog
 from ecrit.ui.overlays.logline_builder import LoglineBuilderDialog
+from ecrit.ui.overlays.series_panel import SeriesPanel
+from ecrit.ui.overlays.sync_settings import SyncSettingsDialog
+from ecrit.ui.overlays.cloud_export import CloudExportDialog
+from ecrit.ui.overlays.share_review import ShareReviewDialog
+from ecrit.screenplay.series_projects import SeriesProject
+from ecrit.export.share_review import generate_review_html, generate_share_link, list_shares
 
 
 class MainWindow(QMainWindow):
@@ -102,6 +108,18 @@ class MainWindow(QMainWindow):
         self._reports_dialog = ReportsDialog(self)
         self._logline_dialog = LoglineBuilderDialog(self)
         self._logline_dialog.logline_ready.connect(self._on_logline_ready)
+
+        self._series_panel = SeriesPanel(self)
+        self._series_panel.episode_selected.connect(self._on_episode_selected)
+
+        self._sync_dialog = SyncSettingsDialog(self)
+        self._sync_dialog.sync_requested.connect(self._on_sync_requested)
+
+        self._cloud_export_dialog = CloudExportDialog(self)
+        self._cloud_export_dialog.export_requested.connect(self._on_cloud_export)
+
+        self._share_dialog = ShareReviewDialog(self)
+        self._share_dialog.share_created.connect(self._on_share_created)
 
         self._cmd_palette_shortcut = QShortcut(QKeySequence("Ctrl+K"), self)
         self._cmd_palette_shortcut.activated.connect(self._show_command_palette)
@@ -197,6 +215,10 @@ class MainWindow(QMainWindow):
             "Export Fountain": lambda: self._export_script("fountain"),
             "Production Reports": self._show_reports,
             "Logline Builder": self._show_logline_builder,
+            "Series Manager": self._show_series_manager,
+            "Remote Sync": self._show_sync_settings,
+            "Cloud Export": self._show_cloud_export,
+            "Share for Review": self._show_share_review,
         }
         handler = handlers.get(name)
         if handler:
@@ -308,6 +330,96 @@ class MainWindow(QMainWindow):
     def _on_logline_ready(self, logline: str):
         if self.stack.currentWidget() is self.editor:
             self.editor.plan.editor.append(f"\nLogline: {logline}")
+
+    def _show_series_manager(self):
+        if not hasattr(self, "_series_project") or self._series_project is None:
+            self._series_project = SeriesProject(title="Untitled Series")
+            self._series_project.add_season("Season 1")
+        self._series_panel.set_project(self._series_project)
+        self._series_panel.exec()
+
+    def _on_episode_selected(self, season: int, episode: int):
+        pass
+
+    def _show_sync_settings(self):
+        if STATE.current_project_path:
+            from ecrit.sync.remote_sync import load_remote_config
+            config = load_remote_config(STATE.current_project_path)
+            if config:
+                self._sync_dialog.set_config({
+                    "provider": config.provider.value if hasattr(config.provider, "value") else config.provider,
+                    "remote_url": config.remote_url,
+                    "username": config.username,
+                    "branch": config.branch,
+                    "auto_sync": config.auto_sync,
+                })
+        self._sync_dialog.exec()
+
+    def _on_sync_requested(self, action: str):
+        if not STATE.current_project_path:
+            return
+        config_dict = self._sync_dialog.get_config()
+        from ecrit.sync.remote_sync import (
+            RemoteConfig, RemoteProvider, push_to_remote, pull_from_remote,
+            save_remote_config,
+        )
+        try:
+            provider = RemoteProvider(config_dict["provider"])
+        except (ValueError, KeyError):
+            provider = RemoteProvider.GITHUB
+        config = RemoteConfig(
+            provider=provider,
+            remote_url=config_dict.get("remote_url", ""),
+            username=config_dict.get("username", ""),
+            token=config_dict.get("token", ""),
+            branch=config_dict.get("branch", "main"),
+            auto_sync=config_dict.get("auto_sync", False),
+        )
+        save_remote_config(STATE.current_project_path, config)
+        if action == "push":
+            result = push_to_remote(STATE.current_project_path, config)
+        else:
+            result = pull_from_remote(STATE.current_project_path, config)
+        self._sync_dialog.set_status(f"{result.status.value}: {result.message}")
+
+    def _show_cloud_export(self):
+        self._cloud_export_dialog.exec()
+
+    def _on_cloud_export(self, provider: str, fmt: str):
+        if self.stack.currentWidget() is not self.editor:
+            return
+        content = self.editor.manuscript.editor.toPlainText()
+        title = self._editor_title_bar.context_label.text() or "Untitled"
+        from ecrit.sync.cloud_export import export_script, CloudProvider
+        try:
+            cp = CloudProvider(provider)
+        except (ValueError, KeyError):
+            return
+        if STATE.current_project_path:
+            result = export_script(STATE.current_project_path, cp, content, f"{title}.{fmt}", fmt)
+            self._cloud_export_dialog.add_history_entry(
+                f"{'✅' if result.success else '❌'} {result.message}"
+            )
+
+    def _show_share_review(self):
+        if STATE.current_project_path:
+            shares = list_shares(STATE.current_project_path)
+            self._share_dialog.set_shares(shares)
+        self._share_dialog.exec()
+
+    def _on_share_created(self, watermark: str):
+        if self.stack.currentWidget() is not self.editor or not STATE.current_project_path:
+            return
+        content = self.editor.manuscript.editor.toPlainText()
+        title = self._editor_title_bar.context_label.text() or "Untitled"
+        html = generate_review_html(content, title, author="", watermark_text=watermark)
+        path = generate_share_link(html, STATE.current_project_path)
+        import datetime
+        self._share_dialog.add_share({
+            "title": title,
+            "created": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
+            "path": path,
+        })
 
     def _export_script(self, kind: str):
         if self.stack.currentWidget() is not self.editor:

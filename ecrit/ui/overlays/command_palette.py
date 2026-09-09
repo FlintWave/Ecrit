@@ -36,6 +36,10 @@ COMMANDS = [
     ("Export Fountain", "export", "Export as .fountain file"),
     ("Production Reports", "tool", "Generate scene, cast, location reports"),
     ("Logline Builder", "tool", "Build a logline from templates"),
+    ("Series Manager", "tool", "Manage episodes, seasons, and series bible"),
+    ("Remote Sync", "tool", "Sync project to GitHub/GitLab/Codeberg"),
+    ("Cloud Export", "export", "Export to Google Drive, Dropbox, etc."),
+    ("Share for Review", "export", "Generate watermarked review link"),
 ]
 
 
