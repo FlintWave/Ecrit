@@ -9,12 +9,14 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, Signal, QTimer
 from PySide6.QtGui import (
     QFont, QTextCharFormat, QColor, QSyntaxHighlighter,
-    QTextDocument, QTextCursor, QPainter, QPen
+    QTextDocument, QTextCursor, QPainter, QPen, QKeySequence, QShortcut
 )
 
 from ecrit.ui.styles import theme
 from ecrit.ui.components.status_bar import StatusBar
 from ecrit.ui.overlays.find_replace import FindReplaceBar
+from ecrit.ui.overlays.reading_mode import ReadingMode
+from ecrit.ui.overlays.scratchpad import Scratchpad
 
 
 class FountainHighlighter(QSyntaxHighlighter):
@@ -72,6 +74,7 @@ class ScriptEditor(QPlainTextEdit):
     """Courier Prime script editor with typewriter scrolling."""
 
     content_changed = Signal()
+    text_cut = Signal(str)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -110,6 +113,9 @@ class ScriptEditor(QPlainTextEdit):
         if event.key() == Qt.Key.Key_Tab:
             self._cycle_element_type()
             return
+        if event.matches(QKeySequence.StandardKey.Cut) and self.textCursor().hasSelection():
+            cut_text = self.textCursor().selectedText().replace(' ', '\n')
+            self.text_cut.emit(cut_text)
         super().keyPressEvent(event)
 
     def _cycle_element_type(self):
@@ -171,9 +177,12 @@ class SceneNavigator(QFrame):
 class CharacterRail(QFrame):
     """Right rail: character list."""
 
+    character_activated = Signal(dict)
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setObjectName("rail")
+        self._characters = []
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 8, 0, 0)
@@ -186,15 +195,22 @@ class CharacterRail(QFrame):
         layout.addLayout(top)
 
         self.char_list = QListWidget()
+        self.char_list.itemDoubleClicked.connect(self._on_activate)
         layout.addWidget(self.char_list)
 
     def update_characters(self, characters: list):
+        self._characters = characters
         self.char_list.clear()
         for ch in characters:
             name = ch.get("name", "")
             lines = ch.get("line_count", 0)
             item = QListWidgetItem(f"{name}  ({lines} lines)")
             self.char_list.addItem(item)
+
+    def _on_activate(self, item):
+        row = self.char_list.row(item)
+        if 0 <= row < len(self._characters):
+            self.character_activated.emit(self._characters[row])
 
 
 class PlanPhase(QWidget):
@@ -550,6 +566,10 @@ class ProofreadPhase(QWidget):
 class DeliverPhase(QWidget):
     """Deliver phase: print preview + export rail."""
 
+    export_pdf_requested = Signal()
+    export_odt_requested = Signal()
+    export_fountain_requested = Signal()
+
     def __init__(self, parent=None):
         super().__init__(parent)
         layout = QHBoxLayout(self)
@@ -628,16 +648,19 @@ class DeliverPhase(QWidget):
         export_btn = QPushButton("Export PDF")
         export_btn.setObjectName("primary")
         export_btn.setFixedHeight(40)
+        export_btn.clicked.connect(self.export_pdf_requested.emit)
         rail_layout.addWidget(export_btn)
 
         odt_btn = QPushButton("Export ODT")
         odt_btn.setObjectName("secondary")
         odt_btn.setFixedHeight(36)
+        odt_btn.clicked.connect(self.export_odt_requested.emit)
         rail_layout.addWidget(odt_btn)
 
         fountain_btn = QPushButton("Fountain (.fountain)")
         fountain_btn.setObjectName("secondary")
         fountain_btn.setFixedHeight(36)
+        fountain_btn.clicked.connect(self.export_fountain_requested.emit)
         rail_layout.addWidget(fountain_btn)
 
         layout.addWidget(rail)
@@ -647,10 +670,17 @@ class EditorScreen(QWidget):
     """Main editor with phase switching."""
 
     go_home = Signal()
+    sprint_clicked = Signal()
+    theme_toggle_requested = Signal()
+    character_activated = Signal(dict)
+    export_pdf_requested = Signal()
+    export_odt_requested = Signal()
+    export_fountain_requested = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self._current_phase = "Manuscript"
+        self._total_pages = 1
         self._build_ui()
 
     def _build_ui(self):
@@ -670,6 +700,11 @@ class EditorScreen(QWidget):
         self.manuscript = ManuscriptPhase()
         self.proofread = ProofreadPhase()
         self.deliver = DeliverPhase()
+        self.deliver.export_pdf_requested.connect(self.export_pdf_requested.emit)
+        self.deliver.export_odt_requested.connect(self.export_odt_requested.emit)
+        self.deliver.export_fountain_requested.connect(self.export_fountain_requested.emit)
+
+        self.manuscript.char_rail.character_activated.connect(self.character_activated.emit)
 
         self.phases = {
             "Plan": self.plan,
@@ -679,26 +714,69 @@ class EditorScreen(QWidget):
             "Deliver": self.deliver,
         }
 
+        self.reading_mode = ReadingMode()
+        self.reading_mode.exit_requested.connect(self.exit_reading_mode)
+
         self.phase_stack = QWidget()
         self.phase_layout = QVBoxLayout(self.phase_stack)
         self.phase_layout.setContentsMargins(0, 0, 0, 0)
         for phase_widget in self.phases.values():
             self.phase_layout.addWidget(phase_widget)
             phase_widget.hide()
+        self.phase_layout.addWidget(self.reading_mode)
+        self.reading_mode.hide()
         self.manuscript.show()
 
-        layout.addWidget(self.phase_stack, 1)
+        self.scratchpad = Scratchpad()
+        self.scratchpad.closed.connect(self.scratchpad.hide)
+        self.scratchpad.paste_requested.connect(self._on_scratchpad_paste)
+        self.scratchpad.hide()
+
+        content_row = QHBoxLayout()
+        content_row.setContentsMargins(0, 0, 0, 0)
+        content_row.setSpacing(0)
+        content_row.addWidget(self.phase_stack, 1)
+        content_row.addWidget(self.scratchpad)
+        layout.addLayout(content_row, 1)
 
         self.status_bar = StatusBar()
         self.status_bar.home_clicked.connect(self.go_home.emit)
-        self.status_bar.theme_clicked.connect(self._toggle_theme)
+        self.status_bar.theme_clicked.connect(self.theme_toggle_requested.emit)
         self.status_bar.find_clicked.connect(self._toggle_find)
+        self.status_bar.reading_mode_clicked.connect(self.enter_reading_mode)
+        self.status_bar.sprint_clicked.connect(self.sprint_clicked.emit)
         layout.addWidget(self.status_bar)
+
+        self._scratchpad_shortcut = QShortcut(QKeySequence("Ctrl+Shift+X"), self)
+        self._scratchpad_shortcut.activated.connect(self.toggle_scratchpad)
+        self.manuscript.editor.text_cut.connect(self.scratchpad.add_text)
 
     def switch_phase(self, phase: str):
         self._current_phase = phase
+        self.reading_mode.hide()
         for name, widget in self.phases.items():
             widget.setVisible(name == phase)
+
+    def enter_reading_mode(self):
+        text = self.manuscript.editor.toPlainText()
+        self.reading_mode.set_content(text, page=1, total_pages=self._total_pages)
+        for widget in self.phases.values():
+            widget.hide()
+        self.reading_mode.show()
+        self.reading_mode.setFocus()
+
+    def exit_reading_mode(self):
+        self.reading_mode.hide()
+        for name, widget in self.phases.items():
+            widget.setVisible(name == self._current_phase)
+
+    def toggle_scratchpad(self):
+        self.scratchpad.setVisible(not self.scratchpad.isVisible())
+
+    def _on_scratchpad_paste(self, text: str):
+        cursor = self.manuscript.editor.textCursor()
+        cursor.insertText(text)
+        self.manuscript.editor.setFocus()
 
     def load_project(self, project_data: dict):
         script = project_data.get("script", "")
@@ -709,6 +787,7 @@ class EditorScreen(QWidget):
             stats = json.loads(ecrit_core.get_script_stats(script))
             scenes = stats.get("scenes", [])
             characters = stats.get("characters", [])
+            self._total_pages = stats.get("page_count", 1)
             self.manuscript.scene_nav.update_scenes(scenes)
             self.manuscript.char_rail.update_characters(characters)
             self.status_bar.update_info(
@@ -774,7 +853,3 @@ class EditorScreen(QWidget):
             new_content = content.replace(find_text, replace_text)
             editor.setPlainText(new_content)
             self.find_bar.set_match_count(0, 0)
-
-    def _toggle_theme(self):
-        from ecrit.ui.styles import theme
-        theme.toggle()

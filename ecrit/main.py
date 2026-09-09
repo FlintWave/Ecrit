@@ -2,7 +2,8 @@
 
 import sys
 from PySide6.QtWidgets import QApplication, QMainWindow, QStackedWidget, QVBoxLayout, QWidget
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
+from PySide6.QtGui import QShortcut, QKeySequence
 
 from ecrit.ui.styles import theme
 from ecrit.ui.styles.stylesheet import generate
@@ -14,6 +15,15 @@ from ecrit.stores.app_state import STATE
 from ecrit.ui.overlays.statistics import StatsDialog
 from ecrit.ui.overlays.shortcuts import ShortcutsDialog
 from ecrit.ui.overlays.settings import SettingsDialog
+from ecrit.ui.overlays.command_palette import CommandPalette
+from ecrit.ui.overlays.sprint_timer import SprintTimerWidget
+from ecrit.ui.overlays.reading_mode import ReadingMode
+from ecrit.ui.overlays.scratchpad import Scratchpad
+from ecrit.ui.overlays.character_sheet import CharacterSheet
+from ecrit.ui.overlays.compare_drafts import CompareDrafts
+from ecrit.ui.overlays.snapshots import (
+    SnapshotsDialog, list_snapshots, get_snapshot_content, create_snapshot,
+)
 
 
 class MainWindow(QMainWindow):
@@ -33,6 +43,7 @@ class MainWindow(QMainWindow):
         self.title_bar = TitleBar(show_phases=False)
         self.title_bar.settings_clicked.connect(self._open_settings)
         self.title_bar.home_clicked.connect(self._go_dashboard)
+        self.title_bar.cmd_chip.clicked.connect(self._show_command_palette)
         root.addWidget(self.title_bar)
 
         self.stack = QStackedWidget()
@@ -53,17 +64,46 @@ class MainWindow(QMainWindow):
         self.editor.go_home.connect(self._go_dashboard)
         self.editor.status_bar.stats_clicked.connect(self._show_stats)
         self.editor.status_bar.shortcuts_clicked.connect(self._show_shortcuts)
+        self.editor.sprint_clicked.connect(self._show_sprint_timer)
+        self.editor.theme_toggle_requested.connect(self._toggle_theme)
+        self.editor.character_activated.connect(self._open_character_sheet)
+        self.editor.export_pdf_requested.connect(lambda: self._export_script("pdf"))
+        self.editor.export_odt_requested.connect(lambda: self._export_script("odt"))
+        self.editor.export_fountain_requested.connect(lambda: self._export_script("fountain"))
         self.stack.addWidget(self.editor)
 
         self._editor_title_bar = TitleBar(show_phases=True)
         self._editor_title_bar.settings_clicked.connect(self._open_settings)
         self._editor_title_bar.home_clicked.connect(self._go_dashboard)
         self._editor_title_bar.phase_changed.connect(self._on_phase_changed)
+        self._editor_title_bar.cmd_chip.clicked.connect(self._show_command_palette)
 
         self._stats_dialog = StatsDialog(self)
         self._shortcuts_dialog = ShortcutsDialog(self)
         self._settings_dialog = SettingsDialog(self)
         self._settings_dialog.theme_changed.connect(self._apply_theme)
+
+        self._command_palette = CommandPalette(self)
+        self._command_palette.command_selected.connect(self._on_command)
+
+        self._sprint_timer = SprintTimerWidget(self)
+        self._sprint_timer.sprint_ended.connect(self._on_sprint_ended)
+
+        self._character_sheet = CharacterSheet(self)
+        self._character_sheet.character_saved.connect(self._on_character_saved)
+
+        self._compare_drafts = CompareDrafts(self)
+
+        self._snapshots_dialog = SnapshotsDialog(self)
+        self._snapshots_dialog.snapshot_restored.connect(self._on_snapshot_restored)
+
+        self._cmd_palette_shortcut = QShortcut(QKeySequence("Ctrl+K"), self)
+        self._cmd_palette_shortcut.activated.connect(self._show_command_palette)
+
+        self._sprint_status_timer = QTimer(self)
+        self._sprint_status_timer.setInterval(1000)
+        self._sprint_status_timer.timeout.connect(self._update_sprint_label)
+        self._sprint_status_timer.start()
 
         self._apply_theme()
         self._go_dashboard()
@@ -123,6 +163,144 @@ class MainWindow(QMainWindow):
 
     def _show_shortcuts(self):
         self._shortcuts_dialog.exec()
+
+    def _on_command(self, name: str):
+        phases = {"Plan", "Outline", "Manuscript", "Proofread", "Deliver"}
+        if name in phases:
+            self._switch_phase(name)
+            return
+
+        handlers = {
+            "Dashboard": self._go_dashboard,
+            "New Project": self._show_new_project,
+            "Import Script": self._import_script,
+            "Open Project": self._go_dashboard,
+            "Save": self._save_script,
+            "Find & Replace": self.editor._toggle_find,
+            "Statistics": self._show_stats,
+            "Keyboard Shortcuts": self._show_shortcuts,
+            "Settings": self._open_settings,
+            "Toggle Theme": self._toggle_theme,
+            "Reading Mode": self._enter_reading_mode,
+            "Sprint Timer": self._show_sprint_timer,
+            "Scratchpad": self._toggle_scratchpad,
+            "Snapshot": self._create_snapshot,
+            "Compare Drafts": self._show_compare_drafts,
+            "Export PDF": lambda: self._export_script("pdf"),
+            "Export ODT": lambda: self._export_script("odt"),
+            "Export Fountain": lambda: self._export_script("fountain"),
+        }
+        handler = handlers.get(name)
+        if handler:
+            handler()
+
+    def _show_command_palette(self):
+        geo = self.geometry()
+        x = geo.x() + (geo.width() - self._command_palette.width()) // 2
+        y = geo.y() + 90
+        self._command_palette.move(x, y)
+        self._command_palette.show()
+        self._command_palette.raise_()
+        self._command_palette.setFocus()
+
+    def _switch_phase(self, phase: str):
+        if self.stack.currentWidget() is not self.editor:
+            return
+        if self._editor_title_bar.phase_tabs:
+            self._editor_title_bar.phase_tabs.set_active(phase)
+
+    def _save_script(self):
+        if self.stack.currentWidget() is not self.editor:
+            return
+        self._on_content_changed()
+
+    def _enter_reading_mode(self):
+        if self.stack.currentWidget() is not self.editor:
+            return
+        self.editor.enter_reading_mode()
+
+    def _show_sprint_timer(self):
+        geo = self.geometry()
+        x = geo.x() + geo.width() - self._sprint_timer.width() - 24
+        y = geo.y() + geo.height() - self._sprint_timer.height() - 48
+        self._sprint_timer.move(x, y)
+        self._sprint_timer.show()
+
+    def _on_sprint_ended(self, minutes: int):
+        self.editor.status_bar.sprint_label.setText(f"Sprint complete — {minutes}m")
+
+    def _update_sprint_label(self):
+        text = self._sprint_timer.get_status_text()
+        if text:
+            self.editor.status_bar.sprint_label.setText(text)
+
+    def _toggle_scratchpad(self):
+        if self.stack.currentWidget() is not self.editor:
+            return
+        self.editor.toggle_scratchpad()
+
+    def _open_character_sheet(self, data: dict):
+        self._character_sheet.set_character(data)
+        self._character_sheet.exec()
+
+    def _on_character_saved(self, data: dict):
+        rail = self.editor.manuscript.char_rail
+        original_name = self._character_sheet._data.get("name", "")
+        updated = []
+        found = False
+        for ch in rail._characters:
+            if ch.get("name") == original_name:
+                updated.append(data)
+                found = True
+            else:
+                updated.append(ch)
+        if not found:
+            updated.append(data)
+        rail.update_characters(updated)
+
+    def _create_snapshot(self):
+        if not STATE.current_project_path:
+            return
+        create_snapshot(STATE.current_project_path)
+        self._snapshots_dialog.set_project(STATE.current_project_path)
+        self._snapshots_dialog.exec()
+
+    def _show_compare_drafts(self):
+        if self.stack.currentWidget() is not self.editor or not STATE.current_project_path:
+            return
+        snapshots = list_snapshots(STATE.current_project_path)
+        self._compare_drafts.set_snapshots(snapshots)
+        current_text = self.editor.manuscript.editor.toPlainText()
+        from_text = ""
+        if snapshots:
+            idx = 1 if len(snapshots) > 1 else 0
+            from_text = get_snapshot_content(STATE.current_project_path, snapshots[idx]["hash"])
+        self._compare_drafts.set_texts(from_text, current_text)
+        self._compare_drafts.exec()
+
+    def _on_snapshot_restored(self, content: str):
+        if not content:
+            return
+        self.editor.manuscript.editor.setPlainText(content)
+        self.editor.proofread.script_view.setPlainText(content)
+        STATE.script_content = content
+        STATE.save_script()
+        self._editor_title_bar.save_dot.set_saved(True)
+
+    def _export_script(self, kind: str):
+        if self.stack.currentWidget() is not self.editor:
+            return
+        content = self.editor.manuscript.editor.toPlainText()
+        title = self._editor_title_bar.context_label.text() or "Untitled"
+        if kind == "pdf":
+            from ecrit.export.pdf_export import export_pdf
+            export_pdf(content, title=title, parent=self)
+        elif kind == "odt":
+            from ecrit.export.odt_export import export_odt
+            export_odt(content, title=title, parent=self)
+        elif kind == "fountain":
+            from ecrit.export.fountain_export import export_fountain
+            export_fountain(content, title=title, parent=self)
 
     def _import_script(self):
         from PySide6.QtWidgets import QFileDialog

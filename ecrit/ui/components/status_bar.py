@@ -12,6 +12,7 @@ class StatusBar(QWidget):
     shortcuts_clicked = Signal()
     theme_clicked = Signal()
     reading_mode_clicked = Signal()
+    sprint_clicked = Signal()
     home_clicked = Signal()
 
     def __init__(self, parent=None):
@@ -50,6 +51,8 @@ class StatusBar(QWidget):
             ("Stats", self.stats_clicked),
             ("KB", self.shortcuts_clicked),
             ("Theme", self.theme_clicked),
+            ("Read", self.reading_mode_clicked),
+            ("Sprint", self.sprint_clicked),
         ]
         for label, signal in buttons:
             btn = QPushButton(label)
