@@ -1,0 +1,56 @@
+[build-system]
+requires = ["setuptools>=68.0", "setuptools-scm>=8.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ecrit"
+version = "0.1.0"
+description = "A cross-platform desktop screenplay writing app for Fountain and Fountain-derived dialects."
+readme = "README.md"
+license = "GPL-3.0-or-later"
+requires-python = ">=3.10"
+authors = [
+    { name = "FlintWave" },
+]
+keywords = ["screenplay", "fountain", "screenwriting", "writing"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Text Editors",
+]
+dependencies = [
+    "PySide6>=6.5",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-qt>=4.2",
+]
+
+[project.scripts]
+ecrit = "ecrit.main:main"
+
+[project.gui-scripts]
+ecrit-gui = "ecrit.main:main"
+
+[project.urls]
+Homepage = "https://github.com/FlintWave/Ecrit"
+Repository = "https://github.com/FlintWave/Ecrit"
+Issues = "https://github.com/FlintWave/Ecrit/issues"
+
+[tool.setuptools.packages.find]
+include = ["ecrit*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+qt_api = "pyside6"
