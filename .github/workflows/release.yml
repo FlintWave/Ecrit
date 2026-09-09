@@ -78,7 +78,14 @@ jobs:
 
       - name: Install system dependencies (macOS)
         if: runner.os == 'macOS'
-        run: brew install cairo
+        run: |
+          brew install cairo
+          # Symlink Homebrew cairo into /usr/local/lib so cffi's dlopen
+          # can find it (DYLD_* vars are stripped by macOS SIP)
+          CAIRO_LIB="$(brew --prefix cairo)/lib"
+          sudo mkdir -p /usr/local/lib
+          sudo ln -sf "${CAIRO_LIB}/libcairo.2.dylib" /usr/local/lib/
+          sudo ln -sf "${CAIRO_LIB}/libcairo.dylib" /usr/local/lib/
 
       # ── Python dependencies ────────────────────────────────────────
 
@@ -110,18 +117,7 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           python - <<'PYEOF'
-          import ctypes, subprocess, os, io
-
-          # Pre-load Homebrew's libcairo before cairocffi tries to find it
-          # (DYLD_FALLBACK_LIBRARY_PATH is stripped by macOS SIP)
-          brew_prefix = subprocess.check_output(
-              ["brew", "--prefix", "cairo"]
-          ).decode().strip()
-          lib_path = os.path.join(brew_prefix, "lib", "libcairo.2.dylib")
-          if os.path.exists(lib_path):
-              ctypes.cdll.LoadLibrary(lib_path)
-
-          import cairosvg
+          import cairosvg, io, os, subprocess
           from PIL import Image
 
           iconset = "public/icon.iconset"
