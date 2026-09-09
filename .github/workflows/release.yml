@@ -108,6 +108,8 @@ jobs:
 
       - name: Convert icon to ICNS (macOS)
         if: runner.os == 'macOS'
+        env:
+          DYLD_FALLBACK_LIBRARY_PATH: ${{ runner.arch == 'ARM64' && '/opt/homebrew/lib' || '/usr/local/lib' }}
         run: |
           python3 - <<'PYEOF'
           import cairosvg, io, os, subprocess
