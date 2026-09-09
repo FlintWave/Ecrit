@@ -252,12 +252,14 @@ class Dashboard(QWidget):
 
         if projects:
             p = projects[0]
+            mod_time = _relative_time(p.get("modified_at", ""))
             self.continue_card.set_project(
                 title=p.get("title", "Untitled"),
                 format_id=p.get("format_id", ""),
                 meta_text=f"{_format_category(p.get('format_id', ''))} · {p.get('format_id', '')}",
-                position=f"edited {_relative_time(p.get('modified_at', ''))}",
+                position=f"edited {mod_time}",
             )
+            self.continue_card.sync_label.setText(f"Saved {mod_time}" if mod_time else "Local")
         else:
             self.continue_card.set_project("No projects yet", meta_text="Create a new project to get started")
 

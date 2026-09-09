@@ -1,0 +1,49 @@
+{
+    "_language_name": "Português",
+
+    "app.title": "Écrit",
+    "app.new_project": "Novo projeto",
+    "app.open_project": "Abrir projeto",
+    "app.import_script": "Importar roteiro",
+    "app.save": "Salvar",
+    "app.settings": "Configurações",
+    "app.dashboard": "Painel",
+
+    "phase.plan": "Planejar",
+    "phase.outline": "Estrutura",
+    "phase.manuscript": "Manuscrito",
+    "phase.proofread": "Revisão",
+    "phase.deliver": "Entregar",
+
+    "editor.start_writing": "Comece a escrever...",
+    "editor.find_replace": "Buscar e substituir",
+    "editor.typewriter": "máquina de escrever",
+    "editor.page_of": "Página {page} de {total}",
+    "editor.words_today": "{words} / {target} hoje",
+    "editor.scenes": "CENAS",
+    "editor.characters": "PERSONAGENS",
+    "editor.documents": "DOCUMENTOS",
+
+    "settings.title": "Configurações",
+    "settings.general": "Geral",
+    "settings.editor": "Editor",
+    "settings.theme": "Tema",
+    "settings.about": "Sobre",
+    "settings.modules": "Módulos",
+    "settings.language": "Idioma",
+    "settings.appearance": "Aparência",
+    "settings.nocturne": "Nocturne (Escuro)",
+    "settings.organic": "Organic (Claro)",
+
+    "cmd.type_command": "Digite um comando...",
+
+    "collab.title": "Colaboração",
+    "collab.start_session": "Iniciar sessão",
+    "collab.join_session": "Entrar na sessão",
+    "collab.connected": "Conectado",
+    "collab.disconnected": "Desconectado",
+
+    "companion.title": "Sincronização do companion",
+    "companion.never_synced": "Nunca sincronizado",
+    "companion.no_devices": "Nenhum dispositivo pareado"
+}

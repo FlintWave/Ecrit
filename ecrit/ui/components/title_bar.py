@@ -9,21 +9,75 @@ from PySide6.QtGui import QPainter, QColor, QPen
 from ecrit.ui.styles import theme
 
 
-class TitleDots(QWidget):
-    def __init__(self):
-        super().__init__()
-        self.setFixedSize(60, 44)
+class WindowButton(QWidget):
+    clicked = Signal()
+
+    def __init__(self, role: str, parent=None):
+        super().__init__(parent)
+        self._role = role
+        self._hovered = False
+        self.setFixedSize(14, 14)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+
+    def enterEvent(self, event):
+        self._hovered = True
+        self.update()
+
+    def leaveEvent(self, event):
+        self._hovered = False
+        self.update()
+
+    def mousePressEvent(self, event):
+        self.clicked.emit()
 
     def paintEvent(self, _event):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
-        t = theme.current()
-        color = QColor(t.neutral_800)
+        colors = {"close": "#FF5F57", "minimize": "#FEBC2E", "maximize": "#28C840"}
+        color = QColor(colors.get(self._role, "#888888"))
+        if not self._hovered:
+            t = theme.current()
+            color = QColor(t.neutral_700)
         p.setBrush(color)
         p.setPen(Qt.PenStyle.NoPen)
-        for i, x in enumerate([16, 28, 40]):
-            p.drawEllipse(x - 5, 17, 11, 11)
+        p.drawEllipse(0, 0, 14, 14)
+        if self._hovered:
+            p.setPen(QPen(QColor("#4a3030" if self._role == "close" else "#5a4a10" if self._role == "minimize" else "#1a4a1a"), 1.5))
+            if self._role == "close":
+                p.drawLine(4, 4, 10, 10)
+                p.drawLine(10, 4, 4, 10)
+            elif self._role == "minimize":
+                p.drawLine(3, 7, 11, 7)
+            elif self._role == "maximize":
+                p.drawRect(3, 3, 8, 8)
         p.end()
+
+
+class WindowControls(QWidget):
+    close_clicked = Signal()
+    minimize_clicked = Signal()
+    maximize_clicked = Signal()
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setFixedSize(68, 44)
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(12, 0, 0, 0)
+        layout.setSpacing(8)
+
+        self._close = WindowButton("close")
+        self._close.clicked.connect(self.close_clicked.emit)
+        layout.addWidget(self._close)
+
+        self._minimize = WindowButton("minimize")
+        self._minimize.clicked.connect(self.minimize_clicked.emit)
+        layout.addWidget(self._minimize)
+
+        self._maximize = WindowButton("maximize")
+        self._maximize.clicked.connect(self.maximize_clicked.emit)
+        layout.addWidget(self._maximize)
+
+        layout.addStretch()
 
 
 class PhaseTabBar(QWidget):
@@ -84,6 +138,9 @@ class TitleBar(QWidget):
     settings_clicked = Signal()
     home_clicked = Signal()
     phase_changed = Signal(str)
+    close_requested = Signal()
+    minimize_requested = Signal()
+    maximize_requested = Signal()
 
     def __init__(self, show_phases=False, parent=None):
         super().__init__(parent)
@@ -94,8 +151,19 @@ class TitleBar(QWidget):
         layout.setContentsMargins(0, 0, 12, 0)
         layout.setSpacing(8)
 
-        self.dots = TitleDots()
-        layout.addWidget(self.dots)
+        self.window_controls = WindowControls()
+        self.window_controls.close_clicked.connect(self.close_requested.emit)
+        self.window_controls.minimize_clicked.connect(self.minimize_requested.emit)
+        self.window_controls.maximize_clicked.connect(self.maximize_requested.emit)
+        layout.addWidget(self.window_controls)
+
+        self.home_btn = QPushButton("⌂")
+        self.home_btn.setObjectName("homeBtn")
+        self.home_btn.setFixedSize(28, 28)
+        self.home_btn.setToolTip("Dashboard")
+        self.home_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.home_btn.clicked.connect(self.home_clicked.emit)
+        layout.addWidget(self.home_btn)
 
         self.wordmark = QLabel("Écrit")
         self.wordmark.setObjectName("wordmark")

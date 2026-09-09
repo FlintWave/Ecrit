@@ -40,6 +40,10 @@ COMMANDS = [
     ("Remote Sync", "tool", "Sync project to GitHub/GitLab/Codeberg"),
     ("Cloud Export", "export", "Export to Google Drive, Dropbox, etc."),
     ("Share for Review", "export", "Generate watermarked review link"),
+    ("Plugin Marketplace", "tool", "Browse and install plugins"),
+    ("Collaboration", "tool", "Start or join a collaboration session"),
+    ("Companion Sync", "tool", "Sync with Android companion app"),
+    ("Change Language", "tool", "Change interface language"),
 ]
 
 

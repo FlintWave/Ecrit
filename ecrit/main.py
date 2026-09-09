@@ -30,8 +30,13 @@ from ecrit.ui.overlays.series_panel import SeriesPanel
 from ecrit.ui.overlays.sync_settings import SyncSettingsDialog
 from ecrit.ui.overlays.cloud_export import CloudExportDialog
 from ecrit.ui.overlays.share_review import ShareReviewDialog
+from ecrit.ui.overlays.marketplace import MarketplaceDialog
+from ecrit.ui.overlays.collaboration import CollaborationDialog
+from ecrit.ui.overlays.companion import CompanionDialog
 from ecrit.screenplay.series_projects import SeriesProject
 from ecrit.export.share_review import generate_review_html, generate_share_link, list_shares
+from ecrit.collab.session import CollabSession
+from ecrit.i18n import set_language
 
 
 class MainWindow(QMainWindow):
@@ -52,6 +57,9 @@ class MainWindow(QMainWindow):
         self.title_bar.settings_clicked.connect(self._open_settings)
         self.title_bar.home_clicked.connect(self._go_dashboard)
         self.title_bar.cmd_chip.clicked.connect(self._show_command_palette)
+        self.title_bar.close_requested.connect(self.close)
+        self.title_bar.minimize_requested.connect(self.showMinimized)
+        self.title_bar.maximize_requested.connect(self._toggle_maximize)
         root.addWidget(self.title_bar)
 
         self.stack = QStackedWidget()
@@ -78,6 +86,7 @@ class MainWindow(QMainWindow):
         self.editor.export_pdf_requested.connect(lambda: self._export_script("pdf"))
         self.editor.export_odt_requested.connect(lambda: self._export_script("odt"))
         self.editor.export_fountain_requested.connect(lambda: self._export_script("fountain"))
+        self.editor.status_bar.typewriter_toggled.connect(self._on_typewriter_toggled)
         self.stack.addWidget(self.editor)
 
         self._editor_title_bar = TitleBar(show_phases=True)
@@ -85,11 +94,15 @@ class MainWindow(QMainWindow):
         self._editor_title_bar.home_clicked.connect(self._go_dashboard)
         self._editor_title_bar.phase_changed.connect(self._on_phase_changed)
         self._editor_title_bar.cmd_chip.clicked.connect(self._show_command_palette)
+        self._editor_title_bar.close_requested.connect(self.close)
+        self._editor_title_bar.minimize_requested.connect(self.showMinimized)
+        self._editor_title_bar.maximize_requested.connect(self._toggle_maximize)
 
         self._stats_dialog = StatsDialog(self)
         self._shortcuts_dialog = ShortcutsDialog(self)
         self._settings_dialog = SettingsDialog(self)
         self._settings_dialog.theme_changed.connect(self._apply_theme)
+        self._settings_dialog.language_changed.connect(self._on_language_changed)
 
         self._command_palette = CommandPalette(self)
         self._command_palette.command_selected.connect(self._on_command)
@@ -120,6 +133,20 @@ class MainWindow(QMainWindow):
 
         self._share_dialog = ShareReviewDialog(self)
         self._share_dialog.share_created.connect(self._on_share_created)
+
+        self._marketplace_dialog = MarketplaceDialog(self)
+
+        self._collab_session = CollabSession(user_name=STATE.author_name or "Writer")
+        self._collab_dialog = CollaborationDialog(self)
+        self._collab_dialog.set_session(self._collab_session)
+        self._collab_dialog.session_started.connect(self._on_collab_started)
+        self._collab_dialog.session_joined.connect(self._on_collab_started)
+        self._collab_dialog.session_left.connect(self._on_collab_left)
+
+        self._companion_dialog = CompanionDialog(self)
+        self._companion_dialog.sync_bundle_requested.connect(self._on_companion_sync)
+        self._companion_dialog.reader_export_requested.connect(self._on_companion_reader)
+        self._companion_dialog.wifi_transfer_requested.connect(self._on_wifi_transfer)
 
         self._cmd_palette_shortcut = QShortcut(QKeySequence("Ctrl+K"), self)
         self._cmd_palette_shortcut.activated.connect(self._show_command_palette)
@@ -222,6 +249,10 @@ class MainWindow(QMainWindow):
             "Remote Sync": self._show_sync_settings,
             "Cloud Export": self._show_cloud_export,
             "Share for Review": self._show_share_review,
+            "Plugin Marketplace": self._show_marketplace,
+            "Collaboration": self._show_collaboration,
+            "Companion Sync": self._show_companion,
+            "Change Language": self._show_language_settings,
         }
         handler = handlers.get(name)
         if handler:
@@ -342,7 +373,15 @@ class MainWindow(QMainWindow):
         self._series_panel.exec()
 
     def _on_episode_selected(self, season: int, episode: int):
-        pass
+        if not hasattr(self, "_series_project") or self._series_project is None:
+            return
+        seasons = self._series_project.seasons
+        if season < len(seasons):
+            episodes = seasons[season].episodes
+            if episode < len(episodes):
+                ep = episodes[episode]
+                if ep.script_path:
+                    self._open_project(ep.script_path)
 
     def _show_sync_settings(self):
         if STATE.current_project_path:
@@ -430,6 +469,68 @@ class MainWindow(QMainWindow):
             "path": path,
         })
 
+    def _show_marketplace(self):
+        self._marketplace_dialog.exec()
+
+    def _show_collaboration(self):
+        if STATE.current_project_path:
+            content = self.editor.manuscript.editor.toPlainText()
+            title = self._editor_title_bar.context_label.text() or "Untitled"
+            self._collab_session.project_title = title
+        self._collab_dialog.exec()
+
+    def _on_collab_started(self, session):
+        if STATE.current_project_path and session.role.value == "host":
+            content = self.editor.manuscript.editor.toPlainText()
+            session._crdt.set_text(content)
+
+    def _on_collab_left(self):
+        self.editor.status_bar.sprint_label.setText("")
+
+    def _show_companion(self):
+        self._companion_dialog.exec()
+
+    def _on_companion_sync(self):
+        if not STATE.current_project_path:
+            return
+        content = self.editor.manuscript.editor.toPlainText()
+        title = self._editor_title_bar.context_label.text() or "Untitled"
+        from ecrit.companion.sync_bundle import create_sync_bundle
+        path = create_sync_bundle(STATE.current_project_path, content, title)
+        url = self._companion_dialog.get_device_sync().start_transfer_server(path)
+        self._companion_dialog.set_transfer_url(url)
+        self._companion_dialog.set_sync_status(f"Bundle ready: {path}")
+
+    def _on_wifi_transfer(self, path: str):
+        if not STATE.current_project_path:
+            return
+        content = self.editor.manuscript.editor.toPlainText()
+        title = self._editor_title_bar.context_label.text() or "Untitled"
+        from ecrit.companion.sync_bundle import create_sync_bundle
+        bundle_path = path or create_sync_bundle(STATE.current_project_path, content, title)
+        url = self._companion_dialog.get_device_sync().start_transfer_server(bundle_path)
+        self._companion_dialog.set_transfer_url(url)
+        self._companion_dialog.set_sync_status(f"Wi-Fi transfer active: {url}")
+
+    def _on_companion_reader(self):
+        if not STATE.current_project_path:
+            return
+        content = self.editor.manuscript.editor.toPlainText()
+        title = self._editor_title_bar.context_label.text() or "Untitled"
+        import os
+        output_dir = os.path.dirname(STATE.current_project_path)
+        from ecrit.companion.reader_export import create_reader_bundle
+        path = create_reader_bundle(content, title, output_dir)
+        self._companion_dialog.set_sync_status(f"Reader bundle: {path}")
+
+    def _show_language_settings(self):
+        self._settings_dialog.load_state()
+        self._settings_dialog.exec()
+
+    def _on_language_changed(self, lang: str):
+        set_language(lang)
+        STATE.language = lang
+
     def _export_script(self, kind: str):
         if self.stack.currentWidget() is not self.editor:
             return
@@ -476,6 +577,15 @@ class MainWindow(QMainWindow):
             root.replaceWidget(old_bar, self.title_bar)
             old_bar.hide()
             self.title_bar.show()
+
+    def _toggle_maximize(self):
+        if self.isMaximized():
+            self.showNormal()
+        else:
+            self.showMaximized()
+
+    def _on_typewriter_toggled(self, enabled: bool):
+        self.editor.manuscript.editor._typewriter = enabled
 
     def _toggle_theme(self):
         theme.toggle()

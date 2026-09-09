@@ -303,13 +303,17 @@ class PlanPhase(QWidget):
         rail_layout.addWidget(header)
 
         self.doc_list = QListWidget()
+        self._doc_content = {}
         docs = ["Logline", "Synopsis", "One-page pitch", "Treatment"]
         for d in docs:
             self.doc_list.addItem(d)
+            self._doc_content[d] = ""
+        self.doc_list.currentRowChanged.connect(self._on_doc_selected)
         rail_layout.addWidget(self.doc_list)
 
         add_btn = QPushButton("+ New document")
         add_btn.setObjectName("ghost")
+        add_btn.clicked.connect(self._add_document)
         rail_layout.addWidget(add_btn)
 
         layout.addWidget(self.doc_rail)
@@ -328,9 +332,10 @@ class PlanPhase(QWidget):
         editor_container.setMaximumWidth(620)
         ec_layout = QVBoxLayout(editor_container)
 
-        self.doc_header = QLabel("SYNOPSIS · DRAFT 1")
+        self.doc_header = QLabel("LOGLINE")
         self.doc_header.setObjectName("kicker")
         ec_layout.addWidget(self.doc_header)
+        self._current_doc = "Logline"
 
         self.editor = QTextEdit()
         self.editor.setObjectName("planEditor")
@@ -341,6 +346,27 @@ class PlanPhase(QWidget):
 
         center_layout.addWidget(editor_container)
         layout.addWidget(center, 1)
+
+        self.doc_list.setCurrentRow(0)
+
+    def _on_doc_selected(self, row):
+        if row < 0:
+            return
+        if self._current_doc in self._doc_content:
+            self._doc_content[self._current_doc] = self.editor.toPlainText()
+        item = self.doc_list.item(row)
+        if item:
+            name = item.text()
+            self._current_doc = name
+            self.doc_header.setText(name.upper())
+            self.editor.setPlainText(self._doc_content.get(name, ""))
+
+    def _add_document(self):
+        count = self.doc_list.count()
+        name = f"Document {count + 1}"
+        self.doc_list.addItem(name)
+        self._doc_content[name] = ""
+        self.doc_list.setCurrentRow(self.doc_list.count() - 1)
 
 
 class OutlinePhase(QWidget):
@@ -362,12 +388,14 @@ class OutlinePhase(QWidget):
         layout_h.setObjectName("secondary")
         layout_h.setFixedSize(28, 28)
         layout_h.setToolTip("Horizontal layout")
+        layout_h.clicked.connect(lambda: self._relayout("horizontal"))
         toolbar.addWidget(layout_h)
 
         layout_v = QPushButton("↓")
         layout_v.setObjectName("secondary")
         layout_v.setFixedSize(28, 28)
         layout_v.setToolTip("Vertical layout")
+        layout_v.clicked.connect(lambda: self._relayout("vertical"))
         toolbar.addWidget(layout_v)
 
         toolbar.addStretch()
@@ -382,6 +410,7 @@ class OutlinePhase(QWidget):
 
         add_btn = QPushButton("+ Add node")
         add_btn.setObjectName("primary")
+        add_btn.clicked.connect(self._add_node)
         toolbar.addWidget(add_btn)
         layout.addLayout(toolbar)
 
@@ -394,15 +423,18 @@ class OutlinePhase(QWidget):
         self.zoom_out = QPushButton("−")
         self.zoom_out.setObjectName("secondary")
         self.zoom_out.setFixedSize(28, 28)
+        self.zoom_out.clicked.connect(lambda: self._zoom(-0.1))
         zoom_bar.addWidget(self.zoom_out)
         self.zoom_label = QLabel("100%")
         zoom_bar.addWidget(self.zoom_label)
         self.zoom_in = QPushButton("+")
         self.zoom_in.setObjectName("secondary")
         self.zoom_in.setFixedSize(28, 28)
+        self.zoom_in.clicked.connect(lambda: self._zoom(0.1))
         zoom_bar.addWidget(self.zoom_in)
         fit_btn = QPushButton("Fit")
         fit_btn.setObjectName("secondary")
+        fit_btn.clicked.connect(self._fit_view)
         zoom_bar.addWidget(fit_btn)
         zoom_bar.addStretch()
         info = QLabel("Right-click to add nodes")
@@ -426,6 +458,37 @@ class OutlinePhase(QWidget):
         if tpl:
             nodes = generate_outline_nodes(tpl)
             self.canvas.set_nodes(nodes)
+
+    def _add_node(self):
+        nodes = list(self.canvas._nodes)
+        new_id = f"node_{len(nodes)+1}"
+        x = 40 + (len(nodes) % 4) * 210
+        y = 40 + (len(nodes) // 4) * 120
+        nodes.append({"id": new_id, "kind": "Scene", "label": f"Scene {len(nodes)+1}", "synopsis": "", "x": x, "y": y, "connections": []})
+        self.canvas.set_nodes(nodes)
+
+    def _zoom(self, delta: float):
+        self.canvas._zoom = max(0.5, min(1.6, self.canvas._zoom + delta))
+        self.zoom_label.setText(f"{int(self.canvas._zoom * 100)}%")
+        self.canvas.update()
+
+    def _fit_view(self):
+        self.canvas._zoom = 1.0
+        self.canvas._pan_x = 0.0
+        self.canvas._pan_y = 0.0
+        self.zoom_label.setText("100%")
+        self.canvas.update()
+
+    def _relayout(self, direction: str):
+        nodes = self.canvas._nodes
+        for i, node in enumerate(nodes):
+            if direction == "horizontal":
+                node["x"] = 40 + i * 210
+                node["y"] = 60
+            else:
+                node["x"] = 120
+                node["y"] = 40 + i * 120
+        self.canvas.update()
 
 
 class OutlineCanvas(QWidget):
@@ -616,7 +679,7 @@ class ManuscriptPhase(QWidget):
 
 
 class ProofreadPhase(QWidget):
-    """Proofread phase: script view + issues rail."""
+    """Proofread phase: script view + issues rail with automated checks."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -651,10 +714,73 @@ class ProofreadPhase(QWidget):
         header.addWidget(self.count_label)
         rail_layout.addLayout(header)
 
+        self.run_btn = QPushButton("Run Proofread")
+        self.run_btn.setObjectName("primary")
+        self.run_btn.setFixedHeight(32)
+        self.run_btn.clicked.connect(self.run_proofread)
+        rail_layout.addWidget(self.run_btn)
+
         self.issues_list = QListWidget()
+        self.issues_list.currentRowChanged.connect(self._on_issue_selected)
         rail_layout.addWidget(self.issues_list)
 
         layout.addWidget(rail)
+        self._issues: list[dict] = []
+
+    def run_proofread(self):
+        text = self.script_view.toPlainText()
+        self._issues = self._check_script(text)
+        self.issues_list.clear()
+        for issue in self._issues:
+            self.issues_list.addItem(f"L{issue['line']}: {issue['message']}")
+        self.count_label.setText(f"{len(self._issues)} flag{'s' if len(self._issues) != 1 else ''}")
+
+    def _on_issue_selected(self, row):
+        if row < 0 or row >= len(self._issues):
+            return
+        line_num = self._issues[row]["line"]
+        block = self.script_view.document().findBlockByLineNumber(line_num - 1)
+        if block.isValid():
+            cursor = self.script_view.textCursor()
+            cursor.setPosition(block.position())
+            cursor.movePosition(QTextCursor.MoveOperation.EndOfBlock, QTextCursor.MoveMode.KeepAnchor)
+            self.script_view.setTextCursor(cursor)
+            self.script_view.centerCursor()
+
+    @staticmethod
+    def _check_script(text: str) -> list[dict]:
+        import re
+        issues = []
+        lines = text.split("\n")
+        prev_blank = False
+        for i, line in enumerate(lines, 1):
+            if "  " in line.strip():
+                issues.append({"line": i, "message": "Double space"})
+            if line.rstrip() != line:
+                pass
+            if line != line and line.endswith(" "):
+                issues.append({"line": i, "message": "Trailing whitespace"})
+            stripped = line.strip()
+            is_blank = not stripped
+            if is_blank and prev_blank:
+                issues.append({"line": i, "message": "Consecutive blank lines"})
+            prev_blank = is_blank
+            if stripped.startswith("(") and not stripped.endswith(")"):
+                issues.append({"line": i, "message": "Unclosed parenthetical"})
+            if stripped.endswith(")") and not stripped.startswith("(") and stripped.count("(") == 0:
+                issues.append({"line": i, "message": "Orphan closing parenthesis"})
+            if stripped.isupper() and len(stripped) > 1 and stripped[0].isalpha():
+                if i < len(lines):
+                    next_line = lines[i].strip() if i < len(lines) else ""
+                    if not next_line:
+                        is_heading = stripped.startswith(("INT.", "EXT.", "EST.", "INT/EXT", "I/E."))
+                        is_transition = stripped.endswith("TO:")
+                        if not is_heading and not is_transition:
+                            issues.append({"line": i, "message": "Character cue with no dialogue"})
+            if re.search(r'[.!?]{2,}', stripped) and not stripped.startswith(("INT.", "EXT.", "EST.", "INT/EXT", "I/E.")):
+                if ".." in stripped and "..." not in stripped:
+                    issues.append({"line": i, "message": "Incomplete ellipsis (use three dots)"})
+        return issues
 
 
 class DeliverPhase(QWidget):
@@ -681,13 +807,16 @@ class DeliverPhase(QWidget):
         top.addWidget(title)
         top.addStretch()
 
+        self._view_mode = "script"
         self.view_seg = QHBoxLayout()
-        cover_btn = QPushButton("Cover page")
-        cover_btn.setObjectName("secondary")
-        self.view_seg.addWidget(cover_btn)
-        script_btn = QPushButton("Script pages")
-        script_btn.setObjectName("primary")
-        self.view_seg.addWidget(script_btn)
+        self._cover_btn = QPushButton("Cover page")
+        self._cover_btn.setObjectName("secondary")
+        self._cover_btn.clicked.connect(lambda: self._set_view("cover"))
+        self.view_seg.addWidget(self._cover_btn)
+        self._script_btn = QPushButton("Script pages")
+        self._script_btn.setObjectName("primary")
+        self._script_btn.clicked.connect(lambda: self._set_view("script"))
+        self.view_seg.addWidget(self._script_btn)
         top.addLayout(self.view_seg)
         center_layout.addLayout(top)
 
@@ -695,12 +824,14 @@ class DeliverPhase(QWidget):
         self.format_label.setStyleSheet(f"color: {theme.current().neutral_500}; font-size: 13px;")
         center_layout.addWidget(self.format_label)
 
-        self.preview_area = QLabel("Print preview will appear here")
-        self.preview_area.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.preview_area = QPlainTextEdit()
+        self.preview_area.setReadOnly(True)
+        self.preview_area.setFont(QFont("Courier Prime", 12))
         self.preview_area.setStyleSheet(
             f"background: {theme.current().surface}; border-radius: 8px; "
-            f"min-height: 400px; color: {theme.current().neutral_500};"
+            f"min-height: 400px; color: {theme.current().text}; padding: 24px;"
         )
+        self.preview_area.setPlaceholderText("Script preview will appear when a project is loaded")
         center_layout.addWidget(self.preview_area, 1)
         center_layout.addStretch()
         layout.addWidget(center, 1)
@@ -724,21 +855,29 @@ class DeliverPhase(QWidget):
         export_title.setObjectName("kicker")
         rail_layout.addWidget(export_title)
 
-        for label_text, seg_options in [
-            ("Title page", ["Include", "Omit"]),
-            ("Scene numbers", ["On", "Off"]),
-            ("Revision marks", ["Show", "Clean"]),
+        self._export_opts = {"title_page": True, "scene_numbers": True, "revision_marks": True}
+        self._toggle_btns = {}
+        for key, label_text, seg_options in [
+            ("title_page", "Title page", ["Include", "Omit"]),
+            ("scene_numbers", "Scene numbers", ["On", "Off"]),
+            ("revision_marks", "Revision marks", ["Show", "Clean"]),
         ]:
             row = QVBoxLayout()
             lbl = QLabel(label_text)
             lbl.setStyleSheet("font-size: 13px;")
             row.addWidget(lbl)
             seg = QHBoxLayout()
-            for opt in seg_options:
+            btns = []
+            for i, opt in enumerate(seg_options):
                 btn = QPushButton(opt)
-                btn.setObjectName("secondary")
+                btn.setObjectName("primary" if i == 0 else "secondary")
                 btn.setFixedHeight(30)
+                opt_key = key
+                opt_val = i == 0
+                btn.clicked.connect(lambda checked=False, k=opt_key, v=opt_val, bs=None: self._toggle_export_opt(k, v))
                 seg.addWidget(btn)
+                btns.append(btn)
+            self._toggle_btns[key] = btns
             row.addLayout(seg)
             rail_layout.addLayout(row)
 
@@ -814,6 +953,7 @@ class DeliverPhase(QWidget):
 
     def set_script(self, script: str):
         self._script = script
+        self._update_preview()
 
     def _update_revision_swatch(self):
         color_name = self._revision_tracker.current_revision().color
@@ -848,6 +988,54 @@ class DeliverPhase(QWidget):
         else:
             lines = [f"⚠️ {w}" for w in warnings]
             self.contest_result_label.setText("\n".join(lines))
+
+    def _set_view(self, mode: str):
+        self._view_mode = mode
+        if mode == "cover":
+            self._cover_btn.setObjectName("primary")
+            self._script_btn.setObjectName("secondary")
+        else:
+            self._cover_btn.setObjectName("secondary")
+            self._script_btn.setObjectName("primary")
+        self._cover_btn.style().unpolish(self._cover_btn)
+        self._cover_btn.style().polish(self._cover_btn)
+        self._script_btn.style().unpolish(self._script_btn)
+        self._script_btn.style().polish(self._script_btn)
+        self._update_preview()
+
+    def _update_preview(self):
+        script = getattr(self, "_script", "")
+        if not script:
+            return
+        if self._view_mode == "cover":
+            lines = script.split("\n")
+            title_page = []
+            for line in lines:
+                stripped = line.strip()
+                if stripped.startswith(("Title:", "Credit:", "Author:", "Source:", "Draft date:", "Contact:", "Copyright:")):
+                    title_page.append(stripped)
+                elif stripped.startswith(("INT.", "EXT.", "EST.")) or (title_page and not stripped and len(title_page) > 1):
+                    break
+            self.preview_area.setPlainText("\n".join(title_page) if title_page else "No title page metadata found")
+        else:
+            self.preview_area.setPlainText(script)
+
+    def _toggle_export_opt(self, key: str, value: bool):
+        self._export_opts[key] = value
+        btns = self._toggle_btns.get(key, [])
+        if len(btns) == 2:
+            btns[0].setObjectName("primary" if value else "secondary")
+            btns[1].setObjectName("secondary" if value else "primary")
+            for b in btns:
+                b.style().unpolish(b)
+                b.style().polish(b)
+
+    def update_format_label(self, format_id: str = "", paper: str = ""):
+        if format_id or paper:
+            self.format_label.setText(
+                f"Paginated against {format_id or 'fountain/core'} · "
+                f"{paper or 'US Letter'} · Courier Prime 12pt"
+            )
 
     def get_revision_tracker(self) -> RevisionTracker:
         return self._revision_tracker
@@ -979,22 +1167,19 @@ class EditorScreen(QWidget):
         self.manuscript.scene_nav.set_script(script)
         self.deliver.set_script(script)
 
-        try:
-            import ecrit_core
-            stats = json.loads(ecrit_core.get_script_stats(script))
-            scenes = stats.get("scenes", [])
-            characters = stats.get("characters", [])
-            self._total_pages = stats.get("page_count", 1)
-            self.manuscript.scene_nav.update_scenes(scenes)
-            self.manuscript.char_rail.update_characters(characters)
-            self.status_bar.update_info(
-                page=1,
-                total_pages=stats.get("page_count", 1),
-                scene=scenes[0]["heading"] if scenes else "",
-                dialect=project_data.get("meta", {}).get("format_id", "fountain/core"),
-            )
-        except Exception:
-            pass
+        from ecrit.stores.app_state import STATE
+        stats = STATE.get_stats()
+        scenes = stats.get("scenes", [])
+        characters = stats.get("characters", [])
+        self._total_pages = stats.get("page_count", 1)
+        self.manuscript.scene_nav.update_scenes(scenes)
+        self.manuscript.char_rail.update_characters(characters)
+        self.status_bar.update_info(
+            page=1,
+            total_pages=stats.get("page_count", 1),
+            scene=scenes[0]["heading"] if scenes else "",
+            dialect=project_data.get("meta", {}).get("format_id", "fountain/core"),
+        )
 
         plans = project_data.get("plan_documents", [])
         if plans:

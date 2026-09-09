@@ -119,6 +119,22 @@ class CompareDrafts(QDialog):
         self._show_diff()
 
     def _run_compare(self):
+        from_data = self.from_select.currentData()
+        to_data = self.to_select.currentData()
+        if from_data and to_data and self._snapshots:
+            from_hash = from_data.get("hash", "")
+            to_hash = to_data.get("hash", "")
+            if from_hash or to_hash:
+                try:
+                    from ecrit.stores.app_state import STATE
+                    from ecrit.ui.overlays.snapshots import get_snapshot_content
+                    if STATE.current_project_path:
+                        if from_hash:
+                            self._from_text = get_snapshot_content(STATE.current_project_path, from_hash)
+                        if to_hash:
+                            self._to_text = get_snapshot_content(STATE.current_project_path, to_hash)
+                except Exception:
+                    pass
         self._show_diff()
 
     def _show_diff(self):

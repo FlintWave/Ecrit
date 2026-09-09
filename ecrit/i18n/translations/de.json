@@ -1,0 +1,51 @@
+{
+    "_language_name": "Deutsch",
+
+    "app.title": "Écrit",
+    "app.new_project": "Neues Projekt",
+    "app.open_project": "Projekt öffnen",
+    "app.import_script": "Drehbuch importieren",
+    "app.save": "Speichern",
+    "app.settings": "Einstellungen",
+    "app.dashboard": "Übersicht",
+
+    "phase.plan": "Planen",
+    "phase.outline": "Gliederung",
+    "phase.manuscript": "Manuskript",
+    "phase.proofread": "Korrektur",
+    "phase.deliver": "Ausliefern",
+
+    "editor.start_writing": "Beginne zu schreiben...",
+    "editor.find_replace": "Suchen und ersetzen",
+    "editor.typewriter": "Schreibmaschine",
+    "editor.page_of": "Seite {page} von {total}",
+    "editor.words_today": "{words} / {target} heute",
+    "editor.scenes": "SZENEN",
+    "editor.characters": "FIGUREN",
+    "editor.documents": "DOKUMENTE",
+
+    "settings.title": "Einstellungen",
+    "settings.general": "Allgemein",
+    "settings.editor": "Editor",
+    "settings.theme": "Design",
+    "settings.about": "Über",
+    "settings.modules": "Module",
+    "settings.language": "Sprache",
+    "settings.author_name": "Autorenname",
+    "settings.author_email": "E-Mail des Autors",
+    "settings.appearance": "Darstellung",
+    "settings.nocturne": "Nocturne (Dunkel)",
+    "settings.organic": "Organic (Hell)",
+
+    "cmd.type_command": "Befehl eingeben...",
+
+    "collab.title": "Zusammenarbeit",
+    "collab.start_session": "Sitzung starten",
+    "collab.join_session": "Sitzung beitreten",
+    "collab.connected": "Verbunden",
+    "collab.disconnected": "Getrennt",
+
+    "companion.title": "Companion-Synchronisation",
+    "companion.never_synced": "Nie synchronisiert",
+    "companion.no_devices": "Keine gekoppelten Geräte"
+}

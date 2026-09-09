@@ -117,7 +117,25 @@ class TestGetStats:
     def test_stats_empty_without_core(self):
         s = AppState()
         result = s.get_stats()
-        assert result == {}
+        assert result["word_count"] == 0
+        assert result["page_count"] == 0
+        assert result["scene_count"] == 0
+        assert result["character_count"] == 0
+        assert result["dialogue_percentage"] == 0
+        assert result["action_percentage"] == 0
+        assert result["characters"] == []
+        assert result["scenes"] == []
+
+    def test_stats_with_script(self):
+        s = AppState()
+        s.script_content = "Title: Test\n\nINT. OFFICE - DAY\n\nJOHN\nHello there.\n\nEXT. PARK - NIGHT\n\nAction line here.\n"
+        result = s.get_stats()
+        assert result["word_count"] > 0
+        assert result["scene_count"] == 2
+        assert result["page_count"] >= 1
+        assert len(result["scenes"]) == 2
+        assert result["scenes"][0]["heading"] == "INT. OFFICE - DAY"
+        assert len(result["characters"]) >= 1
 
 
 class TestSaveScript:

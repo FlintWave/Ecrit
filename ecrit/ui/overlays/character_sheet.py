@@ -12,23 +12,44 @@ from ecrit.ui.styles import theme
 class MoodboardTile(QFrame):
     def __init__(self, parent=None):
         super().__init__(parent)
+        self._image_path = ""
         t = theme.current()
         self.setFixedSize(120, 120)
-        self.setStyleSheet(
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._default_style = (
             f"background: {t.neutral_800 if t.name == 'nocturne' else t.neutral_200}; "
             f"border: 2px dashed {t.neutral_700 if t.name == 'nocturne' else t.neutral_300}; "
             f"border-radius: {t.radius_md}px;"
         )
+        self.setStyleSheet(self._default_style)
         layout = QVBoxLayout(self)
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        icon = QLabel("+")
-        icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        icon.setStyleSheet(f"color: {t.neutral_500}; font-size: 24px; background: transparent;")
-        layout.addWidget(icon)
-        label = QLabel("Drop image")
-        label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        label.setStyleSheet(f"color: {t.neutral_500}; font-size: 11px; background: transparent;")
-        layout.addWidget(label)
+        self._icon = QLabel("+")
+        self._icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._icon.setStyleSheet(f"color: {t.neutral_500}; font-size: 24px; background: transparent;")
+        layout.addWidget(self._icon)
+        self._label = QLabel("Click to add")
+        self._label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._label.setStyleSheet(f"color: {t.neutral_500}; font-size: 11px; background: transparent;")
+        layout.addWidget(self._label)
+
+    def mousePressEvent(self, event):
+        from PySide6.QtWidgets import QFileDialog
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Select Image", "", "Images (*.png *.jpg *.jpeg *.bmp *.webp)"
+        )
+        if path:
+            self._image_path = path
+            self._icon.setText("")
+            self._label.setText(path.rsplit("/", 1)[-1][:14])
+            t = theme.current()
+            self.setStyleSheet(
+                f"border: 2px solid {t.accent}; border-radius: {t.radius_md}px; "
+                f"background: url({path}); background-size: cover;"
+            )
+
+    def get_image_path(self) -> str:
+        return self._image_path
 
 
 class CharacterSheet(QDialog):
