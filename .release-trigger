@@ -1,1 +1,1 @@
-Trigger rebuild with ctypes preload fix for macOS ARM cairo
+Trigger rebuild with /usr/local/lib symlink for cairo on macOS ARM
