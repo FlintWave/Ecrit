@@ -1,1 +1,1 @@
-Trigger rebuild with /usr/local/lib symlink for cairo on macOS ARM
+Trigger rebuild using rsvg-convert CLI instead of cairosvg Python
