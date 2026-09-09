@@ -27,9 +27,17 @@ def _run_git(project_path: str, *args) -> str:
         return ""
 
 
+def _ensure_git_identity(project_path: str):
+    name = _run_git(project_path, "config", "user.name")
+    if not name:
+        _run_git(project_path, "config", "user.name", "Ecrit")
+        _run_git(project_path, "config", "user.email", "ecrit@localhost")
+
+
 def init_repo(project_path: str):
     if not os.path.exists(os.path.join(project_path, ".git")):
         _run_git(project_path, "init")
+        _ensure_git_identity(project_path)
         _run_git(project_path, "add", "-A")
         _run_git(project_path, "commit", "-m", "Initial snapshot")
 
@@ -37,6 +45,8 @@ def init_repo(project_path: str):
 def create_snapshot(project_path: str, message: str = "") -> bool:
     if not os.path.exists(os.path.join(project_path, ".git")):
         init_repo(project_path)
+    else:
+        _ensure_git_identity(project_path)
 
     _run_git(project_path, "add", "-A")
 
