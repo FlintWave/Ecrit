@@ -5,7 +5,7 @@ description: "Screenplay writing app for Fountain and Fountain-derived dialects"
 milestones:
   - id: v0.1
     title: Foundation
-    status: in_progress
+    status: done
     target: "2025-Q1"
     features:
       - rust-core
@@ -17,7 +17,7 @@ milestones:
 
   - id: v0.2
     title: Full Editor
-    status: planned
+    status: done
     target: "2025-Q2"
     features:
       - plan-phase
@@ -29,7 +29,7 @@ milestones:
 
   - id: v0.3
     title: Project Management
-    status: planned
+    status: done
     target: "2025-Q2"
     features:
       - new-project-wizard
@@ -39,7 +39,7 @@ milestones:
 
   - id: v0.4
     title: Polish
-    status: planned
+    status: done
     target: "2025-Q3"
     features:
       - find-replace
@@ -54,7 +54,7 @@ milestones:
 
   - id: v0.5
     title: Export & Sync
-    status: planned
+    status: done
     target: "2025-Q3"
     features:
       - pdf-export
@@ -66,7 +66,7 @@ milestones:
 
   - id: v1.0
     title: Release
-    status: planned
+    status: done
     target: "2025-Q4"
     features:
       - series-projects

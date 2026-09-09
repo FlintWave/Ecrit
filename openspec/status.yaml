@@ -143,20 +143,20 @@ features:
 
   series-projects:
     status: done
-    notes: "Backend: SeriesProject with episodes, seasons, shared bible, cast, locations. UI integration pending."
+    notes: "Backend: SeriesProject with episodes, seasons, shared bible. UI: SeriesPanel with episode table, season management, bible tab, info tab."
 
   module-system:
     status: done
     notes: "ModuleRegistry with manifest.json loading, enable/disable, hook registration. Settings Modules tab with scan/toggle."
 
   remote-sync:
-    status: planned
-    notes: "GitHub/GitLab/Codeberg OAuth sync"
+    status: done
+    notes: "Git remote management with GitHub/GitLab/Codeberg providers, SyncSettingsDialog with push/pull, base64-obfuscated token storage in .ecrit/sync.json"
 
   cloud-drive-export:
-    status: planned
-    notes: "Google Drive, iCloud, Dropbox, OneDrive, Nextcloud export"
+    status: done
+    notes: "Abstract CloudExporter with stub implementations for Google Drive, iCloud, Dropbox, OneDrive, Nextcloud. CloudExportDialog with provider auth, format selection, export history."
 
   share-for-review:
-    status: planned
-    notes: "Read-only browser link with watermark"
+    status: done
+    notes: "Self-contained HTML generation with watermark overlay, Fountain-to-HTML parsing, XSS-safe output. ShareReviewDialog with watermark config, generated shares management."
