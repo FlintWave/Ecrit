@@ -214,12 +214,13 @@ class MainWindow(QMainWindow):
             self._auto_export_if_enabled()
 
     def _auto_sync_if_enabled(self):
-        from ecrit.sync.remote_sync import load_remote_config, push_project
+        from ecrit.sync.remote_sync import load_remote_config, push_to_remote
         config, _result = load_remote_config(STATE.current_project_path)
         if config and config.auto_sync and config.remote_url:
-            push_project(STATE.current_project_path, config)
+            push_to_remote(STATE.current_project_path, config)
 
     def _auto_export_if_enabled(self):
+        import tempfile
         from ecrit.sync.cloud_export import load_cloud_configs, get_exporter
         configs = load_cloud_configs(STATE.current_project_path)
         for cfg in configs:
@@ -228,9 +229,20 @@ class MainWindow(QMainWindow):
                 content = self.editor.manuscript.editor.toPlainText()
                 title = self._editor_title_bar.context_label.text() or "Untitled"
                 try:
-                    exporter.upload(content.encode("utf-8"), f"{title}.fountain", cfg.folder_path)
+                    with tempfile.NamedTemporaryFile(
+                        mode="w", suffix=".fountain", delete=False, encoding="utf-8"
+                    ) as tmp:
+                        tmp.write(content)
+                        tmp_path = tmp.name
+                    exporter.upload_file(tmp_path, cfg.folder_path)
                 except Exception:
                     pass
+                finally:
+                    import os
+                    try:
+                        os.unlink(tmp_path)
+                    except OSError:
+                        pass
 
     def _on_project_created(self, path: str):
         self._open_project(path)

@@ -179,6 +179,14 @@ class Dashboard(QWidget):
         date_label.setStyleSheet(f"color: {t.neutral_500}; font-size: 14px; padding-top: 8px;")
         header.addWidget(date_label)
         header.addStretch()
+
+        settings_btn = QPushButton("⚙")
+        settings_btn.setObjectName("iconBtn")
+        settings_btn.setFixedSize(36, 36)
+        settings_btn.setToolTip("Settings")
+        settings_btn.clicked.connect(self.open_settings.emit)
+        header.addWidget(settings_btn)
+
         inner_layout.addLayout(header)
 
         hero = QHBoxLayout()

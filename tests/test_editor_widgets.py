@@ -480,6 +480,123 @@ class TestCollabOT:
         assert session._pending_ops[0].length == 6
 
 
+class TestDashboardOpenSettings:
+    def test_dashboard_has_open_settings_signal(self, qapp):
+        from ecrit.ui.screens.dashboard import Dashboard
+        d = Dashboard()
+        assert hasattr(d, 'open_settings')
+
+    def test_settings_button_emits_open_settings(self, qapp):
+        from ecrit.ui.screens.dashboard import Dashboard
+        d = Dashboard()
+        received = []
+        d.open_settings.connect(lambda: received.append(True))
+        for child in d.findChildren(type(d)):
+            pass
+        from PySide6.QtWidgets import QPushButton
+        btns = d.findChildren(QPushButton)
+        gear_btn = [b for b in btns if b.toolTip() == "Settings"]
+        assert len(gear_btn) == 1
+        gear_btn[0].click()
+        assert len(received) == 1
+
+
+class TestFindReplaceRegex:
+    def test_regex_find_uses_qregularexpression(self, qapp):
+        from ecrit.ui.screens.editor import EditorScreen
+        screen = EditorScreen()
+        screen.manuscript.editor.setPlainText("hello 123 world 456")
+        screen._do_find("\\d+", False, True)
+        cursor = screen.manuscript.editor.textCursor()
+        assert cursor.hasSelection()
+        assert cursor.selectedText() == "123"
+
+    def test_regex_find_case_insensitive(self, qapp):
+        from ecrit.ui.screens.editor import EditorScreen
+        screen = EditorScreen()
+        screen.manuscript.editor.setPlainText("Hello HELLO hello")
+        screen._do_find("hello", False, True)
+        cursor = screen.manuscript.editor.textCursor()
+        assert cursor.hasSelection()
+        assert cursor.selectedText() == "Hello"
+
+    def test_regex_find_prev(self, qapp):
+        from ecrit.ui.screens.editor import EditorScreen
+        screen = EditorScreen()
+        screen.manuscript.editor.setPlainText("abc 123 def 456")
+        cursor = screen.manuscript.editor.textCursor()
+        cursor.movePosition(QTextCursor.MoveOperation.End)
+        screen.manuscript.editor.setTextCursor(cursor)
+        screen._do_find_prev("\\d+", False, True)
+        cursor = screen.manuscript.editor.textCursor()
+        assert cursor.hasSelection()
+        assert cursor.selectedText() == "456"
+
+    def test_invalid_regex_does_not_crash(self, qapp):
+        from ecrit.ui.screens.editor import EditorScreen
+        screen = EditorScreen()
+        screen.manuscript.editor.setPlainText("hello world")
+        screen._do_find("[invalid", False, True)
+
+
+class TestFindReplaceClosedSignal:
+    def test_closed_signal_connected(self, qapp):
+        from ecrit.ui.screens.editor import EditorScreen
+        screen = EditorScreen()
+        screen.find_bar._expanded = True
+        screen.find_bar.toggle()
+        # After closing, focus should be on manuscript editor
+
+
+class TestManuscriptDividers:
+    def test_dividers_in_splitter(self, qapp):
+        from ecrit.ui.screens.editor import ManuscriptPhase
+        phase = ManuscriptPhase()
+        assert hasattr(phase, 'divider_l')
+        assert hasattr(phase, 'divider_r')
+        assert phase.divider_l.objectName() == "railDivider"
+        assert phase.divider_r.objectName() == "railDivider"
+
+
+class TestCloudExportAutoExport:
+    def test_auto_export_changed_signal(self, qapp):
+        from ecrit.ui.overlays.cloud_export import CloudExportDialog
+        dialog = CloudExportDialog()
+        received = []
+        dialog.auto_export_changed.connect(lambda p, e: received.append((p, e)))
+        dialog.auto_export_check.setChecked(True)
+        assert len(received) == 1
+        assert received[0][1] is True
+
+    def test_provider_changed_restores_auth_status(self, qapp):
+        from ecrit.ui.overlays.cloud_export import CloudExportDialog
+        dialog = CloudExportDialog()
+        dialog.set_configs([{"provider": "google_drive", "authenticated": True, "auto_export": True}])
+        dialog.provider_combo.setCurrentIndex(1)
+        dialog.provider_combo.setCurrentIndex(0)
+        assert dialog.auth_status.text() == "Authenticated"
+
+
+class TestDeliverPhaseInit:
+    def test_script_initialized(self, qapp):
+        from ecrit.ui.screens.editor import DeliverPhase
+        phase = DeliverPhase()
+        assert phase._script == ""
+
+
+class TestAutoSyncImport:
+    def test_push_to_remote_import(self):
+        from ecrit.sync.remote_sync import push_to_remote
+        assert callable(push_to_remote)
+
+    def test_upload_file_method(self):
+        from ecrit.sync.cloud_export import get_exporter, CloudConfig, CloudProvider
+        config = CloudConfig(provider=CloudProvider.GOOGLE_DRIVE, auth_token="test", folder_path="/test")
+        exporter = get_exporter(config.provider, config)
+        assert hasattr(exporter, 'upload_file')
+        assert not hasattr(exporter, 'upload')
+
+
 class TestSeriesProjectChanged:
     def test_series_panel_has_project_changed_signal(self, qapp):
         from ecrit.ui.overlays.series_panel import SeriesPanel

@@ -752,9 +752,9 @@ class ManuscriptPhase(QWidget):
         self.scene_nav = SceneNavigator()
         self.scene_nav.setFixedWidth(216)
 
-        divider_l = QFrame()
-        divider_l.setObjectName("railDivider")
-        divider_l.setFixedWidth(1)
+        self.divider_l = QFrame()
+        self.divider_l.setObjectName("railDivider")
+        self.divider_l.setFixedWidth(1)
 
         center = QWidget()
         center_layout = QVBoxLayout(center)
@@ -778,20 +778,24 @@ class ManuscriptPhase(QWidget):
 
         center_layout.addWidget(self.page_frame)
 
-        divider_r = QFrame()
-        divider_r.setObjectName("railDivider")
-        divider_r.setFixedWidth(1)
+        self.divider_r = QFrame()
+        self.divider_r.setObjectName("railDivider")
+        self.divider_r.setFixedWidth(1)
 
         self.char_rail = CharacterRail()
         self.char_rail.setFixedWidth(264)
 
         splitter = QSplitter(Qt.Orientation.Horizontal)
         splitter.addWidget(self.scene_nav)
+        splitter.addWidget(self.divider_l)
         splitter.addWidget(center)
+        splitter.addWidget(self.divider_r)
         splitter.addWidget(self.char_rail)
         splitter.setStretchFactor(0, 0)
-        splitter.setStretchFactor(1, 1)
-        splitter.setStretchFactor(2, 0)
+        splitter.setStretchFactor(1, 0)
+        splitter.setStretchFactor(2, 1)
+        splitter.setStretchFactor(3, 0)
+        splitter.setStretchFactor(4, 0)
         splitter.setSizes([216, 600, 264])
 
         layout.addWidget(splitter)
@@ -909,6 +913,7 @@ class DeliverPhase(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        self._script = ""
         self._revision_tracker = RevisionTracker()
 
         layout = QHBoxLayout(self)
@@ -1192,6 +1197,7 @@ class EditorScreen(QWidget):
         self.find_bar.find_prev.connect(self._do_find_prev)
         self.find_bar.replace_one.connect(self._do_replace)
         self.find_bar.replace_all.connect(self._do_replace_all)
+        self.find_bar.closed.connect(self._on_find_closed)
         layout.addWidget(self.find_bar)
 
         self.plan = PlanPhase()
@@ -1307,33 +1313,72 @@ class EditorScreen(QWidget):
     def _toggle_find(self):
         self.find_bar.toggle()
 
+    def _on_find_closed(self):
+        self.manuscript.editor.setFocus()
+
     def _do_find(self, text, case_sensitive, regex):
         if not text:
             return
         editor = self.manuscript.editor
-        flags = QTextDocument.FindFlag(0)
-        if case_sensitive:
-            flags |= QTextDocument.FindFlag.FindCaseSensitively
-        found = editor.find(text, flags)
-        if not found:
-            cursor = editor.textCursor()
-            cursor.movePosition(QTextCursor.MoveOperation.Start)
-            editor.setTextCursor(cursor)
-            editor.find(text, flags)
+        if regex:
+            import re as _re
+            try:
+                rx_flags = 0 if case_sensitive else _re.IGNORECASE
+                pattern = _re.compile(text, rx_flags)
+            except _re.error:
+                return
+            from PySide6.QtCore import QRegularExpression
+            opts = QRegularExpression.PatternOption.NoPatternOption
+            if not case_sensitive:
+                opts |= QRegularExpression.PatternOption.CaseInsensitiveOption
+            qre = QRegularExpression(text)
+            qre.setPatternOptions(opts)
+            flags = QTextDocument.FindFlag(0)
+            found = editor.find(qre, flags)
+            if not found:
+                cursor = editor.textCursor()
+                cursor.movePosition(QTextCursor.MoveOperation.Start)
+                editor.setTextCursor(cursor)
+                editor.find(qre, flags)
+        else:
+            flags = QTextDocument.FindFlag(0)
+            if case_sensitive:
+                flags |= QTextDocument.FindFlag.FindCaseSensitively
+            found = editor.find(text, flags)
+            if not found:
+                cursor = editor.textCursor()
+                cursor.movePosition(QTextCursor.MoveOperation.Start)
+                editor.setTextCursor(cursor)
+                editor.find(text, flags)
 
     def _do_find_prev(self, text, case_sensitive, regex):
         if not text:
             return
         editor = self.manuscript.editor
-        flags = QTextDocument.FindFlag.FindBackward
-        if case_sensitive:
-            flags |= QTextDocument.FindFlag.FindCaseSensitively
-        found = editor.find(text, flags)
-        if not found:
-            cursor = editor.textCursor()
-            cursor.movePosition(QTextCursor.MoveOperation.End)
-            editor.setTextCursor(cursor)
-            editor.find(text, flags)
+        if regex:
+            from PySide6.QtCore import QRegularExpression
+            opts = QRegularExpression.PatternOption.NoPatternOption
+            if not case_sensitive:
+                opts |= QRegularExpression.PatternOption.CaseInsensitiveOption
+            qre = QRegularExpression(text)
+            qre.setPatternOptions(opts)
+            flags = QTextDocument.FindFlag.FindBackward
+            found = editor.find(qre, flags)
+            if not found:
+                cursor = editor.textCursor()
+                cursor.movePosition(QTextCursor.MoveOperation.End)
+                editor.setTextCursor(cursor)
+                editor.find(qre, flags)
+        else:
+            flags = QTextDocument.FindFlag.FindBackward
+            if case_sensitive:
+                flags |= QTextDocument.FindFlag.FindCaseSensitively
+            found = editor.find(text, flags)
+            if not found:
+                cursor = editor.textCursor()
+                cursor.movePosition(QTextCursor.MoveOperation.End)
+                editor.setTextCursor(cursor)
+                editor.find(text, flags)
 
     def _do_replace(self, find_text, replace_text):
         editor = self.manuscript.editor

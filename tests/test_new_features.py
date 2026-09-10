@@ -550,21 +550,29 @@ class TestMainWindowNewFeatures:
         from ecrit.main import MainWindow
         win = MainWindow()
         assert hasattr(win, "_series_panel")
+        win.close()
+        qapp.processEvents()
 
     def test_has_sync_dialog(self, qapp):
         from ecrit.main import MainWindow
         win = MainWindow()
         assert hasattr(win, "_sync_dialog")
+        win.close()
+        qapp.processEvents()
 
     def test_has_cloud_export_dialog(self, qapp):
         from ecrit.main import MainWindow
         win = MainWindow()
         assert hasattr(win, "_cloud_export_dialog")
+        win.close()
+        qapp.processEvents()
 
     def test_has_share_dialog(self, qapp):
         from ecrit.main import MainWindow
         win = MainWindow()
         assert hasattr(win, "_share_dialog")
+        win.close()
+        qapp.processEvents()
 
     def test_handlers_wired(self, qapp):
         from ecrit.main import MainWindow
@@ -573,6 +581,8 @@ class TestMainWindowNewFeatures:
         assert hasattr(win, "_show_sync_settings")
         assert hasattr(win, "_show_cloud_export")
         assert hasattr(win, "_show_share_review")
+        win.close()
+        qapp.processEvents()
 
 
 # ---------------------------------------------------------------------------
