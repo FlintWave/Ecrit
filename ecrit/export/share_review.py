@@ -318,6 +318,8 @@ def generate_review_html(
     title: str = "Untitled",
     author: str = "",
     watermark_text: str = "CONFIDENTIAL",
+    include_title_page: bool = True,
+    include_page_numbers: bool = True,
 ) -> str:
     """Return a complete self-contained HTML document for read-only review.
 
@@ -331,6 +333,10 @@ def generate_review_html(
         Author credit shown in the header.
     watermark_text:
         Text repeated diagonally across the page as a low-opacity watermark.
+    include_title_page:
+        Whether to include the title/author header block.
+    include_page_numbers:
+        Whether to include CSS-generated page numbers for print.
     """
     elements = _parse_fountain_to_elements(content)
 
@@ -345,9 +351,28 @@ def generate_review_html(
 
     screenplay_html = "\n".join(body_parts)
 
-    # Build watermark tiles (enough to cover the rotated area)
     wm_escaped = escape(watermark_text)
     watermark_spans = (f"<span>{wm_escaped}</span>" * 200) if watermark_text else ""
+
+    header_html = ""
+    if include_title_page:
+        header_html = f"""\
+<div class="header">
+  <h1>{escape(title)}</h1>
+  <p class="author">{escape(author)}</p>
+  <p class="notice">Confidential — For Review Only</p>
+</div>"""
+
+    page_number_css = ""
+    if include_page_numbers:
+        page_number_css = """
+@media print {
+  @page { @bottom-right { content: counter(page); font-size: 10pt; color: var(--muted); } }
+  .screenplay { counter-reset: page; }
+}
+.screenplay { counter-reset: screenplay-page; }
+.page-break { counter-increment: screenplay-page; }
+"""
 
     html = f"""\
 <!DOCTYPE html>
@@ -358,6 +383,7 @@ def generate_review_html(
 <title>{escape(title)} — Review</title>
 <style>
 {_CSS}
+{page_number_css}
 </style>
 </head>
 <body>
@@ -366,11 +392,7 @@ def generate_review_html(
     {watermark_spans}
   </div>
 </div>
-<div class="header">
-  <h1>{escape(title)}</h1>
-  <p class="author">{escape(author)}</p>
-  <p class="notice">Confidential — For Review Only</p>
-</div>
+{header_html}
 <div class="screenplay">
 {screenplay_html}
 </div>

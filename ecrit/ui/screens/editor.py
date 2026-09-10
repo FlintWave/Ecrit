@@ -83,6 +83,21 @@ class FountainHighlighter(QSyntaxHighlighter):
                 self.setFormat(0, len(text), self.char_fmt)
 
 
+class LineNumberArea(QWidget):
+    """Gutter widget that draws line numbers beside the script editor."""
+
+    def __init__(self, editor: "ScriptEditor"):
+        super().__init__(editor)
+        self._editor = editor
+
+    def sizeHint(self):
+        from PySide6.QtCore import QSize
+        return QSize(self._editor.line_number_area_width(), 0)
+
+    def paintEvent(self, event):
+        self._editor.line_number_area_paint(event)
+
+
 class ScriptEditor(QPlainTextEdit):
     """Courier Prime script editor with typewriter scrolling."""
 
@@ -102,6 +117,9 @@ class ScriptEditor(QPlainTextEdit):
         self.highlighter = FountainHighlighter(self.document())
 
         self._typewriter = True
+        self._show_line_numbers = False
+        self._line_number_area = LineNumberArea(self)
+
         self._save_timer = QTimer()
         self._save_timer.setSingleShot(True)
         self._save_timer.setInterval(1000)
@@ -109,6 +127,63 @@ class ScriptEditor(QPlainTextEdit):
 
         self.textChanged.connect(self._on_text_changed)
         self.cursorPositionChanged.connect(self._on_cursor_moved)
+        self.blockCountChanged.connect(self._update_line_number_area_width)
+        self.updateRequest.connect(self._update_line_number_area)
+
+        self._update_line_number_area_width()
+
+    def set_line_numbers_visible(self, visible: bool):
+        self._show_line_numbers = visible
+        self._update_line_number_area_width()
+        self._line_number_area.setVisible(visible)
+
+    def line_number_area_width(self) -> int:
+        if not self._show_line_numbers:
+            return 0
+        digits = max(1, len(str(self.blockCount())))
+        return 8 + self.fontMetrics().horizontalAdvance("9") * (digits + 1)
+
+    def _update_line_number_area_width(self, _new_count: int = 0):
+        self.setViewportMargins(self.line_number_area_width(), 0, 0, 0)
+
+    def _update_line_number_area(self, rect, dy):
+        if dy:
+            self._line_number_area.scroll(0, dy)
+        else:
+            self._line_number_area.update(0, rect.y(), self._line_number_area.width(), rect.height())
+        if rect.contains(self.viewport().rect()):
+            self._update_line_number_area_width()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        cr = self.contentsRect()
+        self._line_number_area.setGeometry(cr.left(), cr.top(), self.line_number_area_width(), cr.height())
+
+    def line_number_area_paint(self, event):
+        if not self._show_line_numbers:
+            return
+        p = QPainter(self._line_number_area)
+        t = theme.current()
+        p.fillRect(event.rect(), QColor(t.surface))
+
+        block = self.firstVisibleBlock()
+        block_number = block.blockNumber()
+        top = int(self.blockBoundingGeometry(block).translated(self.contentOffset()).top())
+        bottom = top + int(self.blockBoundingRect(block).height())
+
+        while block.isValid() and top <= event.rect().bottom():
+            if block.isVisible() and bottom >= event.rect().top():
+                p.setPen(QColor(t.neutral_500))
+                p.drawText(
+                    0, top, self._line_number_area.width() - 4,
+                    self.fontMetrics().height(),
+                    Qt.AlignmentFlag.AlignRight, str(block_number + 1),
+                )
+            block = block.next()
+            top = bottom
+            bottom = top + int(self.blockBoundingRect(block).height())
+            block_number += 1
+        p.end()
 
     def _on_text_changed(self):
         self._save_timer.start()
@@ -621,6 +696,8 @@ class OutlineCanvas(QWidget):
             self._dragging = True
             self._last_pos = event.position()
             self.setCursor(Qt.CursorShape.ClosedHandCursor)
+        elif event.button() == Qt.MouseButton.RightButton:
+            self._show_context_menu(event.position(), event.globalPosition().toPoint())
 
     def mouseReleaseEvent(self, event):
         self._dragging = False
@@ -633,6 +710,34 @@ class OutlineCanvas(QWidget):
             self._pan_y += delta.y()
             self._last_pos = event.position()
             self.update()
+
+    def _show_context_menu(self, local_pos, global_pos):
+        canvas_x = (local_pos.x() - self._pan_x) / self._zoom
+        canvas_y = (local_pos.y() - self._pan_y) / self._zoom
+
+        menu = QMenu(self)
+        add_scene = menu.addAction("Add Scene")
+        add_act = menu.addAction("Add Act Break")
+        add_note = menu.addAction("Add Note")
+        add_transition = menu.addAction("Add Transition")
+
+        action = menu.exec(global_pos)
+        if action == add_scene:
+            self._add_node_at(canvas_x, canvas_y, "Scene", f"Scene {len(self._nodes) + 1}")
+        elif action == add_act:
+            self._add_node_at(canvas_x, canvas_y, "ActBreak", f"Act {len(self._nodes) + 1}")
+        elif action == add_note:
+            self._add_node_at(canvas_x, canvas_y, "Note", "Note")
+        elif action == add_transition:
+            self._add_node_at(canvas_x, canvas_y, "Transition", "Transition")
+
+    def _add_node_at(self, x: float, y: float, kind: str, label: str):
+        new_id = f"node_{len(self._nodes) + 1}"
+        self._nodes.append({
+            "id": new_id, "kind": kind, "label": label,
+            "synopsis": "", "x": x, "y": y, "connections": [],
+        })
+        self.update()
 
 
 class ManuscriptPhase(QWidget):
@@ -655,6 +760,11 @@ class ManuscriptPhase(QWidget):
         center_layout = QVBoxLayout(center)
         center_layout.setContentsMargins(0, 0, 0, 0)
         center_layout.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+
+        from ecrit.ui.components.presence_indicators import PresenceBar
+        self.presence_bar = PresenceBar()
+        self.presence_bar.setVisible(False)
+        center_layout.addWidget(self.presence_bar)
 
         self.page_frame = QFrame()
         self.page_frame.setStyleSheet(f"background: {theme.current().surface}; border-radius: 4px;")

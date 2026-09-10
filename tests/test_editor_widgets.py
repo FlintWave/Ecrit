@@ -353,3 +353,144 @@ class TestSyncConfigBug:
         assert len(result) == 2
         config, sync_result = result
         assert config is None
+
+
+class TestLineNumbers:
+    def test_line_number_area_created(self, qapp):
+        from ecrit.ui.screens.editor import ScriptEditor
+        editor = ScriptEditor()
+        assert hasattr(editor, '_line_number_area')
+        assert hasattr(editor, '_show_line_numbers')
+        assert editor._show_line_numbers is False
+
+    def test_set_line_numbers_visible(self, qapp):
+        from ecrit.ui.screens.editor import ScriptEditor
+        editor = ScriptEditor()
+        editor.set_line_numbers_visible(True)
+        assert editor._show_line_numbers is True
+        assert not editor._line_number_area.isHidden()
+        editor.set_line_numbers_visible(False)
+        assert editor._show_line_numbers is False
+        assert editor._line_number_area.isHidden()
+
+    def test_line_number_area_width_zero_when_hidden(self, qapp):
+        from ecrit.ui.screens.editor import ScriptEditor
+        editor = ScriptEditor()
+        assert editor.line_number_area_width() == 0
+
+    def test_line_number_area_width_nonzero_when_visible(self, qapp):
+        from ecrit.ui.screens.editor import ScriptEditor
+        editor = ScriptEditor()
+        editor.set_line_numbers_visible(True)
+        assert editor.line_number_area_width() > 0
+
+
+class TestPresenceBar:
+    def test_presence_bar_in_manuscript(self, qapp):
+        from ecrit.ui.screens.editor import ManuscriptPhase
+        mp = ManuscriptPhase()
+        assert hasattr(mp, 'presence_bar')
+        assert not mp.presence_bar.isVisible()
+
+    def test_presence_bar_set_participants(self, qapp):
+        from ecrit.ui.components.presence_indicators import PresenceBar
+        bar = PresenceBar()
+        bar.set_participants([
+            {"user_id": "a", "user_name": "Alice", "color": "#4FC3F7"},
+            {"user_id": "b", "user_name": "Bob", "color": "#81C784"},
+        ])
+        assert len(bar._badges) == 2
+
+    def test_presence_bar_clear(self, qapp):
+        from ecrit.ui.components.presence_indicators import PresenceBar
+        bar = PresenceBar()
+        bar.set_participants([{"user_id": "a", "user_name": "Alice", "color": "#4FC3F7"}])
+        bar.clear_participants()
+        assert len(bar._badges) == 0
+
+
+class TestOutlineContextMenu:
+    def test_add_node_at(self, qapp):
+        from ecrit.ui.screens.editor import OutlineCanvas
+        canvas = OutlineCanvas()
+        canvas._add_node_at(100, 200, "Scene", "Test Scene")
+        assert len(canvas._nodes) == 1
+        assert canvas._nodes[0]["kind"] == "Scene"
+        assert canvas._nodes[0]["x"] == 100
+        assert canvas._nodes[0]["y"] == 200
+
+    def test_add_multiple_node_types(self, qapp):
+        from ecrit.ui.screens.editor import OutlineCanvas
+        canvas = OutlineCanvas()
+        canvas._add_node_at(0, 0, "ActBreak", "Act 1")
+        canvas._add_node_at(0, 100, "Note", "A note")
+        canvas._add_node_at(0, 200, "Transition", "CUT TO:")
+        assert len(canvas._nodes) == 3
+        assert canvas._nodes[0]["kind"] == "ActBreak"
+        assert canvas._nodes[1]["kind"] == "Note"
+        assert canvas._nodes[2]["kind"] == "Transition"
+
+
+class TestShareReviewOptions:
+    def test_generate_review_html_with_title_page(self):
+        from ecrit.export.share_review import generate_review_html
+        html = generate_review_html("INT. OFFICE - DAY", title="Test", include_title_page=True)
+        assert '<div class="header">' in html
+        assert "<h1>Test</h1>" in html
+
+    def test_generate_review_html_without_title_page(self):
+        from ecrit.export.share_review import generate_review_html
+        html = generate_review_html("INT. OFFICE - DAY", title="Test", include_title_page=False)
+        assert '<div class="header">' not in html
+
+    def test_generate_review_html_with_page_numbers(self):
+        from ecrit.export.share_review import generate_review_html
+        html = generate_review_html("INT. OFFICE - DAY", include_page_numbers=True)
+        assert "@page" in html
+
+    def test_generate_review_html_without_page_numbers(self):
+        from ecrit.export.share_review import generate_review_html
+        html = generate_review_html("INT. OFFICE - DAY", include_page_numbers=False)
+        assert "@page" not in html
+
+
+class TestCollabOT:
+    def test_transform_applied_to_remote_ops(self):
+        from ecrit.collab.session import CollabSession
+        session = CollabSession(user_name="Test")
+        assert hasattr(session, '_pending_ops')
+        assert session._pending_ops == []
+
+    def test_pending_ops_populated_on_local_insert(self):
+        from ecrit.collab.session import CollabSession
+        session = CollabSession(user_name="Test")
+        session._crdt.set_text("hello")
+        session._p2p.broadcast = MagicMock()
+        session.apply_local_insert(5, " world")
+        assert len(session._pending_ops) == 1
+        assert session._pending_ops[0].text == " world"
+
+    def test_pending_ops_populated_on_local_delete(self):
+        from ecrit.collab.session import CollabSession
+        session = CollabSession(user_name="Test")
+        session._crdt.set_text("hello world")
+        session._p2p.broadcast = MagicMock()
+        session.apply_local_delete(5, 6)
+        assert len(session._pending_ops) == 1
+        assert session._pending_ops[0].length == 6
+
+
+class TestSeriesProjectChanged:
+    def test_series_panel_has_project_changed_signal(self, qapp):
+        from ecrit.ui.overlays.series_panel import SeriesPanel
+        panel = SeriesPanel()
+        assert hasattr(panel, 'project_changed')
+
+    def test_save_series_project(self, tmp_path):
+        from ecrit.screenplay.series_projects import SeriesProject, save_series_project
+        import json
+        project = SeriesProject(title="Test Series")
+        path = str(tmp_path / "series.json")
+        save_series_project(project, path)
+        data = json.loads(open(path).read())
+        assert data["title"] == "Test Series"

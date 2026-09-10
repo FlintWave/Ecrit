@@ -127,6 +127,7 @@ class MainWindow(QMainWindow):
 
         self._series_panel = SeriesPanel(self)
         self._series_panel.episode_selected.connect(self._on_episode_selected)
+        self._series_panel.project_changed.connect(self._on_series_project_changed)
 
         self._sync_dialog = SyncSettingsDialog(self)
         self._sync_dialog.sync_requested.connect(self._on_sync_requested)
@@ -208,6 +209,28 @@ class MainWindow(QMainWindow):
         STATE.script_content = self.editor.manuscript.editor.toPlainText()
         saved = STATE.save_script()
         self._editor_title_bar.save_dot.set_saved(saved)
+        if saved and STATE.current_project_path:
+            self._auto_sync_if_enabled()
+            self._auto_export_if_enabled()
+
+    def _auto_sync_if_enabled(self):
+        from ecrit.sync.remote_sync import load_remote_config, push_project
+        config, _result = load_remote_config(STATE.current_project_path)
+        if config and config.auto_sync and config.remote_url:
+            push_project(STATE.current_project_path, config)
+
+    def _auto_export_if_enabled(self):
+        from ecrit.sync.cloud_export import load_cloud_configs, get_exporter
+        configs = load_cloud_configs(STATE.current_project_path)
+        for cfg in configs:
+            if cfg.auto_export:
+                exporter = get_exporter(cfg.provider, cfg)
+                content = self.editor.manuscript.editor.toPlainText()
+                title = self._editor_title_bar.context_label.text() or "Untitled"
+                try:
+                    exporter.upload(content.encode("utf-8"), f"{title}.fountain", cfg.folder_path)
+                except Exception:
+                    pass
 
     def _on_project_created(self, path: str):
         self._open_project(path)
@@ -393,6 +416,16 @@ class MainWindow(QMainWindow):
                 if ep.script_path:
                     self._open_project(ep.script_path)
 
+    def _on_series_project_changed(self):
+        if not STATE.current_project_path:
+            return
+        project = self._series_panel._project
+        if project:
+            from ecrit.screenplay.series_projects import save_series_project
+            import os
+            series_path = os.path.join(STATE.current_project_path, "series.json")
+            save_series_project(project, series_path)
+
     def _show_sync_settings(self):
         if STATE.current_project_path:
             from ecrit.sync.remote_sync import load_remote_config
@@ -470,7 +503,12 @@ class MainWindow(QMainWindow):
             return
         content = self.editor.manuscript.editor.toPlainText()
         title = self._editor_title_bar.context_label.text() or "Untitled"
-        html = generate_review_html(content, title, author="", watermark_text=watermark)
+        options = self._share_dialog.get_options()
+        html = generate_review_html(
+            content, title, author="", watermark_text=watermark,
+            include_title_page=options.get("include_title_page", True),
+            include_page_numbers=options.get("include_page_numbers", True),
+        )
         path = generate_share_link(html, STATE.current_project_path)
         import datetime
         self._share_dialog.add_share({
@@ -493,11 +531,10 @@ class MainWindow(QMainWindow):
         if STATE.current_project_path and session.role.value == "host":
             content = self.editor.manuscript.editor.toPlainText()
             session._crdt.set_text(content)
+        self.editor.manuscript.presence_bar.setVisible(True)
         session.set_callbacks(
             on_text_change=self._on_collab_text_change,
-            on_participant_change=lambda: self._collab_dialog.update_participants(
-                len(session.participants)
-            ),
+            on_participant_change=lambda: self._on_collab_participants_changed(session),
         )
 
     def _on_collab_text_change(self, text: str):
@@ -512,8 +549,18 @@ class MainWindow(QMainWindow):
             editor.blockSignals(False)
             STATE.script_content = text
 
+    def _on_collab_participants_changed(self, session):
+        self._collab_dialog.update_participants(len(session.participants))
+        participants = [
+            {"user_id": p.user_id, "user_name": p.user_name, "color": p.color}
+            for p in session.get_participants()
+        ]
+        self.editor.manuscript.presence_bar.set_participants(participants)
+
     def _on_collab_left(self):
         self.editor.status_bar.sprint_label.setText("")
+        self.editor.manuscript.presence_bar.clear_participants()
+        self.editor.manuscript.presence_bar.setVisible(False)
 
     def _show_companion(self):
         self._companion_dialog.exec()
@@ -665,6 +712,9 @@ class MainWindow(QMainWindow):
             self.editor.manuscript.editor._save_timer.setInterval(0)
             self.editor.manuscript.editor._save_timer.stop()
         self.editor.manuscript.editor._typewriter = settings.get("typewriter", True)
+        self.editor.manuscript.editor.set_line_numbers_visible(
+            settings.get("line_numbers", False)
+        )
 
     def _on_plugin_installed(self, plugin_id: str):
         if hasattr(self._settings_dialog, '_module_registry') and self._settings_dialog._module_registry:

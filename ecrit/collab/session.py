@@ -52,6 +52,7 @@ class CollabSession:
         self._lan = LANDiscovery(self.user_id, self.user_name)
         self._p2p = P2PConnection(self.user_id, self.user_name)
         self._participants: dict[str, Participant] = {}
+        self._pending_ops: list = []
         self._color_index = 0
 
         self._on_state_change: Optional[Callable[[SessionState], None]] = None
@@ -159,11 +160,13 @@ class CollabSession:
 
     def apply_local_insert(self, position: int, text: str) -> None:
         op = self._crdt.insert(position, text)
+        self._pending_ops.append(op)
         msg = CollabMessage.operation(self.user_id, op)
         self._p2p.broadcast(msg.to_json())
 
     def apply_local_delete(self, position: int, length: int) -> None:
         op = self._crdt.delete(position, length)
+        self._pending_ops.append(op)
         msg = CollabMessage.operation(self.user_id, op)
         self._p2p.broadcast(msg.to_json())
 
@@ -218,6 +221,9 @@ class CollabSession:
 
         elif msg.msg_type == MessageType.OPERATION:
             op = Operation.from_dict(msg.payload)
+            for pending in self._pending_ops:
+                op = self._crdt.transform(op, pending)
+            self._pending_ops.clear()
             self._crdt.apply_operation(op)
             if self._on_text_change:
                 self._on_text_change(self._crdt.get_text())
