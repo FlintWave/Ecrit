@@ -210,6 +210,24 @@ class TestPDFExport:
         doc = _build_document(MALFORMED_FOUNTAIN)
         assert doc is not None
 
+    def test_build_document_scene_numbers(self, qapp):
+        from ecrit.export.pdf_export import _build_document
+        parsed = json.dumps({
+            "title_page": {},
+            "elements": [
+                {"type": "SceneHeading", "text": "INT. OFFICE - DAY"},
+                {"type": "Action", "text": "Someone walks in."},
+                {"type": "SceneHeading", "text": "EXT. PARK - NIGHT"},
+            ],
+        })
+        mock_core = MagicMock()
+        mock_core.parse_fountain.return_value = parsed
+        with patch.dict("sys.modules", {"ecrit_core": mock_core}):
+            doc = _build_document(SAMPLE_FOUNTAIN, scene_numbers=True)
+        text = doc.toPlainText()
+        assert "1." in text
+        assert "2." in text
+
     def test_export_to_path(self, qapp, tmp_path):
         from ecrit.export.pdf_export import export_pdf_to_path
         out = str(tmp_path / "test.pdf")

@@ -24,7 +24,7 @@ ELEMENT_STYLES = {
 }
 
 
-def _build_document(script_content: str, font_size: int = 12, include_title_page: bool = True) -> QTextDocument:
+def _build_document(script_content: str, font_size: int = 12, include_title_page: bool = True, scene_numbers: bool = False) -> QTextDocument:
     doc = QTextDocument()
     font = QFont("Courier Prime", font_size)
     doc.setDefaultFont(font)
@@ -72,6 +72,7 @@ def _build_document(script_content: str, font_size: int = 12, include_title_page
             cursor.setBlockFormat(break_fmt)
 
     elements = parsed.get("elements", [])
+    scene_num = 0
     for elem in elements:
         kind = elem.get("type", "Action")
         text = elem.get("text", "")
@@ -103,6 +104,9 @@ def _build_document(script_content: str, font_size: int = 12, include_title_page
             char_fmt.setFontItalic(True)
 
         display_text = text.upper() if style.get("upper") else text
+        if scene_numbers and kind == "SceneHeading":
+            scene_num += 1
+            display_text = f"{scene_num}. {display_text}"
         cursor.insertText(display_text, char_fmt)
 
     return doc
@@ -141,7 +145,7 @@ def export_pdf(
     layout = QPageLayout(page_size, QPageLayout.Orientation.Portrait, margins)
     printer.setPageLayout(layout)
 
-    doc = _build_document(script_content, include_title_page=include_title_page)
+    doc = _build_document(script_content, include_title_page=include_title_page, scene_numbers=scene_numbers)
     doc.setPageSize(QSizeF(printer.pageRect(QPrinter.Unit.Point).size()))
     doc.print_(printer)
 

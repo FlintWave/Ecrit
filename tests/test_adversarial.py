@@ -465,3 +465,24 @@ class TestCollabThreadSafety:
         from ecrit.main import MainWindow
         w = MainWindow()
         assert w._active_collab_session is None
+
+
+class TestModuleRegistryWiring:
+    def test_settings_has_registry(self, qapp):
+        from ecrit.main import MainWindow
+        w = MainWindow()
+        assert w._settings_dialog._module_registry is not None
+
+    def test_registry_is_module_registry(self, qapp):
+        from ecrit.main import MainWindow
+        from ecrit.screenplay.module_system import ModuleRegistry
+        w = MainWindow()
+        assert isinstance(w._settings_dialog._module_registry, ModuleRegistry)
+
+
+class TestSprintWordCapture:
+    def test_set_start_words(self, qapp):
+        from ecrit.ui.overlays.sprint_timer import SprintTimerWidget
+        timer = SprintTimerWidget()
+        timer.set_start_words(500)
+        assert timer._words_at_start == 500
