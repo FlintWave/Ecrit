@@ -634,6 +634,41 @@ class TestEpisodeFieldName:
         assert not hasattr(ep, "script_path") or ep.__class__.__dataclass_fields__.get("script_path") is None
 
 
+class TestCursorInfoTracking:
+    def test_cursor_info_signal_exists(self, qapp):
+        from ecrit.ui.screens.editor import ScriptEditor
+        editor = ScriptEditor()
+        assert hasattr(editor, "cursor_info_changed")
+
+    def test_cursor_info_updates_status_bar(self, qapp):
+        from ecrit.ui.screens.editor import EditorScreen
+        screen = EditorScreen()
+        screen._total_pages = 5
+        screen._on_cursor_info_changed(3, "INT. OFFICE - DAY")
+        assert "3" in screen.status_bar.page_label.text()
+        assert "5" in screen.status_bar.page_label.text()
+        assert screen.status_bar.scene_label.text() == "INT. OFFICE - DAY"
+
+    def test_cursor_info_connected(self, qapp):
+        from ecrit.ui.screens.editor import EditorScreen
+        screen = EditorScreen()
+        assert hasattr(screen, "_on_cursor_info_changed")
+        assert callable(screen._on_cursor_info_changed)
+
+    def test_cursor_info_emits_on_move(self, qapp):
+        from ecrit.ui.screens.editor import ScriptEditor
+        editor = ScriptEditor()
+        results = []
+        editor.cursor_info_changed.connect(lambda p, s: results.append((p, s)))
+        editor.setPlainText("INT. HOUSE - NIGHT\n\nSome action here.\n\nEXT. PARK - DAY\n\nMore action.")
+        cursor = editor.textCursor()
+        cursor.movePosition(cursor.MoveOperation.End)
+        editor.setTextCursor(cursor)
+        assert len(results) > 0
+        last_page, last_scene = results[-1]
+        assert last_scene == "EXT. PARK - DAY"
+
+
 class TestWordCountUpdates:
     def test_word_count_updates_on_content_change(self, qapp):
         from ecrit.main import MainWindow

@@ -104,6 +104,7 @@ class ScriptEditor(QPlainTextEdit):
     content_changed = Signal()
     text_modified = Signal()
     text_cut = Signal(str)
+    cursor_info_changed = Signal(int, str)  # (page_number, scene_heading)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -199,6 +200,18 @@ class ScriptEditor(QPlainTextEdit):
             current = scroll_bar.value()
             target = current + cursor.top() - viewport_center
             scroll_bar.setValue(target)
+
+        block_num = self.textCursor().blockNumber()
+        page = max(1, (block_num // 55) + 1)
+        scene_heading = ""
+        block = self.document().findBlockByNumber(block_num)
+        while block.isValid():
+            text = block.text().strip()
+            if text.startswith(("INT.", "EXT.", "INT/EXT", "EST.", "INT./EXT.", "I/E.")):
+                scene_heading = text
+                break
+            block = block.previous()
+        self.cursor_info_changed.emit(page, scene_heading)
 
     def keyPressEvent(self, event):
         if event.key() == Qt.Key.Key_Tab:
@@ -1258,6 +1271,7 @@ class EditorScreen(QWidget):
         self._scratchpad_shortcut = QShortcut(QKeySequence("Ctrl+Shift+X"), self)
         self._scratchpad_shortcut.activated.connect(self.toggle_scratchpad)
         self.manuscript.editor.text_cut.connect(self.scratchpad.add_text)
+        self.manuscript.editor.cursor_info_changed.connect(self._on_cursor_info_changed)
 
     def switch_phase(self, phase: str):
         self._current_phase = phase
@@ -1291,6 +1305,10 @@ class EditorScreen(QWidget):
         cursor = self.manuscript.editor.textCursor()
         cursor.insertText(text)
         self.manuscript.editor.setFocus()
+
+    def _on_cursor_info_changed(self, page: int, scene_heading: str):
+        self.status_bar.page_label.setText(f"Page {page} of {self._total_pages}")
+        self.status_bar.scene_label.setText(scene_heading)
 
     def load_project(self, project_data: dict):
         script = project_data.get("script", "")
