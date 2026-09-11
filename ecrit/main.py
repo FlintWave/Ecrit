@@ -169,6 +169,24 @@ class MainWindow(QMainWindow):
         self._cmd_palette_shortcut = QShortcut(QKeySequence("Ctrl+K"), self)
         self._cmd_palette_shortcut.activated.connect(self._show_command_palette)
 
+        self._find_shortcut = QShortcut(QKeySequence("Ctrl+F"), self)
+        self._find_shortcut.activated.connect(lambda: self.editor._toggle_find() if self.stack.currentWidget() is self.editor else None)
+
+        self._new_shortcut = QShortcut(QKeySequence("Ctrl+N"), self)
+        self._new_shortcut.activated.connect(self._show_new_project)
+
+        self._theme_shortcut = QShortcut(QKeySequence("Ctrl+Shift+T"), self)
+        self._theme_shortcut.activated.connect(self._toggle_theme)
+
+        self._fullscreen_shortcut = QShortcut(QKeySequence("F11"), self)
+        self._fullscreen_shortcut.activated.connect(self._toggle_fullscreen)
+
+        for i in range(1, 6):
+            shortcut = QShortcut(QKeySequence(f"Ctrl+{i}"), self)
+            phases = ["Plan", "Outline", "Manuscript", "Proofread", "Deliver"]
+            phase = phases[i - 1]
+            shortcut.activated.connect(lambda p=phase: self._switch_phase(p))
+
         self._sprint_status_timer = QTimer(self)
         self._sprint_status_timer.setInterval(1000)
         self._sprint_status_timer.timeout.connect(self._update_sprint_label)
@@ -241,8 +259,16 @@ class MainWindow(QMainWindow):
                 self.editor.manuscript.editor.content_changed.disconnect(self._on_content_changed)
             except RuntimeError:
                 pass
+            try:
+                self.editor.manuscript.editor.text_modified.disconnect(self._on_text_modified)
+            except RuntimeError:
+                pass
             self.editor.manuscript.editor.content_changed.connect(self._on_content_changed)
+            self.editor.manuscript.editor.text_modified.connect(self._on_text_modified)
             self.stack.setCurrentWidget(self.editor)
+
+    def _on_text_modified(self):
+        self._editor_title_bar.save_dot.set_saved(False)
 
     def _on_content_changed(self):
         STATE.script_content = self.editor.manuscript.editor.toPlainText()
@@ -785,6 +811,12 @@ class MainWindow(QMainWindow):
             self.showNormal()
         else:
             self.showMaximized()
+
+    def _toggle_fullscreen(self):
+        if self.isFullScreen():
+            self.showNormal()
+        else:
+            self.showFullScreen()
 
     def _on_typewriter_toggled(self, enabled: bool):
         self.editor.manuscript.editor._typewriter = enabled

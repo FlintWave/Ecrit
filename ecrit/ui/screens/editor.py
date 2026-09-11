@@ -102,6 +102,7 @@ class ScriptEditor(QPlainTextEdit):
     """Courier Prime script editor with typewriter scrolling."""
 
     content_changed = Signal()
+    text_modified = Signal()
     text_cut = Signal(str)
 
     def __init__(self, parent=None):
@@ -186,6 +187,7 @@ class ScriptEditor(QPlainTextEdit):
         p.end()
 
     def _on_text_changed(self):
+        self.text_modified.emit()
         if self._save_timer.interval() > 0:
             self._save_timer.start()
 
@@ -1260,11 +1262,11 @@ class EditorScreen(QWidget):
     def switch_phase(self, phase: str):
         self._current_phase = phase
         self.reading_mode.hide()
-        if phase == "proofread":
+        if phase == "Proofread":
             self.proofread.script_view.setPlainText(
                 self.manuscript.editor.toPlainText()
             )
-        elif phase == "deliver":
+        elif phase == "Deliver":
             self.deliver.set_script(self.manuscript.editor.toPlainText())
         for name, widget in self.phases.items():
             widget.setVisible(name == phase)

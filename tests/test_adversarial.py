@@ -559,14 +559,14 @@ class TestProofreadRefresh:
         from ecrit.ui.screens.editor import EditorScreen
         editor = EditorScreen()
         editor.manuscript.editor.setPlainText("INT. TEST - DAY\n\nSome action here.")
-        editor.switch_phase("proofread")
+        editor.switch_phase("Proofread")
         assert "INT. TEST" in editor.proofread.script_view.toPlainText()
 
     def test_switch_to_deliver_copies_manuscript(self, qapp):
         from ecrit.ui.screens.editor import EditorScreen
         editor = EditorScreen()
         editor.manuscript.editor.setPlainText("INT. OFFICE - NIGHT\n\nDialogue here.")
-        editor.switch_phase("deliver")
+        editor.switch_phase("Deliver")
 
 
 class TestPreferencesPersistence:
@@ -596,6 +596,34 @@ class TestPreferencesPersistence:
             loaded = state.load_preferences()
         assert loaded["font_size"] == 14
         assert loaded["word_target"] == 3000
+
+
+class TestSaveDotUnsavedState:
+    def test_text_modified_signal_exists(self, qapp):
+        from ecrit.ui.screens.editor import ScriptEditor
+        assert hasattr(ScriptEditor, "text_modified")
+
+    def test_text_modified_emits_on_change(self, qapp):
+        from ecrit.ui.screens.editor import ScriptEditor
+        editor = ScriptEditor()
+        emitted = []
+        editor.text_modified.connect(lambda: emitted.append(True))
+        editor.setPlainText("hello")
+        assert len(emitted) > 0
+
+
+class TestKeyboardShortcuts:
+    def test_shortcuts_bound(self, qapp):
+        from ecrit.main import MainWindow
+        win = MainWindow()
+        assert hasattr(win, "_find_shortcut")
+        assert hasattr(win, "_new_shortcut")
+        assert hasattr(win, "_theme_shortcut")
+        assert hasattr(win, "_fullscreen_shortcut")
+
+    def test_toggle_fullscreen_exists(self, qapp):
+        from ecrit.main import MainWindow
+        assert hasattr(MainWindow, "_toggle_fullscreen")
 
 
 class TestEpisodeFieldName:
