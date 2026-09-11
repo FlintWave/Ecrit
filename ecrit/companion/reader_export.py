@@ -27,12 +27,14 @@ class ReaderBundle:
 
 
 def _fountain_to_html(script: str, title: str = "") -> str:
+    import html
     lines = script.split("\n")
+    escaped_title = html.escape(title)
     html_parts = [
         "<!DOCTYPE html><html><head>",
         '<meta charset="utf-8">',
         '<meta name="viewport" content="width=device-width, initial-scale=1">',
-        f"<title>{title}</title>",
+        f"<title>{escaped_title}</title>",
         "<style>",
         "body { font-family: 'Courier Prime', 'Courier New', monospace; ",
         "font-size: 12pt; max-width: 8in; margin: 0 auto; padding: 1in; ",
@@ -53,16 +55,18 @@ def _fountain_to_html(script: str, title: str = "") -> str:
         stripped = line.strip()
         if not stripped:
             html_parts.append("<p>&nbsp;</p>")
-        elif stripped.startswith(("INT.", "EXT.", "EST.", "INT./EXT.", "I/E.", ".")):
-            html_parts.append(f'<p class="scene">{stripped}</p>')
+            continue
+        escaped = html.escape(stripped)
+        if stripped.startswith(("INT.", "EXT.", "EST.", "INT./EXT.", "I/E.", ".")):
+            html_parts.append(f'<p class="scene">{escaped}</p>')
         elif stripped.startswith("(") and stripped.endswith(")"):
-            html_parts.append(f'<p class="parenthetical">{stripped}</p>')
+            html_parts.append(f'<p class="parenthetical">{escaped}</p>')
         elif stripped.endswith("TO:") and stripped == stripped.upper():
-            html_parts.append(f'<p class="transition">{stripped}</p>')
+            html_parts.append(f'<p class="transition">{escaped}</p>')
         elif stripped == stripped.upper() and stripped[0:1].isalpha() and len(stripped) > 1:
-            html_parts.append(f'<p class="character">{stripped}</p>')
+            html_parts.append(f'<p class="character">{escaped}</p>')
         else:
-            html_parts.append(f'<p class="action">{stripped}</p>')
+            html_parts.append(f'<p class="action">{escaped}</p>')
 
     html_parts.append("</body></html>")
     return "\n".join(html_parts)

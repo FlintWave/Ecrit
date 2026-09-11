@@ -479,6 +479,22 @@ class TestCollabOT:
         assert len(session._pending_ops) == 1
         assert session._pending_ops[0].length == 6
 
+    def test_pending_ops_transformed_not_cleared(self):
+        from ecrit.collab.session import CollabSession
+        from ecrit.collab.protocol import CollabMessage, Operation, OperationType
+        session = CollabSession(user_name="Test")
+        session._crdt.set_text("hello")
+        session._p2p.broadcast = MagicMock()
+        session.apply_local_insert(5, " world")
+        assert len(session._pending_ops) == 1
+        remote_op = Operation(
+            op_type=OperationType.INSERT, position=0, text="Hi ", user_id="remote"
+        )
+        msg = CollabMessage.operation("remote", remote_op)
+        session._handle_message("remote", msg.to_json())
+        assert len(session._pending_ops) == 1
+        assert session._pending_ops[0].position == 8
+
 
 class TestDashboardOpenSettings:
     def test_dashboard_has_open_settings_signal(self, qapp):

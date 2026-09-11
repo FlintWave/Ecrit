@@ -353,6 +353,61 @@ class TestCharacterSheetAdversarial:
         assert saved[0]["name"] == ""
 
 
+class TestReaderExportXSS:
+    def test_title_is_escaped(self):
+        from ecrit.companion.reader_export import _fountain_to_html
+        html = _fountain_to_html("INT. ROOM - DAY", title='<script>alert("xss")</script>')
+        assert "<script>" not in html
+        assert "&lt;script&gt;" in html
+
+    def test_script_content_is_escaped(self):
+        from ecrit.companion.reader_export import _fountain_to_html
+        html = _fountain_to_html('<img src=x onerror="alert(1)">')
+        assert "<img" not in html
+        assert "&lt;img" in html
+
+    def test_action_line_is_escaped(self):
+        from ecrit.companion.reader_export import _fountain_to_html
+        html = _fountain_to_html('\n<SCRIPT>ALERT("XSS")</SCRIPT>\nDialogue')
+        assert "&lt;SCRIPT&gt;" in html
+        assert "<SCRIPT>" not in html
+
+
+class TestSplitterSizes:
+    def test_manuscript_splitter_has_5_children(self, qapp):
+        from ecrit.ui.screens.editor import ManuscriptPhase
+        phase = ManuscriptPhase()
+        from PySide6.QtWidgets import QSplitter
+        splitters = phase.findChildren(QSplitter)
+        assert len(splitters) == 1
+        assert splitters[0].count() == 5
+
+
+class TestTimestampFalsy:
+    def test_operation_preserves_zero_timestamp(self):
+        from ecrit.collab.protocol import Operation, OperationType
+        op = Operation(op_type=OperationType.INSERT, position=0, text="x", timestamp=0.0)
+        assert op.timestamp != 0.0
+
+    def test_operation_preserves_nonzero_timestamp(self):
+        from ecrit.collab.protocol import Operation, OperationType
+        op = Operation(op_type=OperationType.INSERT, position=0, text="x", timestamp=42.5)
+        assert op.timestamp == 42.5
+
+    def test_collab_message_preserves_nonzero_timestamp(self):
+        from ecrit.collab.protocol import CollabMessage, MessageType
+        msg = CollabMessage(msg_type=MessageType.JOIN, user_id="u1", timestamp=99.0)
+        assert msg.timestamp == 99.0
+
+
+class TestLANDiscoveryThreadSafe:
+    def test_peers_lock_exists(self):
+        from ecrit.collab.lan import LANDiscovery
+        import threading
+        ld = LANDiscovery("u1", "TestUser")
+        assert isinstance(ld._peers_lock, type(threading.Lock()))
+
+
 class TestCompareDraftsAdversarial:
     def test_huge_diff(self, qapp):
         from ecrit.ui.overlays.compare_drafts import CompareDrafts

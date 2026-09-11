@@ -221,9 +221,12 @@ class CollabSession:
 
         elif msg.msg_type == MessageType.OPERATION:
             op = Operation.from_dict(msg.payload)
+            transformed_pending = []
             for pending in self._pending_ops:
+                pending_prime = self._crdt.transform(pending, op)
                 op = self._crdt.transform(op, pending)
-            self._pending_ops.clear()
+                transformed_pending.append(pending_prime)
+            self._pending_ops = transformed_pending
             self._crdt.apply_operation(op)
             if self._on_text_change:
                 self._on_text_change(self._crdt.get_text())

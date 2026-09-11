@@ -34,6 +34,7 @@ class LANDiscovery:
         self.user_name = user_name
         self.port = port
         self._peers: dict[str, LANPeer] = {}
+        self._peers_lock = threading.Lock()
         self._running = False
         self._broadcast_thread: Optional[threading.Thread] = None
         self._listen_thread: Optional[threading.Thread] = None
@@ -63,16 +64,17 @@ class LANDiscovery:
 
     def stop(self) -> None:
         self._running = False
-        self._peers.clear()
+        with self._peers_lock:
+            self._peers.clear()
 
     def get_peers(self) -> list[LANPeer]:
-        now = time.time()
-        stale = [uid for uid, p in self._peers.items() if p.is_stale()]
-        for uid in stale:
-            del self._peers[uid]
-            if self._on_peer_lost:
-                self._on_peer_lost(uid)
-        return list(self._peers.values())
+        with self._peers_lock:
+            stale = [uid for uid, p in self._peers.items() if p.is_stale()]
+            for uid in stale:
+                del self._peers[uid]
+                if self._on_peer_lost:
+                    self._on_peer_lost(uid)
+            return list(self._peers.values())
 
     def _make_announce(self) -> bytes:
         payload = json.dumps({
@@ -125,8 +127,9 @@ class LANDiscovery:
                     project_title=payload.get("project_title", ""),
                     last_seen=time.time(),
                 )
-                is_new = uid not in self._peers
-                self._peers[uid] = peer
+                with self._peers_lock:
+                    is_new = uid not in self._peers
+                    self._peers[uid] = peer
                 if is_new and self._on_peer_found:
                     self._on_peer_found(peer)
             except (socket.timeout, json.JSONDecodeError, OSError):

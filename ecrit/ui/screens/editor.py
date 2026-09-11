@@ -796,7 +796,7 @@ class ManuscriptPhase(QWidget):
         splitter.setStretchFactor(2, 1)
         splitter.setStretchFactor(3, 0)
         splitter.setStretchFactor(4, 0)
-        splitter.setSizes([216, 600, 264])
+        splitter.setSizes([216, 1, 600, 1, 264])
 
         layout.addWidget(splitter)
 
@@ -1316,69 +1316,44 @@ class EditorScreen(QWidget):
     def _on_find_closed(self):
         self.manuscript.editor.setFocus()
 
-    def _do_find(self, text, case_sensitive, regex):
+    def _find_in_direction(self, text, case_sensitive, regex, backward=False):
         if not text:
             return
         editor = self.manuscript.editor
         if regex:
-            import re as _re
-            try:
-                rx_flags = 0 if case_sensitive else _re.IGNORECASE
-                pattern = _re.compile(text, rx_flags)
-            except _re.error:
-                return
             from PySide6.QtCore import QRegularExpression
             opts = QRegularExpression.PatternOption.NoPatternOption
             if not case_sensitive:
                 opts |= QRegularExpression.PatternOption.CaseInsensitiveOption
             qre = QRegularExpression(text)
             qre.setPatternOptions(opts)
-            flags = QTextDocument.FindFlag(0)
+            if not qre.isValid():
+                return
+            flags = QTextDocument.FindFlag.FindBackward if backward else QTextDocument.FindFlag(0)
             found = editor.find(qre, flags)
             if not found:
                 cursor = editor.textCursor()
-                cursor.movePosition(QTextCursor.MoveOperation.Start)
+                wrap_to = QTextCursor.MoveOperation.End if backward else QTextCursor.MoveOperation.Start
+                cursor.movePosition(wrap_to)
                 editor.setTextCursor(cursor)
                 editor.find(qre, flags)
         else:
-            flags = QTextDocument.FindFlag(0)
+            flags = QTextDocument.FindFlag.FindBackward if backward else QTextDocument.FindFlag(0)
             if case_sensitive:
                 flags |= QTextDocument.FindFlag.FindCaseSensitively
             found = editor.find(text, flags)
             if not found:
                 cursor = editor.textCursor()
-                cursor.movePosition(QTextCursor.MoveOperation.Start)
+                wrap_to = QTextCursor.MoveOperation.End if backward else QTextCursor.MoveOperation.Start
+                cursor.movePosition(wrap_to)
                 editor.setTextCursor(cursor)
                 editor.find(text, flags)
 
+    def _do_find(self, text, case_sensitive, regex):
+        self._find_in_direction(text, case_sensitive, regex, backward=False)
+
     def _do_find_prev(self, text, case_sensitive, regex):
-        if not text:
-            return
-        editor = self.manuscript.editor
-        if regex:
-            from PySide6.QtCore import QRegularExpression
-            opts = QRegularExpression.PatternOption.NoPatternOption
-            if not case_sensitive:
-                opts |= QRegularExpression.PatternOption.CaseInsensitiveOption
-            qre = QRegularExpression(text)
-            qre.setPatternOptions(opts)
-            flags = QTextDocument.FindFlag.FindBackward
-            found = editor.find(qre, flags)
-            if not found:
-                cursor = editor.textCursor()
-                cursor.movePosition(QTextCursor.MoveOperation.End)
-                editor.setTextCursor(cursor)
-                editor.find(qre, flags)
-        else:
-            flags = QTextDocument.FindFlag.FindBackward
-            if case_sensitive:
-                flags |= QTextDocument.FindFlag.FindCaseSensitively
-            found = editor.find(text, flags)
-            if not found:
-                cursor = editor.textCursor()
-                cursor.movePosition(QTextCursor.MoveOperation.End)
-                editor.setTextCursor(cursor)
-                editor.find(text, flags)
+        self._find_in_direction(text, case_sensitive, regex, backward=True)
 
     def _do_replace(self, find_text, replace_text):
         editor = self.manuscript.editor

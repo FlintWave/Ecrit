@@ -38,7 +38,7 @@ class Operation:
     revision: int = 0
 
     def __post_init__(self):
-        if not self.timestamp:
+        if self.timestamp == 0.0:
             self.timestamp = time.time()
 
     def to_dict(self) -> dict:
@@ -74,7 +74,7 @@ class CollabMessage:
     timestamp: float = 0.0
 
     def __post_init__(self):
-        if not self.timestamp:
+        if self.timestamp == 0.0:
             self.timestamp = time.time()
 
     def to_json(self) -> str:

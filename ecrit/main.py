@@ -221,13 +221,15 @@ class MainWindow(QMainWindow):
 
     def _auto_export_if_enabled(self):
         import tempfile
+        import os
         from ecrit.sync.cloud_export import load_cloud_configs, get_exporter
         configs = load_cloud_configs(STATE.current_project_path)
+        content = STATE.script_content
+        title = self._editor_title_bar.context_label.text() or "Untitled"
         for cfg in configs:
             if cfg.auto_export:
                 exporter = get_exporter(cfg.provider, cfg)
-                content = self.editor.manuscript.editor.toPlainText()
-                title = self._editor_title_bar.context_label.text() or "Untitled"
+                tmp_path = None
                 try:
                     with tempfile.NamedTemporaryFile(
                         mode="w", suffix=".fountain", delete=False, encoding="utf-8"
@@ -238,11 +240,11 @@ class MainWindow(QMainWindow):
                 except Exception:
                     pass
                 finally:
-                    import os
-                    try:
-                        os.unlink(tmp_path)
-                    except OSError:
-                        pass
+                    if tmp_path:
+                        try:
+                            os.unlink(tmp_path)
+                        except OSError:
+                            pass
 
     def _on_project_created(self, path: str):
         self._open_project(path)
@@ -562,7 +564,7 @@ class MainWindow(QMainWindow):
             STATE.script_content = text
 
     def _on_collab_participants_changed(self, session):
-        self._collab_dialog.update_participants(len(session.participants))
+        self._collab_dialog.update_participants(len(session.get_participants()))
         participants = [
             {"user_id": p.user_id, "user_name": p.user_name, "color": p.color}
             for p in session.get_participants()
@@ -716,7 +718,9 @@ class MainWindow(QMainWindow):
         font.setStyleHint(QFont.StyleHint.Monospace)
         self.editor.manuscript.editor.setFont(font)
         word_target = settings.get("word_target", 2500)
-        self.editor.status_bar.update_info(target=word_target)
+        self.editor.status_bar.words_label.setText(
+            f"0 / {word_target:,} today"
+        )
         auto_save = settings.get("auto_save", True)
         if auto_save:
             self.editor.manuscript.editor._save_timer.setInterval(1000)
