@@ -13,12 +13,14 @@ class StatusBar(QWidget):
     sprint_clicked = Signal()
     home_clicked = Signal()
     typewriter_toggled = Signal(bool)
+    focus_toggled = Signal(bool)
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setObjectName("statusBar")
         self.setFixedHeight(28)
         self._typewriter_on = True
+        self._focus_on = False
 
         layout = QHBoxLayout(self)
         layout.setContentsMargins(12, 0, 8, 0)
@@ -46,6 +48,14 @@ class StatusBar(QWidget):
         self.mode_label.setCursor(Qt.CursorShape.PointingHandCursor)
         self.mode_label.clicked.connect(self._toggle_typewriter)
         layout.addWidget(self.mode_label)
+
+        self.focus_label = QPushButton("focus")
+        self.focus_label.setObjectName("iconBtn")
+        self.focus_label.setFixedHeight(22)
+        self.focus_label.setToolTip("Toggle focus mode (dim inactive paragraphs)")
+        self.focus_label.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.focus_label.clicked.connect(self._toggle_focus)
+        layout.addWidget(self.focus_label)
 
         sep = QLabel("|")
         sep.setFixedWidth(8)
@@ -86,6 +96,11 @@ class StatusBar(QWidget):
         self._typewriter_on = not self._typewriter_on
         self.mode_label.setText("typewriter" if self._typewriter_on else "standard")
         self.typewriter_toggled.emit(self._typewriter_on)
+
+    def _toggle_focus(self):
+        self._focus_on = not self._focus_on
+        self.focus_label.setText("focus" if not self._focus_on else "focus*")
+        self.focus_toggled.emit(self._focus_on)
 
     def update_info(self, page=1, total_pages=1, scene="", words_today=0, target=2500, dialect="fountain/core"):
         self.page_label.setText(f"Page {page} of {total_pages}")

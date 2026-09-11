@@ -213,6 +213,8 @@ class P2PConnection:
             except OSError:
                 if not self._running:
                     break
+                import time
+                time.sleep(0.5)
 
     def _recv_loop(self, peer_id: str, sock: socket.socket) -> None:
         while self._running:

@@ -855,6 +855,248 @@ class TestScriptCompleter:
         assert len([n for n in names if n.startswith("JOHN")]) == 1
 
 
+class TestFocusMode:
+    def test_focus_mode_toggle(self, qapp):
+        from ecrit.ui.screens.editor import ScriptEditor
+        editor = ScriptEditor()
+        editor.setPlainText("Line one\n\nLine three\n\nLine five")
+        assert not editor._focus_mode
+        editor.set_focus_mode(True)
+        assert editor._focus_mode
+        editor.set_focus_mode(False)
+        assert not editor._focus_mode
+
+    def test_focus_mode_creates_extra_selections(self, qapp):
+        from ecrit.ui.screens.editor import ScriptEditor
+        editor = ScriptEditor()
+        editor.setPlainText("Line one\n\nLine three\n\nLine five")
+        cursor = editor.textCursor()
+        cursor.movePosition(cursor.MoveOperation.Start)
+        editor.setTextCursor(cursor)
+        editor.set_focus_mode(True)
+        sels = editor.extraSelections()
+        assert len(sels) > 0
+
+    def test_focus_mode_clears_on_disable(self, qapp):
+        from ecrit.ui.screens.editor import ScriptEditor
+        editor = ScriptEditor()
+        editor.setPlainText("Line one\n\nLine three")
+        editor.set_focus_mode(True)
+        editor.set_focus_mode(False)
+        assert len(editor.extraSelections()) == 0
+
+    def test_status_bar_focus_signal(self, qapp):
+        from ecrit.ui.components.status_bar import StatusBar
+        sb = StatusBar()
+        received = []
+        sb.focus_toggled.connect(lambda v: received.append(v))
+        sb._toggle_focus()
+        assert received == [True]
+        sb._toggle_focus()
+        assert received == [True, False]
+
+
+class TestEstimatedRuntime:
+    def test_stats_dialog_has_runtime_row(self, qapp):
+        from ecrit.ui.overlays.statistics import StatsDialog
+        d = StatsDialog()
+        assert "est_runtime" in d.stat_rows
+
+    def test_runtime_minutes(self, qapp):
+        from ecrit.ui.overlays.statistics import StatsDialog
+        d = StatsDialog()
+        d.set_stats({"page_count": 45, "word_count": 10000, "scene_count": 20,
+                      "character_count": 5, "dialogue_percentage": 50,
+                      "action_percentage": 50, "characters": [], "scenes": []})
+        assert "45 min" in d.stat_rows["est_runtime"]._val_label.text()
+
+    def test_runtime_hours(self, qapp):
+        from ecrit.ui.overlays.statistics import StatsDialog
+        d = StatsDialog()
+        d.set_stats({"page_count": 120, "word_count": 25000, "scene_count": 60,
+                      "character_count": 10, "dialogue_percentage": 55,
+                      "action_percentage": 45, "characters": [], "scenes": []})
+        assert "2h 0m" in d.stat_rows["est_runtime"]._val_label.text()
+
+
+class TestFdxImport:
+    def test_basic_fdx_conversion(self):
+        from ecrit.export.fdx_import import fdx_to_fountain
+        fdx = '''<?xml version="1.0" encoding="UTF-8"?>
+<FinalDraft DocumentType="Script" Template="No" Version="1">
+  <Content>
+    <Paragraph Type="Scene Heading">
+      <Text>INT. OFFICE - DAY</Text>
+    </Paragraph>
+    <Paragraph Type="Action">
+      <Text>John enters the office.</Text>
+    </Paragraph>
+    <Paragraph Type="Character">
+      <Text>JOHN</Text>
+    </Paragraph>
+    <Paragraph Type="Dialogue">
+      <Text>Hello there.</Text>
+    </Paragraph>
+  </Content>
+</FinalDraft>'''
+        fountain = fdx_to_fountain(fdx)
+        assert "INT. OFFICE - DAY" in fountain
+        assert "John enters the office." in fountain
+        assert "JOHN" in fountain
+        assert "Hello there." in fountain
+
+    def test_fdx_with_title_page(self):
+        from ecrit.export.fdx_import import fdx_to_fountain
+        fdx = '''<?xml version="1.0" encoding="UTF-8"?>
+<FinalDraft DocumentType="Script" Template="No" Version="1">
+  <TitlePage>
+    <Content>
+      <Paragraph Type="Title">
+        <Text>MY SCREENPLAY</Text>
+      </Paragraph>
+      <Paragraph Type="Author">
+        <Text>Jane Doe</Text>
+      </Paragraph>
+    </Content>
+  </TitlePage>
+  <Content>
+    <Paragraph Type="Action">
+      <Text>FADE IN:</Text>
+    </Paragraph>
+  </Content>
+</FinalDraft>'''
+        fountain = fdx_to_fountain(fdx)
+        assert "Title: MY SCREENPLAY" in fountain
+        assert "Author: Jane Doe" in fountain
+
+    def test_fdx_invalid_xml(self):
+        from ecrit.export.fdx_import import fdx_to_fountain
+        assert fdx_to_fountain("not xml at all") == ""
+
+    def test_fdx_empty_content(self):
+        from ecrit.export.fdx_import import fdx_to_fountain
+        fdx = '''<?xml version="1.0"?><FinalDraft></FinalDraft>'''
+        result = fdx_to_fountain(fdx)
+        assert result == ""
+
+
+class TestNameGenerator:
+    def test_generate_name(self):
+        from ecrit.screenplay.name_generator import generate_name
+        name = generate_name()
+        assert " " in name
+        parts = name.split()
+        assert len(parts) == 2
+
+    def test_generate_name_first_only(self):
+        from ecrit.screenplay.name_generator import generate_name
+        name = generate_name(include_last=False)
+        assert " " not in name
+
+    def test_generate_names_unique(self):
+        from ecrit.screenplay.name_generator import generate_names
+        names = generate_names(10)
+        assert len(names) == len(set(names))
+        assert len(names) == 10
+
+    def test_generate_character_name_uppercase(self):
+        from ecrit.screenplay.name_generator import generate_character_name
+        name = generate_character_name()
+        assert name == name.upper()
+
+    def test_generate_character_names_count(self):
+        from ecrit.screenplay.name_generator import generate_character_names
+        names = generate_character_names(5)
+        assert len(names) == 5
+        assert all(n == n.upper() for n in names)
+
+
+class TestNewCommandPaletteEntries:
+    def test_has_generate_name_command(self):
+        from ecrit.ui.overlays.command_palette import COMMANDS
+        names = [c[0] for c in COMMANDS]
+        assert "Generate Character Name" in names
+
+    def test_has_focus_mode_command(self):
+        from ecrit.ui.overlays.command_palette import COMMANDS
+        names = [c[0] for c in COMMANDS]
+        assert "Focus Mode" in names
+
+    def test_has_import_final_draft_command(self):
+        from ecrit.ui.overlays.command_palette import COMMANDS
+        names = [c[0] for c in COMMANDS]
+        assert "Import Final Draft" in names
+
+    def test_command_handler_wired(self, qapp):
+        from ecrit.main import MainWindow
+        win = MainWindow()
+        win._on_command("Focus Mode")
+        assert win.editor.manuscript.editor._focus_mode
+
+
+class TestPluginIdSanitization:
+    def test_rejects_path_traversal(self):
+        from ecrit.plugins.marketplace import _sanitize_plugin_id
+        assert _sanitize_plugin_id("../../etc/passwd") == ""
+        assert _sanitize_plugin_id("../../../.bashrc") == ""
+        assert _sanitize_plugin_id("../../../../tmp/pwned") == ""
+        assert _sanitize_plugin_id("") == ""
+        assert _sanitize_plugin_id("foo/bar") == ""
+
+    def test_rejects_dots_only(self):
+        from ecrit.plugins.marketplace import _sanitize_plugin_id
+        assert _sanitize_plugin_id("..") == ""
+        assert _sanitize_plugin_id(".") == ""
+
+    def test_accepts_valid_ids(self):
+        from ecrit.plugins.marketplace import _sanitize_plugin_id
+        assert _sanitize_plugin_id("my-plugin") == "my-plugin"
+        assert _sanitize_plugin_id("plugin_v2.0") == "plugin_v2.0"
+        assert _sanitize_plugin_id("CoolPlugin123") == "CoolPlugin123"
+
+    def test_marketplace_install_rejects_traversal(self, qapp):
+        import tempfile, os, json
+        from ecrit.plugins.marketplace import Marketplace
+        with tempfile.TemporaryDirectory() as tmpdir:
+            mp = Marketplace(plugins_dir=os.path.join(tmpdir, "plugins"))
+            src = os.path.join(tmpdir, "evil-plugin")
+            os.makedirs(src)
+            manifest = {"id": "../../../../tmp/pwned", "name": "Evil", "version": "1.0"}
+            with open(os.path.join(src, "manifest.json"), "w") as f:
+                json.dump(manifest, f)
+            result = mp.install_from_directory(src)
+            assert result is None
+
+    def test_marketplace_uninstall_rejects_traversal(self, qapp):
+        import tempfile, os
+        from ecrit.plugins.marketplace import Marketplace
+        with tempfile.TemporaryDirectory() as tmpdir:
+            mp = Marketplace(plugins_dir=os.path.join(tmpdir, "plugins"))
+            result = mp.uninstall("../../etc")
+            assert result is False
+
+
+class TestCollabOTRelay:
+    def test_pending_ops_cleared_on_sync_response(self):
+        from ecrit.collab.session import CollabSession, CollabRole
+        from ecrit.collab.crdt import Operation, TextCRDT
+        session = CollabSession.__new__(CollabSession)
+        session.role = CollabRole.GUEST
+        session.user_id = "user1"
+        session._participants = {}
+        session._pending_ops = [Operation(0, 0, "old")]
+        session._crdt = TextCRDT()
+        session._p2p = None
+        session._on_text_change = None
+        session._on_participant_change = None
+        session._on_cursor_change = None
+        from ecrit.collab.session import CollabMessage
+        msg = CollabMessage.sync_response("host", "hello world", 1)
+        session._handle_message("host", msg.to_json())
+        assert session._pending_ops == []
+        assert session._crdt.get_text() == "hello world"
+
+
 class TestWordCountUpdates:
     def test_word_count_updates_on_content_change(self, qapp):
         from ecrit.main import MainWindow

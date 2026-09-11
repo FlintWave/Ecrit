@@ -90,6 +90,7 @@ class MainWindow(QMainWindow):
         self.editor.export_odt_requested.connect(lambda: self._export_script("odt"))
         self.editor.export_fountain_requested.connect(lambda: self._export_script("fountain"))
         self.editor.status_bar.typewriter_toggled.connect(self._on_typewriter_toggled)
+        self.editor.status_bar.focus_toggled.connect(self._on_focus_toggled)
         self.editor.manuscript.scene_nav.scenes_renumbered.connect(self._on_scenes_renumbered)
         self.stack.addWidget(self.editor)
 
@@ -292,10 +293,14 @@ class MainWindow(QMainWindow):
         )
 
     def _auto_sync_if_enabled(self):
+        import threading
         from ecrit.sync.remote_sync import load_remote_config, push_to_remote
         config, _result = load_remote_config(STATE.current_project_path)
         if config and config.auto_sync and config.remote_url:
-            push_to_remote(STATE.current_project_path, config)
+            path = STATE.current_project_path
+            threading.Thread(
+                target=push_to_remote, args=(path, config), daemon=True
+            ).start()
 
     def _auto_export_if_enabled(self):
         import tempfile
@@ -378,6 +383,9 @@ class MainWindow(QMainWindow):
             "Collaboration": self._show_collaboration,
             "Companion Sync": self._show_companion,
             "Change Language": self._show_language_settings,
+            "Generate Character Name": self._generate_character_name,
+            "Focus Mode": self._toggle_focus_mode,
+            "Import Final Draft": self._import_script,
         }
         handler = handlers.get(name)
         if handler:
@@ -676,6 +684,7 @@ class MainWindow(QMainWindow):
             editor.setTextCursor(cursor)
             editor.blockSignals(False)
             STATE.script_content = text
+            STATE.save_script()
 
     def _apply_collab_participants(self):
         session = self._active_collab_session
@@ -782,14 +791,18 @@ class MainWindow(QMainWindow):
     def _import_script(self):
         from PySide6.QtWidgets import QFileDialog, QMessageBox
         path, _ = QFileDialog.getOpenFileName(
-            self, "Import Fountain Script", "",
-            "Fountain files (*.fountain *.ftn);;All files (*)"
+            self, "Import Script", "",
+            "All supported (*.fountain *.ftn *.fdx);;Fountain files (*.fountain *.ftn);;Final Draft (*.fdx);;All files (*)"
         )
         if path:
             try:
-                with open(path, 'r', encoding='utf-8') as f:
-                    content = f.read()
                 import os
+                if path.lower().endswith(".fdx"):
+                    from ecrit.export.fdx_import import import_fdx_file
+                    content = import_fdx_file(path)
+                else:
+                    with open(path, 'r', encoding='utf-8') as f:
+                        content = f.read()
                 title = os.path.splitext(os.path.basename(path))[0]
                 meta = STATE.create_project(title=title, author="", format_id="fountain/core", paper="USLetter")
                 if meta:
@@ -825,6 +838,21 @@ class MainWindow(QMainWindow):
 
     def _on_typewriter_toggled(self, enabled: bool):
         self.editor.manuscript.editor._typewriter = enabled
+
+    def _on_focus_toggled(self, enabled: bool):
+        self.editor.manuscript.editor.set_focus_mode(enabled)
+
+    def _toggle_focus_mode(self):
+        sb = self.editor.status_bar
+        sb._toggle_focus()
+
+    def _generate_character_name(self):
+        from ecrit.screenplay.name_generator import generate_character_name
+        name = generate_character_name()
+        if self.stack.currentWidget() is self.editor:
+            cursor = self.editor.manuscript.editor.textCursor()
+            cursor.insertText(name)
+            self.editor.manuscript.editor.setTextCursor(cursor)
 
     def _toggle_theme(self):
         theme.toggle()

@@ -8,7 +8,18 @@ import shutil
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
+import re
 from typing import Optional
+
+_SAFE_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
+
+
+def _sanitize_plugin_id(raw_id: str) -> str:
+    if not raw_id or raw_id != os.path.basename(raw_id):
+        return ""
+    if not _SAFE_ID_RE.match(raw_id) or ".." in raw_id:
+        return ""
+    return raw_id
 
 
 class PluginCategory(str, Enum):
@@ -140,6 +151,9 @@ class Marketplace:
         listing = PluginListing.from_dict(data)
         if not listing.id:
             listing.id = os.path.basename(source_dir)
+        listing.id = _sanitize_plugin_id(listing.id)
+        if not listing.id:
+            return None
 
         dest = os.path.join(self.plugins_dir, listing.id)
         os.makedirs(dest, exist_ok=True)
@@ -158,7 +172,8 @@ class Marketplace:
         return listing
 
     def uninstall(self, plugin_id: str) -> bool:
-        if plugin_id not in self._installed:
+        plugin_id = _sanitize_plugin_id(plugin_id)
+        if not plugin_id or plugin_id not in self._installed:
             return False
         plugin_dir = os.path.join(self.plugins_dir, plugin_id)
         if os.path.isdir(plugin_dir):

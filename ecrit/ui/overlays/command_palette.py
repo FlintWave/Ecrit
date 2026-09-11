@@ -44,6 +44,9 @@ COMMANDS = [
     ("Collaboration", "tool", "Start or join a collaboration session"),
     ("Companion Sync", "tool", "Sync with Android companion app"),
     ("Change Language", "tool", "Change interface language"),
+    ("Generate Character Name", "tool", "Generate a random character name"),
+    ("Focus Mode", "tool", "Toggle paragraph focus dimming"),
+    ("Import Final Draft", "file", "Import a .fdx Final Draft file"),
 ]
 
 

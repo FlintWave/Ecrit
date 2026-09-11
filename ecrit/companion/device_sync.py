@@ -46,9 +46,16 @@ class PairedDevice:
 
 class _TransferHandler(BaseHTTPRequestHandler):
     bundle_path: str = ""
+    transfer_token: str = ""
 
     def do_GET(self):
-        if self.path == "/bundle" and self.bundle_path and os.path.exists(self.bundle_path):
+        if self.path.startswith("/bundle") and self.bundle_path and os.path.exists(self.bundle_path):
+            from urllib.parse import urlparse, parse_qs
+            qs = parse_qs(urlparse(self.path).query)
+            token = qs.get("token", [""])[0]
+            if not self.transfer_token or token != self.transfer_token:
+                self.send_error(403, "Invalid transfer token")
+                return
             with open(self.bundle_path, "rb") as f:
                 data = f.read()
             self.send_response(200)
@@ -142,17 +149,20 @@ class DeviceSync:
             return "127.0.0.1"
 
     def start_transfer_server(self, bundle_path: str, port: int = 8739) -> str:
+        import secrets
         if self._server:
             self.stop_transfer_server()
 
+        token = secrets.token_urlsafe(32)
         _TransferHandler.bundle_path = bundle_path
+        _TransferHandler.transfer_token = token
         self._server = HTTPServer(("0.0.0.0", port), _TransferHandler)
         self._server_thread = threading.Thread(target=self._server.serve_forever, daemon=True)
         self._server_thread.start()
         self._set_status(SyncStatus.TRANSFERRING)
 
         ip = self.get_local_ip()
-        return f"http://{ip}:{port}/bundle"
+        return f"http://{ip}:{port}/bundle?token={token}"
 
     def stop_transfer_server(self) -> None:
         if self._server:

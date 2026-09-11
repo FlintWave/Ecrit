@@ -231,9 +231,11 @@ class CollabSession:
             if self._on_text_change:
                 self._on_text_change(self._crdt.get_text())
             if self.role == CollabRole.HOST:
+                relay = CollabMessage.operation(msg.user_id, op.to_dict())
+                relay_data = relay.to_json()
                 for pid in self._p2p._clients:
                     if pid != peer_id:
-                        self._p2p.send(pid, raw)
+                        self._p2p.send(pid, relay_data)
 
         elif msg.msg_type == MessageType.CURSOR_UPDATE:
             p = self._participants.get(msg.user_id)
@@ -261,6 +263,7 @@ class CollabSession:
         elif msg.msg_type == MessageType.SYNC_RESPONSE:
             content = msg.payload.get("content", "")
             self._crdt.set_text(content)
+            self._pending_ops.clear()
             if self._on_text_change:
                 self._on_text_change(content)
 

@@ -272,6 +272,7 @@ class ScriptEditor(QPlainTextEdit):
         self.completer = ScriptCompleter(self)
 
         self._typewriter = True
+        self._focus_mode = False
         self._show_line_numbers = False
         self._line_number_area = LineNumberArea(self)
 
@@ -365,6 +366,47 @@ class ScriptEditor(QPlainTextEdit):
                 break
             block = block.previous()
         self.cursor_info_changed.emit(page, scene_heading)
+        if self._focus_mode:
+            self._apply_focus_dim()
+
+    def set_focus_mode(self, enabled: bool):
+        self._focus_mode = enabled
+        if enabled:
+            self._apply_focus_dim()
+        else:
+            self.setExtraSelections([])
+
+    def _apply_focus_dim(self):
+        t = theme.current()
+        dim_color = QColor(t.text)
+        dim_color.setAlphaF(0.2)
+        selections = []
+        current_block = self.textCursor().block()
+        start = current_block.blockNumber()
+        end = start
+        block = current_block.previous()
+        while block.isValid() and block.text().strip():
+            start = block.blockNumber()
+            block = block.previous()
+        block = current_block.next()
+        while block.isValid() and block.text().strip():
+            end = block.blockNumber()
+            block = block.next()
+        doc = self.document()
+        block = doc.begin()
+        while block.isValid():
+            bn = block.blockNumber()
+            if bn < start or bn > end:
+                sel = QTextEdit.ExtraSelection()
+                fmt = QTextCharFormat()
+                fmt.setForeground(dim_color)
+                sel.format = fmt
+                cursor = QTextCursor(block)
+                cursor.movePosition(QTextCursor.MoveOperation.EndOfBlock, QTextCursor.MoveMode.KeepAnchor)
+                sel.cursor = cursor
+                selections.append(sel)
+            block = block.next()
+        self.setExtraSelections(selections)
 
     def keyPressEvent(self, event):
         if self.completer.isVisible():
