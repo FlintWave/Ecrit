@@ -4,7 +4,7 @@ import json
 from PySide6.QtWidgets import QFileDialog
 from PySide6.QtCore import QMarginsF, QSizeF, Qt
 from PySide6.QtGui import (
-    QFont, QPainter, QPageLayout, QPageSize, QTextDocument,
+    QFont, QPageLayout, QPageSize, QTextDocument,
     QTextCursor, QTextCharFormat, QTextBlockFormat
 )
 from PySide6.QtPrintSupport import QPrinter

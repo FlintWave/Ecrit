@@ -1,6 +1,5 @@
 """Editor screen — five phases: Plan, Outline, Manuscript, Proofread, Deliver."""
 
-import json
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QFrame, QSplitter, QListWidget, QListWidgetItem,
@@ -24,10 +23,10 @@ from ecrit.screenplay.structure_templates import (
 )
 from ecrit.screenplay.scene_numbers import (
     SceneNumber, assign_scene_numbers, lock_scene, unlock_scene,
-    renumber_scenes, format_scene_heading,
+    renumber_scenes,
 )
 from ecrit.screenplay.revisions import (
-    RevisionTracker, REVISION_COLORS, get_revision_color_hex,
+    RevisionTracker, get_revision_color_hex,
 )
 from ecrit.screenplay.contest_presets import CONTEST_PRESETS, validate_against_preset
 

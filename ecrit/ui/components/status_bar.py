@@ -3,8 +3,6 @@
 from PySide6.QtWidgets import QWidget, QHBoxLayout, QLabel, QPushButton
 from PySide6.QtCore import Qt, Signal
 
-from ecrit.ui.styles import theme
-
 
 class StatusBar(QWidget):
     find_clicked = Signal()

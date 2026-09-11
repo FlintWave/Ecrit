@@ -1,6 +1,5 @@
 """Generate self-contained HTML from Fountain screenplay for read-only review sharing."""
 
-import json
 import os
 import re
 import uuid
