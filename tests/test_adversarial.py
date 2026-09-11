@@ -486,3 +486,69 @@ class TestSprintWordCapture:
         timer = SprintTimerWidget()
         timer.set_start_words(500)
         assert timer._words_at_start == 500
+
+
+class TestCollabCursorSignal:
+    def test_cursor_signal_exists(self, qapp):
+        from ecrit.main import MainWindow
+        assert hasattr(MainWindow, "_collab_cursor_changed")
+
+    def test_apply_collab_cursor_method(self, qapp):
+        from ecrit.main import MainWindow
+        assert hasattr(MainWindow, "_apply_collab_cursor")
+
+
+class TestScenesRenumberedWiring:
+    def test_handler_exists(self, qapp):
+        from ecrit.main import MainWindow
+        assert hasattr(MainWindow, "_on_scenes_renumbered")
+
+    def test_handler_runs(self, qapp):
+        from ecrit.main import MainWindow
+        win = MainWindow()
+        win._on_scenes_renumbered()
+
+
+class TestCloudExportConfigsLoaded:
+    def test_show_cloud_export_loads_configs(self, qapp):
+        from ecrit.main import MainWindow
+        win = MainWindow()
+        with patch.object(win._cloud_export_dialog, "set_configs") as mock_set, \
+             patch.object(win._cloud_export_dialog, "exec") as mock_exec:
+            from ecrit.stores.app_state import STATE
+            original = STATE.current_project_path
+            STATE.current_project_path = "/tmp/test_proj"
+            with patch("ecrit.sync.cloud_export.load_cloud_configs", return_value=[]):
+                win._show_cloud_export()
+            STATE.current_project_path = original
+            mock_exec.assert_called_once()
+            mock_set.assert_called_once()
+
+
+class TestDeliverFormatLabelWiring:
+    def test_update_format_label_callable(self, qapp):
+        from ecrit.ui.screens.editor import EditorScreen
+        editor = EditorScreen()
+        editor.deliver.update_format_label(format_id="fountain/core", paper="A4")
+        assert "A4" in editor.deliver.format_label.text()
+
+
+class TestModuleHookDispatch:
+    def test_hooks_called_on_export(self, qapp):
+        from ecrit.main import MainWindow
+        win = MainWindow()
+        calls = []
+        win._module_registry.register_hook("before_export", lambda *a: calls.append(("before", a)))
+        win._module_registry.register_hook("after_export", lambda *a: calls.append(("after", a)))
+        with patch("ecrit.export.pdf_export.export_pdf", return_value=""):
+            with patch.object(win.stack, "currentWidget", return_value=win.editor):
+                win._export_script("pdf")
+        assert any(c[0] == "before" for c in calls)
+        assert any(c[0] == "after" for c in calls)
+
+
+class TestCompanionStatusCallback:
+    def test_status_callback_wired(self, qapp):
+        from ecrit.ui.overlays.companion import CompanionDialog
+        dialog = CompanionDialog()
+        assert dialog._device_sync._on_status_change is not None

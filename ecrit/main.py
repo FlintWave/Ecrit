@@ -42,6 +42,7 @@ from ecrit.i18n import set_language
 class MainWindow(QMainWindow):
     _collab_text_changed = QtSignal(str)
     _collab_participants_changed = QtSignal()
+    _collab_cursor_changed = QtSignal(str, int, int)
 
     def __init__(self):
         super().__init__()
@@ -91,6 +92,7 @@ class MainWindow(QMainWindow):
         self.editor.export_odt_requested.connect(lambda: self._export_script("odt"))
         self.editor.export_fountain_requested.connect(lambda: self._export_script("fountain"))
         self.editor.status_bar.typewriter_toggled.connect(self._on_typewriter_toggled)
+        self.editor.manuscript.scene_nav.scenes_renumbered.connect(self._on_scenes_renumbered)
         self.stack.addWidget(self.editor)
 
         self._editor_title_bar = TitleBar(show_phases=True)
@@ -205,7 +207,9 @@ class MainWindow(QMainWindow):
             self._editor_title_bar.set_context(title)
             self._editor_title_bar.set_wordmark_accent()
             dialect = data.get("meta", {}).get("format_id", "fountain/core")
+            paper = data.get("meta", {}).get("paper", "US Letter")
             self.editor.status_bar.update_info(dialect=dialect)
+            self.editor.deliver.update_format_label(format_id=dialect, paper=paper)
             self.editor.load_project(data)
             try:
                 self.editor.manuscript.editor.content_changed.disconnect(self._on_content_changed)
@@ -216,11 +220,22 @@ class MainWindow(QMainWindow):
 
     def _on_content_changed(self):
         STATE.script_content = self.editor.manuscript.editor.toPlainText()
+        from ecrit.screenplay.module_system import HOOK_BEFORE_SAVE, HOOK_AFTER_SAVE
+        self._module_registry.call_hook(HOOK_BEFORE_SAVE, STATE.script_content)
         saved = STATE.save_script()
+        if saved:
+            self._module_registry.call_hook(HOOK_AFTER_SAVE, STATE.script_content)
         self._editor_title_bar.save_dot.set_saved(saved)
         if saved and STATE.current_project_path:
             self._auto_sync_if_enabled()
             self._auto_export_if_enabled()
+
+    def _on_scenes_renumbered(self):
+        scene_nav = self.editor.manuscript.scene_nav
+        scene_numbers = scene_nav.get_scene_numbers()
+        self.editor.status_bar.update_info(
+            scene=f"{len(scene_numbers)} scenes renumbered"
+        )
 
     def _auto_sync_if_enabled(self):
         from ecrit.sync.remote_sync import load_remote_config, push_to_remote
@@ -500,6 +515,10 @@ class MainWindow(QMainWindow):
             self._sync_dialog.set_status(f"error: {exc}")
 
     def _show_cloud_export(self):
+        if STATE.current_project_path:
+            from ecrit.sync.cloud_export import load_cloud_configs
+            configs = load_cloud_configs(STATE.current_project_path)
+            self._cloud_export_dialog.set_configs(configs)
         self._cloud_export_dialog.exec()
 
     def _on_cloud_export(self, provider: str, fmt: str):
@@ -585,9 +604,11 @@ class MainWindow(QMainWindow):
         self._active_collab_session = session
         self._collab_text_changed.connect(self._apply_collab_text)
         self._collab_participants_changed.connect(self._apply_collab_participants)
+        self._collab_cursor_changed.connect(self._apply_collab_cursor)
         session.set_callbacks(
             on_text_change=lambda text: self._collab_text_changed.emit(text),
             on_participant_change=lambda: self._collab_participants_changed.emit(),
+            on_cursor_change=lambda uid, pos, length: self._collab_cursor_changed.emit(uid, pos, length),
         )
 
     def _apply_collab_text(self, text: str):
@@ -613,6 +634,9 @@ class MainWindow(QMainWindow):
         ]
         self.editor.manuscript.presence_bar.set_participants(participants)
 
+    def _apply_collab_cursor(self, user_id: str, position: int, length: int):
+        self.editor.manuscript.presence_bar.update_cursor(user_id, position)
+
     def _on_collab_left(self):
         try:
             self._collab_text_changed.disconnect(self._apply_collab_text)
@@ -620,6 +644,10 @@ class MainWindow(QMainWindow):
             pass
         try:
             self._collab_participants_changed.disconnect(self._apply_collab_participants)
+        except RuntimeError:
+            pass
+        try:
+            self._collab_cursor_changed.disconnect(self._apply_collab_cursor)
         except RuntimeError:
             pass
         self._active_collab_session = None
@@ -679,6 +707,8 @@ class MainWindow(QMainWindow):
             return
         content = self.editor.manuscript.editor.toPlainText()
         title = self._editor_title_bar.context_label.text() or "Untitled"
+        from ecrit.screenplay.module_system import HOOK_BEFORE_EXPORT, HOOK_AFTER_EXPORT
+        self._module_registry.call_hook(HOOK_BEFORE_EXPORT, kind, content)
         if kind == "pdf":
             from ecrit.export.pdf_export import export_pdf
             export_pdf(content, title=title, parent=self)
@@ -688,6 +718,7 @@ class MainWindow(QMainWindow):
         elif kind == "fountain":
             from ecrit.export.fountain_export import export_fountain
             export_fountain(content, title=title, parent=self)
+        self._module_registry.call_hook(HOOK_AFTER_EXPORT, kind, content)
 
     def _import_script(self):
         from PySide6.QtWidgets import QFileDialog, QMessageBox

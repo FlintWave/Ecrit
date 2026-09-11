@@ -24,6 +24,7 @@ class CompanionDialog(QDialog):
         self.setModal(True)
 
         self._device_sync = DeviceSync()
+        self._device_sync.set_status_callback(self._on_sync_status_change)
         t = theme.current()
 
         layout = QVBoxLayout(self)
@@ -170,6 +171,9 @@ class CompanionDialog(QDialog):
 
     def set_sync_status(self, status: str):
         self.sync_status_label.setText(status)
+
+    def _on_sync_status_change(self, status):
+        self.sync_status_label.setText(status.value)
 
     def get_device_sync(self) -> DeviceSync:
         return self._device_sync
