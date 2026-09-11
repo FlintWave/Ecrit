@@ -1,0 +1,49 @@
+{
+    "_language_name": "日本語",
+
+    "app.title": "Écrit",
+    "app.new_project": "新規プロジェクト",
+    "app.open_project": "プロジェクトを開く",
+    "app.import_script": "脚本をインポート",
+    "app.save": "保存",
+    "app.settings": "設定",
+    "app.dashboard": "ダッシュボード",
+
+    "phase.plan": "企画",
+    "phase.outline": "構成",
+    "phase.manuscript": "原稿",
+    "phase.proofread": "校正",
+    "phase.deliver": "納品",
+
+    "editor.start_writing": "書き始めましょう...",
+    "editor.find_replace": "検索と置換",
+    "editor.typewriter": "タイプライター",
+    "editor.page_of": "{total}ページ中{page}ページ",
+    "editor.words_today": "本日 {words} / {target}",
+    "editor.scenes": "シーン",
+    "editor.characters": "登場人物",
+    "editor.documents": "文書",
+
+    "settings.title": "設定",
+    "settings.general": "一般",
+    "settings.editor": "エディタ",
+    "settings.theme": "テーマ",
+    "settings.about": "このアプリについて",
+    "settings.modules": "モジュール",
+    "settings.language": "言語",
+    "settings.appearance": "外観",
+    "settings.nocturne": "Nocturne（ダーク）",
+    "settings.organic": "Organic（ライト）",
+
+    "cmd.type_command": "コマンドを入力...",
+
+    "collab.title": "コラボレーション",
+    "collab.start_session": "セッションを開始",
+    "collab.join_session": "セッションに参加",
+    "collab.connected": "接続済み",
+    "collab.disconnected": "切断",
+
+    "companion.title": "コンパニオン同期",
+    "companion.never_synced": "未同期",
+    "companion.no_devices": "ペアリング済みデバイスなし"
+}

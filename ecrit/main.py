@@ -2,7 +2,7 @@
 
 import sys
 from PySide6.QtWidgets import QApplication, QMainWindow, QStackedWidget, QVBoxLayout, QWidget
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import Qt, QTimer, Signal as QtSignal
 from PySide6.QtGui import QShortcut, QKeySequence
 
 from ecrit.ui.styles import theme
@@ -17,8 +17,6 @@ from ecrit.ui.overlays.shortcuts import ShortcutsDialog
 from ecrit.ui.overlays.settings import SettingsDialog
 from ecrit.ui.overlays.command_palette import CommandPalette
 from ecrit.ui.overlays.sprint_timer import SprintTimerWidget
-from ecrit.ui.overlays.reading_mode import ReadingMode
-from ecrit.ui.overlays.scratchpad import Scratchpad
 from ecrit.ui.overlays.character_sheet import CharacterSheet
 from ecrit.ui.overlays.compare_drafts import CompareDrafts
 from ecrit.ui.overlays.snapshots import (
@@ -30,11 +28,20 @@ from ecrit.ui.overlays.series_panel import SeriesPanel
 from ecrit.ui.overlays.sync_settings import SyncSettingsDialog
 from ecrit.ui.overlays.cloud_export import CloudExportDialog
 from ecrit.ui.overlays.share_review import ShareReviewDialog
+from ecrit.ui.overlays.marketplace import MarketplaceDialog
+from ecrit.ui.overlays.collaboration import CollaborationDialog
+from ecrit.ui.overlays.companion import CompanionDialog
 from ecrit.screenplay.series_projects import SeriesProject
 from ecrit.export.share_review import generate_review_html, generate_share_link, list_shares
+from ecrit.collab.session import CollabSession
+from ecrit.i18n import set_language
 
 
 class MainWindow(QMainWindow):
+    _collab_text_changed = QtSignal(str)
+    _collab_participants_changed = QtSignal()
+    _collab_cursor_changed = QtSignal(str, int, int)
+
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Écrit")
@@ -52,6 +59,9 @@ class MainWindow(QMainWindow):
         self.title_bar.settings_clicked.connect(self._open_settings)
         self.title_bar.home_clicked.connect(self._go_dashboard)
         self.title_bar.cmd_chip.clicked.connect(self._show_command_palette)
+        self.title_bar.close_requested.connect(self.close)
+        self.title_bar.minimize_requested.connect(self.showMinimized)
+        self.title_bar.maximize_requested.connect(self._toggle_maximize)
         root.addWidget(self.title_bar)
 
         self.stack = QStackedWidget()
@@ -61,6 +71,7 @@ class MainWindow(QMainWindow):
         self.dashboard.open_project.connect(self._open_project)
         self.dashboard.new_project.connect(self._show_new_project)
         self.dashboard.import_script.connect(self._import_script)
+        self.dashboard.open_settings.connect(self._open_settings)
         self.stack.addWidget(self.dashboard)
 
         self.new_project_wizard = NewProjectWizard()
@@ -78,6 +89,9 @@ class MainWindow(QMainWindow):
         self.editor.export_pdf_requested.connect(lambda: self._export_script("pdf"))
         self.editor.export_odt_requested.connect(lambda: self._export_script("odt"))
         self.editor.export_fountain_requested.connect(lambda: self._export_script("fountain"))
+        self.editor.status_bar.typewriter_toggled.connect(self._on_typewriter_toggled)
+        self.editor.status_bar.focus_toggled.connect(self._on_focus_toggled)
+        self.editor.manuscript.scene_nav.scenes_renumbered.connect(self._on_scenes_renumbered)
         self.stack.addWidget(self.editor)
 
         self._editor_title_bar = TitleBar(show_phases=True)
@@ -85,11 +99,21 @@ class MainWindow(QMainWindow):
         self._editor_title_bar.home_clicked.connect(self._go_dashboard)
         self._editor_title_bar.phase_changed.connect(self._on_phase_changed)
         self._editor_title_bar.cmd_chip.clicked.connect(self._show_command_palette)
+        self._editor_title_bar.close_requested.connect(self.close)
+        self._editor_title_bar.minimize_requested.connect(self.showMinimized)
+        self._editor_title_bar.maximize_requested.connect(self._toggle_maximize)
 
         self._stats_dialog = StatsDialog(self)
         self._shortcuts_dialog = ShortcutsDialog(self)
         self._settings_dialog = SettingsDialog(self)
         self._settings_dialog.theme_changed.connect(self._apply_theme)
+        self._settings_dialog.language_changed.connect(self._on_language_changed)
+        self._settings_dialog.project_folder_changed.connect(self._on_project_folder_changed)
+        self._settings_dialog.settings_applied.connect(self._on_settings_applied)
+
+        from ecrit.screenplay.module_system import ModuleRegistry
+        self._module_registry = ModuleRegistry()
+        self._settings_dialog.set_registry(self._module_registry)
 
         self._command_palette = CommandPalette(self)
         self._command_palette.command_selected.connect(self._on_command)
@@ -111,36 +135,104 @@ class MainWindow(QMainWindow):
 
         self._series_panel = SeriesPanel(self)
         self._series_panel.episode_selected.connect(self._on_episode_selected)
+        self._series_panel.project_changed.connect(self._on_series_project_changed)
 
         self._sync_dialog = SyncSettingsDialog(self)
         self._sync_dialog.sync_requested.connect(self._on_sync_requested)
+        self._sync_dialog.config_changed.connect(self._on_sync_config_saved)
 
         self._cloud_export_dialog = CloudExportDialog(self)
         self._cloud_export_dialog.export_requested.connect(self._on_cloud_export)
+        self._cloud_export_dialog.auto_export_changed.connect(self._on_auto_export_changed)
 
         self._share_dialog = ShareReviewDialog(self)
         self._share_dialog.share_created.connect(self._on_share_created)
 
+        self._marketplace_dialog = MarketplaceDialog(self)
+        self._marketplace_dialog.plugin_installed.connect(self._on_plugin_installed)
+        self._marketplace_dialog.plugin_uninstalled.connect(self._on_plugin_uninstalled)
+
+        self._collab_session = CollabSession(user_name=STATE.author_name or "Writer")
+        self._active_collab_session = None
+        self._collab_dialog = CollaborationDialog(self)
+        self._collab_dialog.set_session(self._collab_session)
+        self._collab_dialog.session_started.connect(self._on_collab_started)
+        self._collab_dialog.session_joined.connect(self._on_collab_started)
+        self._collab_dialog.session_left.connect(self._on_collab_left)
+
+        self._companion_dialog = CompanionDialog(self)
+        self._companion_dialog.sync_bundle_requested.connect(self._on_companion_sync)
+        self._companion_dialog.reader_export_requested.connect(self._on_companion_reader)
+        self._companion_dialog.wifi_transfer_requested.connect(self._on_wifi_transfer)
+
         self._cmd_palette_shortcut = QShortcut(QKeySequence("Ctrl+K"), self)
         self._cmd_palette_shortcut.activated.connect(self._show_command_palette)
+
+        self._find_shortcut = QShortcut(QKeySequence("Ctrl+F"), self)
+        self._find_shortcut.activated.connect(lambda: self.editor._toggle_find() if self.stack.currentWidget() is self.editor else None)
+
+        self._new_shortcut = QShortcut(QKeySequence("Ctrl+N"), self)
+        self._new_shortcut.activated.connect(self._show_new_project)
+
+        self._theme_shortcut = QShortcut(QKeySequence("Ctrl+Shift+T"), self)
+        self._theme_shortcut.activated.connect(self._toggle_theme)
+
+        self._fullscreen_shortcut = QShortcut(QKeySequence("F11"), self)
+        self._fullscreen_shortcut.activated.connect(self._toggle_fullscreen)
+
+        for i in range(1, 6):
+            shortcut = QShortcut(QKeySequence(f"Ctrl+{i}"), self)
+            phases = ["Plan", "Outline", "Manuscript", "Proofread", "Deliver"]
+            phase = phases[i - 1]
+            shortcut.activated.connect(lambda p=phase: self._switch_phase(p))
 
         self._sprint_status_timer = QTimer(self)
         self._sprint_status_timer.setInterval(1000)
         self._sprint_status_timer.timeout.connect(self._update_sprint_label)
         self._sprint_status_timer.start()
 
+        self._load_saved_preferences()
         self._apply_theme()
         self._go_dashboard()
+
+    def _load_saved_preferences(self):
+        prefs = STATE.load_preferences()
+        if not prefs:
+            return
+        STATE.author_name = prefs.get("author_name", STATE.author_name)
+        STATE.author_email = prefs.get("author_email", STATE.author_email)
+        if "language" in prefs:
+            STATE.language = prefs["language"]
+            set_language(prefs["language"])
+        if "font_size" in prefs:
+            from PySide6.QtGui import QFont
+            font = QFont("Courier Prime", prefs["font_size"])
+            font.setStyleHint(QFont.StyleHint.Monospace)
+            self.editor.manuscript.editor.setFont(font)
+        if "auto_save" in prefs:
+            if prefs["auto_save"]:
+                self.editor.manuscript.editor._save_timer.setInterval(1000)
+            else:
+                self.editor.manuscript.editor._save_timer.setInterval(0)
+                self.editor.manuscript.editor._save_timer.stop()
+        if "typewriter" in prefs:
+            self.editor.manuscript.editor._typewriter = prefs["typewriter"]
+        if "line_numbers" in prefs:
+            self.editor.manuscript.editor.set_line_numbers_visible(prefs["line_numbers"])
 
     def _apply_theme(self):
         t = theme.current()
         self.setStyleSheet(generate(t))
 
     def _go_dashboard(self):
+        if self.stack.currentWidget() is self.editor and STATE.current_project_path:
+            STATE.script_content = self.editor.manuscript.editor.toPlainText()
+            STATE.save_script()
         self._swap_title_bar(show_phases=False)
         self.title_bar.set_context("")
         self.stack.setCurrentWidget(self.dashboard)
         self.dashboard.refresh()
+        self._update_week_stats()
 
     def _show_new_project(self):
         self._swap_title_bar(show_phases=False)
@@ -158,19 +250,84 @@ class MainWindow(QMainWindow):
             self._editor_title_bar.set_context(title)
             self._editor_title_bar.set_wordmark_accent()
             dialect = data.get("meta", {}).get("format_id", "fountain/core")
+            paper = data.get("meta", {}).get("paper", "US Letter")
             self.editor.status_bar.update_info(dialect=dialect)
+            self.editor.deliver.update_format_label(format_id=dialect, paper=paper)
             self.editor.load_project(data)
             try:
                 self.editor.manuscript.editor.content_changed.disconnect(self._on_content_changed)
             except RuntimeError:
                 pass
+            try:
+                self.editor.manuscript.editor.text_modified.disconnect(self._on_text_modified)
+            except RuntimeError:
+                pass
             self.editor.manuscript.editor.content_changed.connect(self._on_content_changed)
+            self.editor.manuscript.editor.text_modified.connect(self._on_text_modified)
             self.stack.setCurrentWidget(self.editor)
+
+    def _on_text_modified(self):
+        self._editor_title_bar.save_dot.set_saved(False)
 
     def _on_content_changed(self):
         STATE.script_content = self.editor.manuscript.editor.toPlainText()
-        STATE.save_script()
-        self._editor_title_bar.save_dot.set_saved(True)
+        words = len(STATE.script_content.split())
+        self.editor.status_bar.words_label.setText(f"{words:,} words")
+        lines = STATE.script_content.count('\n') + 1
+        self.editor._total_pages = max(1, lines // 55)
+        from ecrit.screenplay.module_system import HOOK_BEFORE_SAVE, HOOK_AFTER_SAVE
+        self._module_registry.call_hook(HOOK_BEFORE_SAVE, STATE.script_content)
+        saved = STATE.save_script()
+        if saved:
+            self._module_registry.call_hook(HOOK_AFTER_SAVE, STATE.script_content)
+        self._editor_title_bar.save_dot.set_saved(saved)
+        if saved and STATE.current_project_path:
+            self._auto_sync_if_enabled()
+            self._auto_export_if_enabled()
+
+    def _on_scenes_renumbered(self):
+        scene_nav = self.editor.manuscript.scene_nav
+        scene_numbers = scene_nav.get_scene_numbers()
+        self.editor.status_bar.update_info(
+            scene=f"{len(scene_numbers)} scenes renumbered"
+        )
+
+    def _auto_sync_if_enabled(self):
+        import threading
+        from ecrit.sync.remote_sync import load_remote_config, push_to_remote
+        config, _result = load_remote_config(STATE.current_project_path)
+        if config and config.auto_sync and config.remote_url:
+            path = STATE.current_project_path
+            threading.Thread(
+                target=push_to_remote, args=(path, config), daemon=True
+            ).start()
+
+    def _auto_export_if_enabled(self):
+        import tempfile
+        import os
+        from ecrit.sync.cloud_export import load_cloud_configs, get_exporter
+        configs = load_cloud_configs(STATE.current_project_path)
+        content = STATE.script_content
+        title = self._editor_title_bar.context_label.text() or "Untitled"
+        for cfg in configs:
+            if cfg.auto_export:
+                exporter = get_exporter(cfg.provider, cfg)
+                tmp_path = None
+                try:
+                    with tempfile.NamedTemporaryFile(
+                        mode="w", suffix=".fountain", delete=False, encoding="utf-8"
+                    ) as tmp:
+                        tmp.write(content)
+                        tmp_path = tmp.name
+                    exporter.upload_file(tmp_path, cfg.folder_path)
+                except Exception:
+                    pass
+                finally:
+                    if tmp_path:
+                        try:
+                            os.unlink(tmp_path)
+                        except OSError:
+                            pass
 
     def _on_project_created(self, path: str):
         self._open_project(path)
@@ -222,6 +379,13 @@ class MainWindow(QMainWindow):
             "Remote Sync": self._show_sync_settings,
             "Cloud Export": self._show_cloud_export,
             "Share for Review": self._show_share_review,
+            "Plugin Marketplace": self._show_marketplace,
+            "Collaboration": self._show_collaboration,
+            "Companion Sync": self._show_companion,
+            "Change Language": self._show_language_settings,
+            "Generate Character Name": self._generate_character_name,
+            "Focus Mode": self._toggle_focus_mode,
+            "Import Final Draft": self._import_script,
         }
         handler = handlers.get(name)
         if handler:
@@ -253,14 +417,20 @@ class MainWindow(QMainWindow):
         self.editor.enter_reading_mode()
 
     def _show_sprint_timer(self):
+        current_words = len(self.editor.manuscript.editor.toPlainText().split())
+        self._sprint_timer.set_start_words(current_words)
         geo = self.geometry()
         x = geo.x() + geo.width() - self._sprint_timer.width() - 24
         y = geo.y() + geo.height() - self._sprint_timer.height() - 48
         self._sprint_timer.move(x, y)
         self._sprint_timer.show()
 
-    def _on_sprint_ended(self, minutes: int):
-        self.editor.status_bar.sprint_label.setText(f"Sprint complete — {minutes}m")
+    def _on_sprint_ended(self, minutes: int, words_at_start: int):
+        current_words = len(self.editor.manuscript.editor.toPlainText().split())
+        written = max(0, current_words - words_at_start)
+        self.editor.status_bar.sprint_label.setText(
+            f"Sprint complete — {minutes}m, {written} words"
+        )
 
     def _update_sprint_label(self):
         text = self._sprint_timer.get_status_text()
@@ -342,12 +512,30 @@ class MainWindow(QMainWindow):
         self._series_panel.exec()
 
     def _on_episode_selected(self, season: int, episode: int):
-        pass
+        if not hasattr(self, "_series_project") or self._series_project is None:
+            return
+        seasons = self._series_project.seasons
+        if season < len(seasons):
+            episodes = seasons[season].episodes
+            if episode < len(episodes):
+                ep = episodes[episode]
+                if ep.script_file:
+                    self._open_project(ep.script_file)
+
+    def _on_series_project_changed(self):
+        if not STATE.current_project_path:
+            return
+        project = self._series_panel._project
+        if project:
+            from ecrit.screenplay.series_projects import save_series_project
+            import os
+            series_path = os.path.join(STATE.current_project_path, "series.json")
+            save_series_project(project, series_path)
 
     def _show_sync_settings(self):
         if STATE.current_project_path:
             from ecrit.sync.remote_sync import load_remote_config
-            config = load_remote_config(STATE.current_project_path)
+            config, _result = load_remote_config(STATE.current_project_path)
             if config:
                 self._sync_dialog.set_config({
                     "provider": config.provider.value if hasattr(config.provider, "value") else config.provider,
@@ -389,6 +577,10 @@ class MainWindow(QMainWindow):
             self._sync_dialog.set_status(f"error: {exc}")
 
     def _show_cloud_export(self):
+        if STATE.current_project_path:
+            from ecrit.sync.cloud_export import load_cloud_configs
+            configs = load_cloud_configs(STATE.current_project_path)
+            self._cloud_export_dialog.set_configs(configs)
         self._cloud_export_dialog.exec()
 
     def _on_cloud_export(self, provider: str, fmt: str):
@@ -410,6 +602,27 @@ class MainWindow(QMainWindow):
             except Exception as exc:
                 self._cloud_export_dialog.add_history_entry(f"❌ Export failed: {exc}")
 
+    def _on_auto_export_changed(self, provider: str, enabled: bool):
+        if not STATE.current_project_path:
+            return
+        from ecrit.sync.cloud_export import (
+            load_cloud_configs, save_cloud_configs, CloudConfig, CloudProvider,
+        )
+        configs = load_cloud_configs(STATE.current_project_path)
+        found = False
+        for cfg in configs:
+            if cfg.provider.value == provider:
+                cfg.auto_export = enabled
+                found = True
+                break
+        if not found and enabled:
+            try:
+                cp = CloudProvider(provider)
+            except (ValueError, KeyError):
+                return
+            configs.append(CloudConfig(provider=cp, auto_export=True))
+        save_cloud_configs(STATE.current_project_path, configs)
+
     def _show_share_review(self):
         if STATE.current_project_path:
             shares = list_shares(STATE.current_project_path)
@@ -421,7 +634,12 @@ class MainWindow(QMainWindow):
             return
         content = self.editor.manuscript.editor.toPlainText()
         title = self._editor_title_bar.context_label.text() or "Untitled"
-        html = generate_review_html(content, title, author="", watermark_text=watermark)
+        options = self._share_dialog.get_options()
+        html = generate_review_html(
+            content, title, author="", watermark_text=watermark,
+            include_title_page=options.get("include_title_page", True),
+            include_page_numbers=options.get("include_page_numbers", True),
+        )
         path = generate_share_link(html, STATE.current_project_path)
         import datetime
         self._share_dialog.add_share({
@@ -430,40 +648,169 @@ class MainWindow(QMainWindow):
             "path": path,
         })
 
+    def _show_marketplace(self):
+        self._marketplace_dialog.exec()
+
+    def _show_collaboration(self):
+        if STATE.current_project_path:
+            content = self.editor.manuscript.editor.toPlainText()
+            title = self._editor_title_bar.context_label.text() or "Untitled"
+            self._collab_session.project_title = title
+        self._collab_dialog.exec()
+
+    def _on_collab_started(self, session):
+        if STATE.current_project_path and session.role.value == "host":
+            content = self.editor.manuscript.editor.toPlainText()
+            session._crdt.set_text(content)
+        self.editor.manuscript.presence_bar.setVisible(True)
+        self._active_collab_session = session
+        self._collab_text_changed.connect(self._apply_collab_text)
+        self._collab_participants_changed.connect(self._apply_collab_participants)
+        self._collab_cursor_changed.connect(self._apply_collab_cursor)
+        session.set_callbacks(
+            on_text_change=lambda text: self._collab_text_changed.emit(text),
+            on_participant_change=lambda: self._collab_participants_changed.emit(),
+            on_cursor_change=lambda uid, pos, length: self._collab_cursor_changed.emit(uid, pos, length),
+        )
+
+    def _apply_collab_text(self, text: str):
+        editor = self.editor.manuscript.editor
+        if editor.toPlainText() != text:
+            cursor_pos = editor.textCursor().position()
+            editor.blockSignals(True)
+            editor.setPlainText(text)
+            cursor = editor.textCursor()
+            cursor.setPosition(min(cursor_pos, len(text)))
+            editor.setTextCursor(cursor)
+            editor.blockSignals(False)
+            STATE.script_content = text
+            STATE.save_script()
+
+    def _apply_collab_participants(self):
+        session = self._active_collab_session
+        if not session:
+            return
+        self._collab_dialog.update_participants(len(session.get_participants()))
+        participants = [
+            {"user_id": p.user_id, "user_name": p.user_name, "color": p.color}
+            for p in session.get_participants()
+        ]
+        self.editor.manuscript.presence_bar.set_participants(participants)
+
+    def _apply_collab_cursor(self, user_id: str, position: int, length: int):
+        self.editor.manuscript.presence_bar.update_cursor(user_id, position)
+
+    def _on_collab_left(self):
+        try:
+            self._collab_text_changed.disconnect(self._apply_collab_text)
+        except RuntimeError:
+            pass
+        try:
+            self._collab_participants_changed.disconnect(self._apply_collab_participants)
+        except RuntimeError:
+            pass
+        try:
+            self._collab_cursor_changed.disconnect(self._apply_collab_cursor)
+        except RuntimeError:
+            pass
+        self._active_collab_session = None
+        self.editor.status_bar.sprint_label.setText("")
+        self.editor.manuscript.presence_bar.clear_participants()
+        self.editor.manuscript.presence_bar.setVisible(False)
+
+    def _show_companion(self):
+        self._companion_dialog.exec()
+
+    def _on_companion_sync(self):
+        if not STATE.current_project_path:
+            return
+        content = self.editor.manuscript.editor.toPlainText()
+        title = self._editor_title_bar.context_label.text() or "Untitled"
+        from ecrit.companion.sync_bundle import create_sync_bundle
+        path = create_sync_bundle(STATE.current_project_path, content, title)
+        device_sync = self._companion_dialog.get_device_sync()
+        url = device_sync.start_transfer_server(path)
+        self._companion_dialog.set_transfer_url(url)
+        self._companion_dialog.set_sync_status(f"Bundle ready: {path}")
+        for device in device_sync._devices:
+            device_sync.mark_synced(device.device_id)
+
+    def _on_wifi_transfer(self, path: str):
+        if not STATE.current_project_path:
+            return
+        content = self.editor.manuscript.editor.toPlainText()
+        title = self._editor_title_bar.context_label.text() or "Untitled"
+        from ecrit.companion.sync_bundle import create_sync_bundle
+        bundle_path = path or create_sync_bundle(STATE.current_project_path, content, title)
+        url = self._companion_dialog.get_device_sync().start_transfer_server(bundle_path)
+        self._companion_dialog.set_transfer_url(url)
+        self._companion_dialog.set_sync_status(f"Wi-Fi transfer active: {url}")
+
+    def _on_companion_reader(self):
+        if not STATE.current_project_path:
+            return
+        content = self.editor.manuscript.editor.toPlainText()
+        title = self._editor_title_bar.context_label.text() or "Untitled"
+        import os
+        output_dir = os.path.dirname(STATE.current_project_path)
+        from ecrit.companion.reader_export import create_reader_bundle
+        path = create_reader_bundle(content, title, output_dir)
+        self._companion_dialog.set_sync_status(f"Reader bundle: {path}")
+
+    def _show_language_settings(self):
+        self._settings_dialog.load_state()
+        self._settings_dialog.exec()
+
+    def _on_language_changed(self, lang: str):
+        set_language(lang)
+        STATE.language = lang
+
     def _export_script(self, kind: str):
         if self.stack.currentWidget() is not self.editor:
             return
         content = self.editor.manuscript.editor.toPlainText()
         title = self._editor_title_bar.context_label.text() or "Untitled"
+        from ecrit.screenplay.module_system import HOOK_BEFORE_EXPORT, HOOK_AFTER_EXPORT
+        self._module_registry.call_hook(HOOK_BEFORE_EXPORT, kind, content)
+        export_opts = self.editor.deliver._export_opts
         if kind == "pdf":
             from ecrit.export.pdf_export import export_pdf
-            export_pdf(content, title=title, parent=self)
+            export_pdf(
+                content, title=title, parent=self,
+                include_title_page=export_opts.get("title_page", True),
+                scene_numbers=export_opts.get("scene_numbers", True),
+            )
         elif kind == "odt":
             from ecrit.export.odt_export import export_odt
             export_odt(content, title=title, parent=self)
         elif kind == "fountain":
             from ecrit.export.fountain_export import export_fountain
             export_fountain(content, title=title, parent=self)
+        self._module_registry.call_hook(HOOK_AFTER_EXPORT, kind, content)
 
     def _import_script(self):
-        from PySide6.QtWidgets import QFileDialog
+        from PySide6.QtWidgets import QFileDialog, QMessageBox
         path, _ = QFileDialog.getOpenFileName(
-            self, "Import Fountain Script", "",
-            "Fountain files (*.fountain *.ftn);;All files (*)"
+            self, "Import Script", "",
+            "All supported (*.fountain *.ftn *.fdx);;Fountain files (*.fountain *.ftn);;Final Draft (*.fdx);;All files (*)"
         )
         if path:
             try:
-                with open(path, 'r', encoding='utf-8') as f:
-                    content = f.read()
                 import os
+                if path.lower().endswith(".fdx"):
+                    from ecrit.export.fdx_import import import_fdx_file
+                    content = import_fdx_file(path)
+                else:
+                    with open(path, 'r', encoding='utf-8') as f:
+                        content = f.read()
                 title = os.path.splitext(os.path.basename(path))[0]
                 meta = STATE.create_project(title=title, author="", format_id="fountain/core", paper="USLetter")
                 if meta:
                     STATE.script_content = content
                     STATE.save_script()
                     self._open_project(meta.get("path", ""))
-            except Exception:
-                pass
+            except Exception as exc:
+                QMessageBox.warning(self, "Import Failed", f"Could not import script:\n{exc}")
 
     def _swap_title_bar(self, show_phases: bool):
         root = self.centralWidget().layout()
@@ -476,6 +823,36 @@ class MainWindow(QMainWindow):
             root.replaceWidget(old_bar, self.title_bar)
             old_bar.hide()
             self.title_bar.show()
+
+    def _toggle_maximize(self):
+        if self.isMaximized():
+            self.showNormal()
+        else:
+            self.showMaximized()
+
+    def _toggle_fullscreen(self):
+        if self.isFullScreen():
+            self.showNormal()
+        else:
+            self.showFullScreen()
+
+    def _on_typewriter_toggled(self, enabled: bool):
+        self.editor.manuscript.editor._typewriter = enabled
+
+    def _on_focus_toggled(self, enabled: bool):
+        self.editor.manuscript.editor.set_focus_mode(enabled)
+
+    def _toggle_focus_mode(self):
+        sb = self.editor.status_bar
+        sb._toggle_focus()
+
+    def _generate_character_name(self):
+        from ecrit.screenplay.name_generator import generate_character_name
+        name = generate_character_name()
+        if self.stack.currentWidget() is self.editor:
+            cursor = self.editor.manuscript.editor.textCursor()
+            cursor.insertText(name)
+            self.editor.manuscript.editor.setTextCursor(cursor)
 
     def _toggle_theme(self):
         theme.toggle()
@@ -502,6 +879,79 @@ class MainWindow(QMainWindow):
                 self.showNormal()
             else:
                 self.showMaximized()
+
+    def _on_project_folder_changed(self, folder: str):
+        STATE.project_folder = folder
+        STATE.load_projects()
+
+    def _on_settings_applied(self, settings: dict):
+        STATE.author_name = settings.get("author_name", STATE.author_name)
+        STATE.author_email = settings.get("author_email", STATE.author_email)
+        font_size = settings.get("font_size", 15)
+        from PySide6.QtGui import QFont
+        font = QFont("Courier Prime", font_size)
+        font.setStyleHint(QFont.StyleHint.Monospace)
+        self.editor.manuscript.editor.setFont(font)
+        word_target = settings.get("word_target", 2500)
+        self.editor.status_bar.words_label.setText(
+            f"0 / {word_target:,} today"
+        )
+        auto_save = settings.get("auto_save", True)
+        if auto_save:
+            self.editor.manuscript.editor._save_timer.setInterval(1000)
+        else:
+            self.editor.manuscript.editor._save_timer.setInterval(0)
+            self.editor.manuscript.editor._save_timer.stop()
+        self.editor.manuscript.editor._typewriter = settings.get("typewriter", True)
+        self.editor.manuscript.editor.set_line_numbers_visible(
+            settings.get("line_numbers", False)
+        )
+        STATE.save_preferences({
+            "author_name": STATE.author_name,
+            "author_email": STATE.author_email,
+            "font_size": font_size,
+            "word_target": word_target,
+            "auto_save": auto_save,
+            "typewriter": settings.get("typewriter", True),
+            "line_numbers": settings.get("line_numbers", False),
+            "language": STATE.language,
+        })
+
+    def _on_plugin_installed(self, plugin_id: str):
+        if hasattr(self._settings_dialog, '_module_registry') and self._settings_dialog._module_registry:
+            self._settings_dialog._refresh_modules_list()
+
+    def _on_plugin_uninstalled(self, plugin_id: str):
+        if hasattr(self._settings_dialog, '_module_registry') and self._settings_dialog._module_registry:
+            self._settings_dialog._refresh_modules_list()
+
+    def _on_sync_config_saved(self, config: dict):
+        if not STATE.current_project_path:
+            return
+        from ecrit.sync.remote_sync import (
+            RemoteConfig, RemoteProvider, save_remote_config,
+        )
+        try:
+            provider = RemoteProvider(config.get("provider", "github"))
+        except (ValueError, KeyError):
+            provider = RemoteProvider.GITHUB
+        rc = RemoteConfig(
+            provider=provider,
+            remote_url=config.get("remote_url", ""),
+            username=config.get("username", ""),
+            token=config.get("token", ""),
+            branch=config.get("branch", "main"),
+            auto_sync=config.get("auto_sync", False),
+        )
+        save_remote_config(STATE.current_project_path, rc)
+        self._sync_dialog.set_status("Config saved.")
+
+    def _update_week_stats(self):
+        stats = STATE.get_stats()
+        self.dashboard.week_stats.set_stats(
+            words=stats.get("word_count", 0),
+            pages=stats.get("page_count", 0),
+        )
 
 
 def main():

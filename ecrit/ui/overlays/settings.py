@@ -3,21 +3,54 @@
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QLineEdit, QCheckBox, QComboBox, QTabWidget, QWidget,
-    QFrame, QFileDialog, QListWidget, QListWidgetItem
+    QFrame, QFileDialog, QListWidget, QListWidgetItem, QGridLayout
 )
 from PySide6.QtCore import Qt, Signal
 
 from ecrit.ui.styles import theme
+from ecrit.i18n import tr, set_language, get_language, available_languages
+
+
+class _FormGroup(QFrame):
+    def __init__(self, label: str, parent=None):
+        super().__init__(parent)
+        t = theme.current()
+        self.setStyleSheet(
+            f"QFrame {{ background: {t.neutral_100 if t.name == 'organic' else t.neutral_900}; "
+            f"border-radius: 8px; padding: 0; }}"
+        )
+        self._layout = QVBoxLayout(self)
+        self._layout.setContentsMargins(16, 12, 16, 12)
+        self._layout.setSpacing(10)
+        if label:
+            heading = QLabel(label)
+            heading.setStyleSheet("font-size: 13px; font-weight: 600; background: transparent;")
+            self._layout.addWidget(heading)
+
+    def add_row(self, label_text: str, widget):
+        row = QHBoxLayout()
+        row.setSpacing(12)
+        lbl = QLabel(label_text)
+        lbl.setFixedWidth(140)
+        lbl.setStyleSheet("font-size: 13px; background: transparent;")
+        row.addWidget(lbl)
+        row.addWidget(widget, 1)
+        self._layout.addLayout(row)
+
+    def add_widget(self, widget):
+        self._layout.addWidget(widget)
 
 
 class SettingsDialog(QDialog):
     theme_changed = Signal()
     project_folder_changed = Signal(str)
+    language_changed = Signal(str)
+    settings_applied = Signal(dict)
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Settings")
-        self.setMinimumSize(560, 440)
+        self.setMinimumSize(580, 500)
         self.setModal(True)
 
         layout = QVBoxLayout(self)
@@ -26,7 +59,7 @@ class SettingsDialog(QDialog):
         t = theme.current()
 
         header = QHBoxLayout()
-        header.setContentsMargins(24, 20, 24, 0)
+        header.setContentsMargins(24, 20, 24, 12)
         title = QLabel("Settings")
         title.setStyleSheet("font-size: 20px; font-weight: 500;")
         header.addWidget(title)
@@ -40,140 +73,165 @@ class SettingsDialog(QDialog):
 
         tabs = QTabWidget()
 
-        # General tab
+        # ── General tab ──
         general = QWidget()
         g_layout = QVBoxLayout(general)
         g_layout.setContentsMargins(20, 16, 20, 16)
         g_layout.setSpacing(16)
 
-        g_layout.addWidget(QLabel("Author Name"))
+        identity_group = _FormGroup("Identity")
         self.author_input = QLineEdit()
+        self.author_input.setPlaceholderText("Your name")
         self.author_input.setFixedHeight(34)
-        g_layout.addWidget(self.author_input)
+        identity_group.add_row("Author Name", self.author_input)
 
-        g_layout.addWidget(QLabel("Author Email"))
         self.email_input = QLineEdit()
+        self.email_input.setPlaceholderText("you@example.com")
         self.email_input.setFixedHeight(34)
-        g_layout.addWidget(self.email_input)
+        identity_group.add_row("Author Email", self.email_input)
+        g_layout.addWidget(identity_group)
 
-        folder_row = QHBoxLayout()
-        folder_row.addWidget(QLabel("Project Folder"))
-        folder_row.addStretch()
+        locale_group = _FormGroup("Locale")
+        self.language_combo = QComboBox()
+        self.language_combo.setFixedHeight(34)
+        self.language_combo.setMinimumWidth(180)
+        for code, display_name in available_languages():
+            self.language_combo.addItem(display_name, code)
+        current = get_language()
+        for i in range(self.language_combo.count()):
+            if self.language_combo.itemData(i) == current:
+                self.language_combo.setCurrentIndex(i)
+                break
+        self.language_combo.currentIndexChanged.connect(self._on_language_changed)
+        locale_group.add_row("Language", self.language_combo)
+        g_layout.addWidget(locale_group)
+
+        storage_group = _FormGroup("Storage")
+        folder_widget = QWidget()
+        folder_layout = QHBoxLayout(folder_widget)
+        folder_layout.setContentsMargins(0, 0, 0, 0)
+        folder_layout.setSpacing(8)
         self.folder_label = QLabel()
         self.folder_label.setStyleSheet(
             f"font-family: ui-monospace, Menlo, monospace; font-size: 12px; "
-            f"color: {t.neutral_500};"
+            f"color: {t.neutral_500}; background: transparent;"
         )
-        folder_row.addWidget(self.folder_label)
+        folder_layout.addWidget(self.folder_label, 1)
         browse_btn = QPushButton("Browse")
         browse_btn.setObjectName("secondary")
-        browse_btn.setFixedHeight(28)
+        browse_btn.setFixedSize(80, 30)
         browse_btn.clicked.connect(self._browse_folder)
-        folder_row.addWidget(browse_btn)
-        g_layout.addLayout(folder_row)
+        folder_layout.addWidget(browse_btn)
+        storage_group.add_row("Project Folder", folder_widget)
+        g_layout.addWidget(storage_group)
 
         g_layout.addStretch()
         tabs.addTab(general, "General")
 
-        # Editor tab
+        # ── Editor tab ──
         editor = QWidget()
         e_layout = QVBoxLayout(editor)
         e_layout.setContentsMargins(20, 16, 20, 16)
-        e_layout.setSpacing(12)
+        e_layout.setSpacing(16)
 
+        behavior_group = _FormGroup("Behavior")
         self.typewriter_check = QCheckBox("Typewriter scrolling")
+        self.typewriter_check.setStyleSheet("background: transparent;")
         self.typewriter_check.setChecked(True)
-        e_layout.addWidget(self.typewriter_check)
+        behavior_group.add_widget(self.typewriter_check)
 
         self.line_numbers_check = QCheckBox("Show line numbers")
-        e_layout.addWidget(self.line_numbers_check)
+        self.line_numbers_check.setStyleSheet("background: transparent;")
+        behavior_group.add_widget(self.line_numbers_check)
 
-        self.auto_save_check = QCheckBox("Auto-save every 60 seconds")
+        self.auto_save_check = QCheckBox("Auto-save on pause (1s debounce)")
+        self.auto_save_check.setStyleSheet("background: transparent;")
         self.auto_save_check.setChecked(True)
-        e_layout.addWidget(self.auto_save_check)
+        behavior_group.add_widget(self.auto_save_check)
+        e_layout.addWidget(behavior_group)
 
-        font_row = QHBoxLayout()
-        font_row.addWidget(QLabel("Script font size"))
+        typography_group = _FormGroup("Typography & Goals")
         self.font_size = QComboBox()
+        self.font_size.setFixedHeight(34)
+        self.font_size.setMinimumWidth(100)
         for s in ["12", "13", "14", "15", "16", "18"]:
             self.font_size.addItem(f"{s}pt", int(s))
         self.font_size.setCurrentText("15pt")
-        font_row.addWidget(self.font_size)
-        font_row.addStretch()
-        e_layout.addLayout(font_row)
+        typography_group.add_row("Script Font Size", self.font_size)
 
-        target_row = QHBoxLayout()
-        target_row.addWidget(QLabel("Daily word target"))
         self.word_target = QLineEdit("2500")
-        self.word_target.setFixedWidth(80)
-        self.word_target.setFixedHeight(30)
-        target_row.addWidget(self.word_target)
-        target_row.addStretch()
-        e_layout.addLayout(target_row)
+        self.word_target.setFixedHeight(34)
+        self.word_target.setFixedWidth(100)
+        typography_group.add_row("Daily Word Target", self.word_target)
+        e_layout.addWidget(typography_group)
 
         e_layout.addStretch()
         tabs.addTab(editor, "Editor")
 
-        # Theme tab
+        # ── Theme tab ──
         theme_tab = QWidget()
         t_layout = QVBoxLayout(theme_tab)
         t_layout.setContentsMargins(20, 16, 20, 16)
         t_layout.setSpacing(16)
 
-        t_layout.addWidget(QLabel("Appearance"))
-
+        appearance_group = _FormGroup("Appearance")
         theme_row = QHBoxLayout()
+        theme_row.setSpacing(12)
         self.dark_btn = QPushButton("Nocturne (Dark)")
         self.dark_btn.setObjectName("primary" if t.name == "nocturne" else "secondary")
-        self.dark_btn.setFixedHeight(40)
+        self.dark_btn.setFixedHeight(44)
         self.dark_btn.clicked.connect(lambda: self._set_theme("nocturne"))
         theme_row.addWidget(self.dark_btn)
 
         self.light_btn = QPushButton("Organic (Light)")
         self.light_btn.setObjectName("primary" if t.name == "organic" else "secondary")
-        self.light_btn.setFixedHeight(40)
+        self.light_btn.setFixedHeight(44)
         self.light_btn.clicked.connect(lambda: self._set_theme("organic"))
         theme_row.addWidget(self.light_btn)
-        t_layout.addLayout(theme_row)
+        appearance_group._layout.addLayout(theme_row)
+        t_layout.addWidget(appearance_group)
 
         t_layout.addStretch()
         tabs.addTab(theme_tab, "Theme")
 
-        # About tab
+        # ── About tab ──
         about = QWidget()
         a_layout = QVBoxLayout(about)
         a_layout.setContentsMargins(20, 16, 20, 16)
         a_layout.setSpacing(8)
 
-        a_layout.addWidget(QLabel("Écrit"))
-        ver = QLabel("v0.1.0 — Foundation")
-        ver.setStyleSheet(f"color: {t.neutral_500}; font-size: 13px;")
-        a_layout.addWidget(ver)
+        about_group = _FormGroup("")
+        app_name = QLabel("Écrit")
+        app_name.setStyleSheet("font-size: 22px; font-weight: 500; background: transparent;")
+        about_group.add_widget(app_name)
 
-        a_layout.addSpacing(12)
+        ver = QLabel("v26.9.1 — Cross-platform Screenplay Editor")
+        ver.setStyleSheet(f"color: {t.neutral_500}; font-size: 13px; background: transparent;")
+        about_group.add_widget(ver)
+
         desc = QLabel(
             "A cross-platform desktop screenplay editor for Fountain "
             "and Fountain-derived dialects. Built with Rust and PySide6."
         )
         desc.setWordWrap(True)
-        desc.setStyleSheet("font-size: 14px;")
-        a_layout.addWidget(desc)
+        desc.setStyleSheet("font-size: 14px; background: transparent;")
+        about_group.add_widget(desc)
+        a_layout.addWidget(about_group)
 
         a_layout.addStretch()
         tabs.addTab(about, "About")
 
-        # Modules tab
+        # ── Modules tab ──
         modules_tab = QWidget()
         m_layout = QVBoxLayout(modules_tab)
         m_layout.setContentsMargins(20, 16, 20, 16)
         m_layout.setSpacing(12)
 
-        m_layout.addWidget(QLabel("Loaded Modules"))
-
+        modules_group = _FormGroup("Loaded Modules")
         self.modules_list = QListWidget()
         self.modules_list.setFixedHeight(140)
         self.modules_list.currentRowChanged.connect(self._on_module_selected)
-        m_layout.addWidget(self.modules_list)
+        modules_group.add_widget(self.modules_list)
 
         mod_btn_row = QHBoxLayout()
         self.toggle_module_btn = QPushButton("Enable/Disable")
@@ -189,57 +247,47 @@ class SettingsDialog(QDialog):
         self.scan_dir_btn.clicked.connect(self._scan_modules_directory)
         mod_btn_row.addWidget(self.scan_dir_btn)
         mod_btn_row.addStretch()
-        m_layout.addLayout(mod_btn_row)
+        modules_group._layout.addLayout(mod_btn_row)
+        m_layout.addWidget(modules_group)
 
-        details_label = QLabel("Module Details")
-        details_label.setStyleSheet("font-weight: 500; margin-top: 4px;")
-        m_layout.addWidget(details_label)
-
-        details_frame = QFrame()
-        details_frame.setStyleSheet(
-            f"QFrame {{ background: {t.neutral_100}; border-radius: 6px; "
-            f"padding: 10px; }}"
-        )
-        d_layout = QVBoxLayout(details_frame)
-        d_layout.setContentsMargins(10, 8, 10, 8)
-        d_layout.setSpacing(4)
+        details_group = _FormGroup("Module Details")
 
         self.mod_detail_name = QLabel("—")
-        self.mod_detail_name.setStyleSheet("font-weight: 500; font-size: 14px;")
-        d_layout.addWidget(self.mod_detail_name)
+        self.mod_detail_name.setStyleSheet("font-weight: 500; font-size: 14px; background: transparent;")
+        details_group.add_widget(self.mod_detail_name)
 
         self.mod_detail_version = QLabel("")
-        self.mod_detail_version.setStyleSheet(f"color: {t.neutral_500}; font-size: 12px;")
-        d_layout.addWidget(self.mod_detail_version)
+        self.mod_detail_version.setStyleSheet(f"color: {t.neutral_500}; font-size: 12px; background: transparent;")
+        details_group.add_widget(self.mod_detail_version)
 
         self.mod_detail_author = QLabel("")
-        self.mod_detail_author.setStyleSheet(f"color: {t.neutral_500}; font-size: 12px;")
-        d_layout.addWidget(self.mod_detail_author)
+        self.mod_detail_author.setStyleSheet(f"color: {t.neutral_500}; font-size: 12px; background: transparent;")
+        details_group.add_widget(self.mod_detail_author)
 
         self.mod_detail_desc = QLabel("")
         self.mod_detail_desc.setWordWrap(True)
-        self.mod_detail_desc.setStyleSheet("font-size: 13px;")
-        d_layout.addWidget(self.mod_detail_desc)
+        self.mod_detail_desc.setStyleSheet("font-size: 13px; background: transparent;")
+        details_group.add_widget(self.mod_detail_desc)
 
         self.mod_detail_type = QLabel("")
-        self.mod_detail_type.setStyleSheet(f"color: {t.neutral_500}; font-size: 12px;")
-        d_layout.addWidget(self.mod_detail_type)
+        self.mod_detail_type.setStyleSheet(f"color: {t.neutral_500}; font-size: 12px; background: transparent;")
+        details_group.add_widget(self.mod_detail_type)
 
         self.mod_detail_path = QLabel("")
         self.mod_detail_path.setWordWrap(True)
         self.mod_detail_path.setStyleSheet(
             f"font-family: ui-monospace, Menlo, monospace; font-size: 11px; "
-            f"color: {t.neutral_500};"
+            f"color: {t.neutral_500}; background: transparent;"
         )
-        d_layout.addWidget(self.mod_detail_path)
+        details_group.add_widget(self.mod_detail_path)
 
         self.mod_detail_error = QLabel("")
         self.mod_detail_error.setWordWrap(True)
-        self.mod_detail_error.setStyleSheet("color: #c0392b; font-size: 12px;")
+        self.mod_detail_error.setStyleSheet("color: #c0392b; font-size: 12px; background: transparent;")
         self.mod_detail_error.setVisible(False)
-        d_layout.addWidget(self.mod_detail_error)
+        details_group.add_widget(self.mod_detail_error)
 
-        m_layout.addWidget(details_frame)
+        m_layout.addWidget(details_group)
         m_layout.addStretch()
         tabs.addTab(modules_tab, "Modules")
 
@@ -262,7 +310,6 @@ class SettingsDialog(QDialog):
         self.theme_changed.emit()
 
     def set_registry(self, registry):
-        """Connect a ModuleRegistry instance to the Modules tab."""
         from ecrit.screenplay.module_system import ModuleRegistry
         self._module_registry = registry
         self._refresh_modules_list()
@@ -343,8 +390,36 @@ class SettingsDialog(QDialog):
             self._module_registry.load_all(folder)
             self._refresh_modules_list()
 
+    def _on_language_changed(self, index: int):
+        lang_code = self.language_combo.itemData(index)
+        if lang_code:
+            set_language(lang_code)
+            from ecrit.stores.app_state import STATE
+            STATE.language = lang_code
+            self.language_changed.emit(lang_code)
+
     def load_state(self):
         from ecrit.stores.app_state import STATE
         self.author_input.setText(STATE.author_name)
         self.email_input.setText(STATE.author_email)
         self.folder_label.setText(STATE.project_folder)
+        for i in range(self.language_combo.count()):
+            if self.language_combo.itemData(i) == STATE.language:
+                self.language_combo.setCurrentIndex(i)
+                break
+
+    def closeEvent(self, event):
+        try:
+            word_target = int(self.word_target.text())
+        except (ValueError, TypeError):
+            word_target = 2500
+        self.settings_applied.emit({
+            "author_name": self.author_input.text(),
+            "author_email": self.email_input.text(),
+            "font_size": self.font_size.currentData() or 15,
+            "word_target": word_target,
+            "typewriter": self.typewriter_check.isChecked(),
+            "line_numbers": self.line_numbers_check.isChecked(),
+            "auto_save": self.auto_save_check.isChecked(),
+        })
+        super().closeEvent(event)

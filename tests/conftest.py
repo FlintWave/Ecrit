@@ -25,10 +25,13 @@ def qapp():
 
 
 @pytest.fixture(autouse=True)
-def reset_theme():
+def reset_theme(qapp):
     set_theme(NOCTURNE)
     yield
     set_theme(NOCTURNE)
+    import gc
+    gc.collect()
+    qapp.processEvents()
 
 
 @pytest.fixture

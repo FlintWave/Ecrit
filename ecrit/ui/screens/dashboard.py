@@ -179,6 +179,14 @@ class Dashboard(QWidget):
         date_label.setStyleSheet(f"color: {t.neutral_500}; font-size: 14px; padding-top: 8px;")
         header.addWidget(date_label)
         header.addStretch()
+
+        settings_btn = QPushButton("⚙")
+        settings_btn.setObjectName("iconBtn")
+        settings_btn.setFixedSize(36, 36)
+        settings_btn.setToolTip("Settings")
+        settings_btn.clicked.connect(self.open_settings.emit)
+        header.addWidget(settings_btn)
+
         inner_layout.addLayout(header)
 
         hero = QHBoxLayout()
@@ -252,12 +260,14 @@ class Dashboard(QWidget):
 
         if projects:
             p = projects[0]
+            mod_time = _relative_time(p.get("modified_at", ""))
             self.continue_card.set_project(
                 title=p.get("title", "Untitled"),
                 format_id=p.get("format_id", ""),
                 meta_text=f"{_format_category(p.get('format_id', ''))} · {p.get('format_id', '')}",
-                position=f"edited {_relative_time(p.get('modified_at', ''))}",
+                position=f"edited {mod_time}",
             )
+            self.continue_card.sync_label.setText(f"Saved {mod_time}" if mod_time else "Local")
         else:
             self.continue_card.set_project("No projects yet", meta_text="Create a new project to get started")
 

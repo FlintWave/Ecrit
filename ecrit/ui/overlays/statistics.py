@@ -65,6 +65,7 @@ class StatsDialog(QDialog):
         self.stat_rows = {}
         for key, label in [
             ("pages", "Pages"),
+            ("est_runtime", "Est. Runtime"),
             ("words", "Words"),
             ("scenes", "Scenes"),
             ("characters", "Characters"),
@@ -111,6 +112,13 @@ class StatsDialog(QDialog):
         self.stat_rows["words"].set_value(f'{stats.get("word_count", 0):,}')
         self.stat_rows["scenes"].set_value(str(stats.get("scene_count", 0)))
         self.stat_rows["characters"].set_value(str(stats.get("character_count", 0)))
+
+        pages = stats.get("page_count", 0)
+        mins = pages
+        if mins >= 60:
+            self.stat_rows["est_runtime"].set_value(f"{mins // 60}h {mins % 60}m")
+        else:
+            self.stat_rows["est_runtime"].set_value(f"{mins} min")
 
         d_pct = stats.get("dialogue_percentage", 0)
         a_pct = stats.get("action_percentage", 0)

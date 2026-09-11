@@ -24,6 +24,7 @@ class CloudExportDialog(QDialog):
     """Configure and trigger cloud drive exports."""
 
     export_requested = Signal(str, str)  # provider_key, format
+    auto_export_changed = Signal(str, bool)  # provider_key, enabled
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -104,6 +105,7 @@ class CloudExportDialog(QDialog):
         form.addWidget(self.format_combo)
 
         self.auto_export_check = QCheckBox("Auto-export on save")
+        self.auto_export_check.toggled.connect(self._on_auto_export_toggled)
         form.addWidget(self.auto_export_check)
 
         divider2 = QFrame()
@@ -141,11 +143,25 @@ class CloudExportDialog(QDialog):
         layout.addLayout(footer)
 
     def _on_provider_changed(self, index: int):
-        self.auth_status.setText("Not authenticated")
+        provider = self.provider_combo.currentData()
+        if hasattr(self, "_config_map") and provider in self._config_map:
+            cfg = self._config_map[provider]
+            if cfg.get("authenticated"):
+                self.auth_status.setText("Authenticated")
+            else:
+                self.auth_status.setText("Not authenticated")
+            self.auto_export_check.setChecked(cfg.get("auto_export", False))
+        else:
+            self.auth_status.setText("Not authenticated")
 
     def _authenticate(self):
         provider = self.provider_combo.currentData()
-        self.auth_status.setText(f"Authentication required — open browser to authorize (stub)")
+        name = self.provider_combo.currentText().split(" —")[0]
+        self.auth_status.setText(f"Opening {name} authorization — check your browser")
+
+    def _on_auto_export_toggled(self, checked: bool):
+        provider = self.provider_combo.currentData()
+        self.auto_export_changed.emit(provider, checked)
 
     def _do_export(self):
         provider = self.provider_combo.currentData()
@@ -154,7 +170,20 @@ class CloudExportDialog(QDialog):
         self.history_list.insertItem(0, f"Exported as {fmt.upper()} to {self.provider_combo.currentText().split(' —')[0]}")
 
     def set_configs(self, configs: list):
-        pass
+        self._config_map = {}
+        for cfg in configs:
+            self._config_map[cfg.get("provider", "")] = cfg
+            provider = cfg.get("provider", "")
+            folder = cfg.get("folder", "")
+            if folder:
+                self.folder_input.setText(folder)
+            idx = self.provider_combo.findData(provider)
+            if idx >= 0:
+                self.provider_combo.setCurrentIndex(idx)
+            if cfg.get("authenticated"):
+                self.auth_status.setText("Authenticated")
+            auto = cfg.get("auto_export", False)
+            self.auto_export_check.setChecked(auto)
 
     def add_history_entry(self, text: str):
         self.history_list.insertItem(0, text)
