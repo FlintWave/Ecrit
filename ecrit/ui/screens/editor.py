@@ -186,7 +186,8 @@ class ScriptEditor(QPlainTextEdit):
         p.end()
 
     def _on_text_changed(self):
-        self._save_timer.start()
+        if self._save_timer.interval() > 0:
+            self._save_timer.start()
 
     def _on_cursor_moved(self):
         if self._typewriter:

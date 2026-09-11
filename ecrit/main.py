@@ -2,7 +2,7 @@
 
 import sys
 from PySide6.QtWidgets import QApplication, QMainWindow, QStackedWidget, QVBoxLayout, QWidget
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import Qt, QTimer, Signal as QtSignal
 from PySide6.QtGui import QShortcut, QKeySequence
 
 from ecrit.ui.styles import theme
@@ -40,6 +40,9 @@ from ecrit.i18n import set_language
 
 
 class MainWindow(QMainWindow):
+    _collab_text_changed = QtSignal(str)
+    _collab_participants_changed = QtSignal()
+
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Écrit")
@@ -107,6 +110,10 @@ class MainWindow(QMainWindow):
         self._settings_dialog.project_folder_changed.connect(self._on_project_folder_changed)
         self._settings_dialog.settings_applied.connect(self._on_settings_applied)
 
+        from ecrit.screenplay.module_system import ModuleRegistry
+        self._module_registry = ModuleRegistry()
+        self._settings_dialog.set_registry(self._module_registry)
+
         self._command_palette = CommandPalette(self)
         self._command_palette.command_selected.connect(self._on_command)
 
@@ -135,6 +142,7 @@ class MainWindow(QMainWindow):
 
         self._cloud_export_dialog = CloudExportDialog(self)
         self._cloud_export_dialog.export_requested.connect(self._on_cloud_export)
+        self._cloud_export_dialog.auto_export_changed.connect(self._on_auto_export_changed)
 
         self._share_dialog = ShareReviewDialog(self)
         self._share_dialog.share_created.connect(self._on_share_created)
@@ -144,6 +152,7 @@ class MainWindow(QMainWindow):
         self._marketplace_dialog.plugin_uninstalled.connect(self._on_plugin_uninstalled)
 
         self._collab_session = CollabSession(user_name=STATE.author_name or "Writer")
+        self._active_collab_session = None
         self._collab_dialog = CollaborationDialog(self)
         self._collab_dialog.set_session(self._collab_session)
         self._collab_dialog.session_started.connect(self._on_collab_started)
@@ -331,6 +340,8 @@ class MainWindow(QMainWindow):
         self.editor.enter_reading_mode()
 
     def _show_sprint_timer(self):
+        current_words = len(self.editor.manuscript.editor.toPlainText().split())
+        self._sprint_timer.set_start_words(current_words)
         geo = self.geometry()
         x = geo.x() + geo.width() - self._sprint_timer.width() - 24
         y = geo.y() + geo.height() - self._sprint_timer.height() - 48
@@ -510,6 +521,27 @@ class MainWindow(QMainWindow):
             except Exception as exc:
                 self._cloud_export_dialog.add_history_entry(f"❌ Export failed: {exc}")
 
+    def _on_auto_export_changed(self, provider: str, enabled: bool):
+        if not STATE.current_project_path:
+            return
+        from ecrit.sync.cloud_export import (
+            load_cloud_configs, save_cloud_configs, CloudConfig, CloudProvider,
+        )
+        configs = load_cloud_configs(STATE.current_project_path)
+        found = False
+        for cfg in configs:
+            if cfg.provider.value == provider:
+                cfg.auto_export = enabled
+                found = True
+                break
+        if not found and enabled:
+            try:
+                cp = CloudProvider(provider)
+            except (ValueError, KeyError):
+                return
+            configs.append(CloudConfig(provider=cp, auto_export=True))
+        save_cloud_configs(STATE.current_project_path, configs)
+
     def _show_share_review(self):
         if STATE.current_project_path:
             shares = list_shares(STATE.current_project_path)
@@ -550,12 +582,15 @@ class MainWindow(QMainWindow):
             content = self.editor.manuscript.editor.toPlainText()
             session._crdt.set_text(content)
         self.editor.manuscript.presence_bar.setVisible(True)
+        self._active_collab_session = session
+        self._collab_text_changed.connect(self._apply_collab_text)
+        self._collab_participants_changed.connect(self._apply_collab_participants)
         session.set_callbacks(
-            on_text_change=self._on_collab_text_change,
-            on_participant_change=lambda: self._on_collab_participants_changed(session),
+            on_text_change=lambda text: self._collab_text_changed.emit(text),
+            on_participant_change=lambda: self._collab_participants_changed.emit(),
         )
 
-    def _on_collab_text_change(self, text: str):
+    def _apply_collab_text(self, text: str):
         editor = self.editor.manuscript.editor
         if editor.toPlainText() != text:
             cursor_pos = editor.textCursor().position()
@@ -567,7 +602,10 @@ class MainWindow(QMainWindow):
             editor.blockSignals(False)
             STATE.script_content = text
 
-    def _on_collab_participants_changed(self, session):
+    def _apply_collab_participants(self):
+        session = self._active_collab_session
+        if not session:
+            return
         self._collab_dialog.update_participants(len(session.get_participants()))
         participants = [
             {"user_id": p.user_id, "user_name": p.user_name, "color": p.color}
@@ -576,6 +614,15 @@ class MainWindow(QMainWindow):
         self.editor.manuscript.presence_bar.set_participants(participants)
 
     def _on_collab_left(self):
+        try:
+            self._collab_text_changed.disconnect(self._apply_collab_text)
+        except RuntimeError:
+            pass
+        try:
+            self._collab_participants_changed.disconnect(self._apply_collab_participants)
+        except RuntimeError:
+            pass
+        self._active_collab_session = None
         self.editor.status_bar.sprint_label.setText("")
         self.editor.manuscript.presence_bar.clear_participants()
         self.editor.manuscript.presence_bar.setVisible(False)

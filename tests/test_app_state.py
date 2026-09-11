@@ -76,27 +76,6 @@ class TestPhaseManagement:
         assert s.current_phase == "Nonexistent"
 
 
-class TestThemeToggle:
-    def test_toggle_from_dark(self):
-        s = AppState()
-        s.theme = "dark"
-        s.toggle_theme()
-        assert s.theme == "light"
-
-    def test_toggle_from_light(self):
-        s = AppState()
-        s.theme = "light"
-        s.toggle_theme()
-        assert s.theme == "dark"
-
-    def test_toggle_notifies(self):
-        s = AppState()
-        called = []
-        s.subscribe(lambda: called.append(1))
-        s.toggle_theme()
-        assert len(called) == 1
-
-
 class TestParseScript:
     def test_parse_empty_without_core(self):
         s = AppState()

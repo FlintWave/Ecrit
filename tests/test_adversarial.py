@@ -434,4 +434,34 @@ class TestCompareDraftsAdversarial:
         cd = CompareDrafts()
         cd._side_by_side = False
         cd.set_texts("<html>&amp;\n", "<body>&lt;\n")
-        # Should not crash, and HTML should be escaped
+
+
+class TestAutoSaveGuard:
+    def test_no_save_when_interval_zero(self, qapp):
+        from ecrit.ui.screens.editor import ScriptEditor
+        editor = ScriptEditor()
+        editor._save_timer.setInterval(0)
+        editor._save_timer.stop()
+        fired = []
+        editor.content_changed.connect(lambda: fired.append(True))
+        editor._on_text_changed()
+        assert not editor._save_timer.isActive()
+
+    def test_save_debounce_when_enabled(self, qapp):
+        from ecrit.ui.screens.editor import ScriptEditor
+        editor = ScriptEditor()
+        editor._save_timer.setInterval(1000)
+        editor._on_text_changed()
+        assert editor._save_timer.isActive()
+
+
+class TestCollabThreadSafety:
+    def test_main_window_has_collab_signals(self, qapp):
+        from ecrit.main import MainWindow
+        assert hasattr(MainWindow, '_collab_text_changed')
+        assert hasattr(MainWindow, '_collab_participants_changed')
+
+    def test_active_collab_session_init(self, qapp):
+        from ecrit.main import MainWindow
+        w = MainWindow()
+        assert w._active_collab_session is None

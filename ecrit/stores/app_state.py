@@ -285,9 +285,4 @@ class AppState:
         self.current_phase = phase
         self.notify()
 
-    def toggle_theme(self):
-        self.theme = "light" if self.theme == "dark" else "dark"
-        self.notify()
-
-
 STATE = AppState()

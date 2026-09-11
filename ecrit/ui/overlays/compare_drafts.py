@@ -133,8 +133,11 @@ class CompareDrafts(QDialog):
                             self._from_text = get_snapshot_content(STATE.current_project_path, from_hash)
                         if to_hash:
                             self._to_text = get_snapshot_content(STATE.current_project_path, to_hash)
-                except Exception:
-                    pass
+                except Exception as exc:
+                    import logging
+                    logging.getLogger("ecrit.compare").warning(
+                        "Failed to load snapshot: %s", exc,
+                    )
         self._show_diff()
 
     def _show_diff(self):
