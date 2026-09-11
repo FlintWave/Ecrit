@@ -236,7 +236,7 @@ class ScriptEditor(QPlainTextEdit):
                     return
         else:
             cursor.removeSelectedText()
-            cursor.insertText(line.upper())
+            cursor.insertText(f"({line})")
 
 
 class SceneNavigator(QFrame):

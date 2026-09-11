@@ -202,6 +202,8 @@ class TitleBar(QWidget):
         self.context_label.setText(text)
 
     def set_wordmark_accent(self):
+        from PySide6.QtCore import Qt
         t = theme.current()
+        self.wordmark.setTextFormat(Qt.TextFormat.RichText)
         self.wordmark.setText(f"<span style='color:{t.text}'>Écrit</span>"
                               f"<span style='color:{t.accent}'>.</span>")

@@ -9,7 +9,7 @@ from ecrit.ui.styles import theme
 
 
 class SprintTimerWidget(QFrame):
-    sprint_ended = Signal(int)
+    sprint_ended = Signal(int, int)
 
     PRESETS = [15, 25, 45]
 
@@ -101,7 +101,7 @@ class SprintTimerWidget(QFrame):
             self._running = False
             self._timer.stop()
             self.start_btn.setText("Start")
-            self.sprint_ended.emit(self._total_seconds // 60)
+            self.sprint_ended.emit(self._total_seconds // 60, self._words_at_start)
 
     def _update_display(self):
         mins = self._seconds_left // 60

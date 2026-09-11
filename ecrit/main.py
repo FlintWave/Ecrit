@@ -337,8 +337,12 @@ class MainWindow(QMainWindow):
         self._sprint_timer.move(x, y)
         self._sprint_timer.show()
 
-    def _on_sprint_ended(self, minutes: int):
-        self.editor.status_bar.sprint_label.setText(f"Sprint complete — {minutes}m")
+    def _on_sprint_ended(self, minutes: int, words_at_start: int):
+        current_words = len(self.editor.manuscript.editor.toPlainText().split())
+        written = max(0, current_words - words_at_start)
+        self.editor.status_bar.sprint_label.setText(
+            f"Sprint complete — {minutes}m, {written} words"
+        )
 
     def _update_sprint_label(self):
         text = self._sprint_timer.get_status_text()

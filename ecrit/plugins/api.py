@@ -61,8 +61,11 @@ class PluginAPI:
         for cb in self._hooks.get(hook.value, []):
             try:
                 results.append(cb(*args, **kwargs))
-            except Exception:
-                pass
+            except Exception as exc:
+                import logging
+                logging.getLogger("ecrit.plugins").warning(
+                    "Plugin hook %s raised: %s", hook.value, exc,
+                )
         return results
 
     def register_command(self, name: str, description: str, callback: Callable) -> None:
