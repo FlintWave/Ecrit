@@ -97,6 +97,159 @@ class LineNumberArea(QWidget):
         self._editor.line_number_area_paint(event)
 
 
+class ScriptCompleter(QListWidget):
+    """Popup autocomplete for character names and location names."""
+
+    SCENE_PREFIXES = ("INT.", "EXT.", "INT/EXT.", "INT/EXT", "EST.", "INT./EXT.", "I/E.")
+    HEADER_KEYS = ("Title:", "Credit:", "Author:", "Draft", "Source:", "Contact:")
+
+    def __init__(self, editor: "ScriptEditor"):
+        super().__init__(editor)
+        self._editor = editor
+        self._prefix = ""
+        self._mode = ""  # "character" or "location"
+        self.setWindowFlags(Qt.WindowType.ToolTip)
+        self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.setMaximumHeight(160)
+        self.setFont(QFont("Courier Prime", 13))
+        self.hide()
+        self.itemClicked.connect(self._accept_item)
+        self._apply_theme()
+
+    def _apply_theme(self):
+        t = theme.current()
+        self.setStyleSheet(
+            f"QListWidget {{ background: {t.surface}; color: {t.text}; "
+            f"border: 1px solid {t.neutral_700}; border-radius: 4px; padding: 2px; }}"
+            f"QListWidget::item {{ padding: 3px 8px; }}"
+            f"QListWidget::item:selected {{ background: {t.accent}; color: {t.bg}; }}"
+        )
+
+    @staticmethod
+    def extract_character_names(text: str) -> list[str]:
+        lines = text.split("\n")
+        names: dict[str, int] = {}
+        prev_blank = False
+        for line in lines:
+            stripped = line.strip()
+            if not stripped:
+                prev_blank = True
+                continue
+            if prev_blank and stripped.isupper() and len(stripped) < 50:
+                if not stripped.startswith(ScriptCompleter.SCENE_PREFIXES) and \
+                   not stripped.startswith(ScriptCompleter.HEADER_KEYS) and \
+                   not stripped.endswith(("TO:", "OUT.")) and \
+                   stripped[0].isalpha():
+                    name = stripped.split("(")[0].strip()
+                    if name:
+                        names[name] = names.get(name, 0) + 1
+            prev_blank = False
+        return sorted(names, key=lambda n: names[n], reverse=True)
+
+    @staticmethod
+    def extract_locations(text: str) -> list[str]:
+        seen: dict[str, int] = {}
+        for line in text.split("\n"):
+            stripped = line.strip()
+            for pfx in ScriptCompleter.SCENE_PREFIXES:
+                if stripped.startswith(pfx):
+                    rest = stripped[len(pfx):].strip()
+                    loc = rest.split(" - ")[0].strip() if " - " in rest else rest
+                    if loc:
+                        seen[loc] = seen.get(loc, 0) + 1
+                    break
+        return sorted(seen, key=lambda n: seen[n], reverse=True)
+
+    def update_popup(self):
+        cursor = self._editor.textCursor()
+        block = cursor.block()
+        line = block.text()
+        stripped = line.strip()
+
+        prev_block = block.previous()
+        prev_blank = prev_block.isValid() and not prev_block.text().strip()
+
+        text = self._editor.toPlainText()
+        candidates = []
+        self._prefix = ""
+        self._mode = ""
+
+        for pfx in self.SCENE_PREFIXES:
+            if stripped.upper().startswith(pfx):
+                after_prefix = stripped[len(pfx):].strip()
+                location_part = after_prefix.split(" - ")[0].strip() if " - " in after_prefix else after_prefix
+                if location_part:
+                    self._prefix = location_part
+                    self._mode = "location"
+                    all_locs = self.extract_locations(text)
+                    candidates = [l for l in all_locs if l.upper().startswith(self._prefix.upper()) and l.upper() != self._prefix.upper()]
+                break
+        else:
+            if prev_blank and stripped and stripped == stripped.upper() and stripped[0:1].isalpha() and not stripped.endswith(("TO:", "OUT.")):
+                self._prefix = stripped.split("(")[0].strip()
+                self._mode = "character"
+                all_chars = self.extract_character_names(text)
+                candidates = [c for c in all_chars if c.startswith(self._prefix) and c != self._prefix]
+
+        if not candidates:
+            self.hide()
+            return
+
+        self.clear()
+        for name in candidates[:8]:
+            self.addItem(name)
+        self.setCurrentRow(0)
+
+        rect = self._editor.cursorRect()
+        pos = self._editor.mapToGlobal(rect.bottomLeft())
+        self.move(pos)
+        width = max(self.sizeHintForColumn(0) + 20, 200)
+        row_h = self.sizeHintForRow(0) if self.count() else 24
+        self.setFixedSize(min(width, 400), min(row_h * self.count() + 6, 160))
+        self.show()
+
+    def navigate(self, direction: int):
+        row = self.currentRow() + direction
+        if 0 <= row < self.count():
+            self.setCurrentRow(row)
+
+    def accept_current(self) -> bool:
+        item = self.currentItem()
+        if item and self.isVisible():
+            self._accept_item(item)
+            return True
+        return False
+
+    def _accept_item(self, item):
+        name = item.text()
+        cursor = self._editor.textCursor()
+        block = cursor.block()
+
+        if self._mode == "location":
+            line = block.text()
+            for pfx in self.SCENE_PREFIXES:
+                if line.strip().upper().startswith(pfx):
+                    after_dot = line.strip()[len(pfx):]
+                    if " - " in after_dot:
+                        old_loc = after_dot.split(" - ")[0].strip()
+                    else:
+                        old_loc = after_dot.strip()
+                    suffix = after_dot[after_dot.find(" - "):] if " - " in after_dot else ""
+                    prefix_in_line = line[:len(line) - len(line.lstrip())] + line.strip()[:len(pfx)]
+                    cursor.movePosition(QTextCursor.MoveOperation.StartOfBlock)
+                    cursor.movePosition(QTextCursor.MoveOperation.EndOfBlock, QTextCursor.MoveMode.KeepAnchor)
+                    cursor.insertText(f"{prefix_in_line} {name}{suffix}")
+                    break
+        elif self._mode == "character":
+            cursor.movePosition(QTextCursor.MoveOperation.StartOfBlock)
+            cursor.movePosition(QTextCursor.MoveOperation.EndOfBlock, QTextCursor.MoveMode.KeepAnchor)
+            cursor.insertText(name)
+
+        self._editor.setTextCursor(cursor)
+        self.hide()
+
+
 class ScriptEditor(QPlainTextEdit):
     """Courier Prime script editor with typewriter scrolling."""
 
@@ -116,6 +269,7 @@ class ScriptEditor(QPlainTextEdit):
         self.setTabStopDistance(40)
 
         self.highlighter = FountainHighlighter(self.document())
+        self.completer = ScriptCompleter(self)
 
         self._typewriter = True
         self._show_line_numbers = False
@@ -213,6 +367,17 @@ class ScriptEditor(QPlainTextEdit):
         self.cursor_info_changed.emit(page, scene_heading)
 
     def keyPressEvent(self, event):
+        if self.completer.isVisible():
+            if event.key() in (Qt.Key.Key_Down, Qt.Key.Key_Up):
+                self.completer.navigate(1 if event.key() == Qt.Key.Key_Down else -1)
+                return
+            if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
+                if self.completer.accept_current():
+                    return
+            if event.key() == Qt.Key.Key_Escape:
+                self.completer.hide()
+                return
+
         if event.key() == Qt.Key.Key_Tab:
             self._cycle_element_type()
             return
@@ -220,6 +385,9 @@ class ScriptEditor(QPlainTextEdit):
             cut_text = self.textCursor().selectedText().replace(' ', '\n')
             self.text_cut.emit(cut_text)
         super().keyPressEvent(event)
+        if event.key() not in (Qt.Key.Key_Return, Qt.Key.Key_Enter,
+                               Qt.Key.Key_Escape, Qt.Key.Key_Up, Qt.Key.Key_Down):
+            self.completer.update_popup()
 
     def _cycle_element_type(self):
         cursor = self.textCursor()

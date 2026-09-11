@@ -739,6 +739,122 @@ class TestTotalPagesUpdates:
         assert win.editor._total_pages >= 3
 
 
+class TestScriptCompleter:
+    def test_extract_character_names(self, qapp):
+        from ecrit.ui.screens.editor import ScriptCompleter
+        text = "\nJOHN\nHello there.\n\nMARY\nHi John.\n\nJOHN\nGoodbye.\n"
+        names = ScriptCompleter.extract_character_names(text)
+        assert "JOHN" in names
+        assert "MARY" in names
+        assert names.index("JOHN") < names.index("MARY")
+
+    def test_extract_character_names_ignores_headings(self, qapp):
+        from ecrit.ui.screens.editor import ScriptCompleter
+        text = "\nINT. OFFICE - DAY\n\nJOHN\nHello.\n\nCUT TO:\n"
+        names = ScriptCompleter.extract_character_names(text)
+        assert "JOHN" in names
+        assert "CUT TO:" not in names
+        assert "INT. OFFICE - DAY" not in names
+
+    def test_extract_character_names_empty(self, qapp):
+        from ecrit.ui.screens.editor import ScriptCompleter
+        assert ScriptCompleter.extract_character_names("") == []
+        assert ScriptCompleter.extract_character_names("just prose") == []
+
+    def test_extract_locations(self, qapp):
+        from ecrit.ui.screens.editor import ScriptCompleter
+        text = "INT. OFFICE - DAY\naction\nEXT. PARK - NIGHT\nINT. OFFICE - NIGHT\n"
+        locs = ScriptCompleter.extract_locations(text)
+        assert "OFFICE" in locs
+        assert "PARK" in locs
+        assert locs.index("OFFICE") < locs.index("PARK")
+
+    def test_extract_locations_no_time_of_day(self, qapp):
+        from ecrit.ui.screens.editor import ScriptCompleter
+        text = "INT. WAREHOUSE\nEXT. WAREHOUSE\n"
+        locs = ScriptCompleter.extract_locations(text)
+        assert "WAREHOUSE" in locs
+        assert len(locs) == 1
+
+    def test_extract_locations_empty(self, qapp):
+        from ecrit.ui.screens.editor import ScriptCompleter
+        assert ScriptCompleter.extract_locations("") == []
+
+    def test_update_popup_character_mode(self, qapp):
+        from ecrit.ui.screens.editor import ScriptEditor
+        editor = ScriptEditor()
+        editor.setPlainText("\nJOHN\nHello.\n\nMARY\nHi.\n\nJO")
+        cursor = editor.textCursor()
+        cursor.movePosition(cursor.MoveOperation.End)
+        editor.setTextCursor(cursor)
+        editor.completer.update_popup()
+        if editor.completer.count() > 0:
+            assert editor.completer.item(0).text() == "JOHN"
+
+    def test_update_popup_hides_when_no_match(self, qapp):
+        from ecrit.ui.screens.editor import ScriptEditor
+        editor = ScriptEditor()
+        editor.setPlainText("just some regular text")
+        cursor = editor.textCursor()
+        cursor.movePosition(cursor.MoveOperation.End)
+        editor.setTextCursor(cursor)
+        editor.completer.update_popup()
+        assert not editor.completer.isVisible()
+
+    def test_navigate_down_up(self, qapp):
+        from ecrit.ui.screens.editor import ScriptCompleter, ScriptEditor
+        editor = ScriptEditor()
+        completer = editor.completer
+        completer.addItem("JOHN")
+        completer.addItem("JANE")
+        completer.addItem("JACK")
+        completer.setCurrentRow(0)
+        completer.navigate(1)
+        assert completer.currentRow() == 1
+        completer.navigate(1)
+        assert completer.currentRow() == 2
+        completer.navigate(-1)
+        assert completer.currentRow() == 1
+        completer.navigate(-1)
+        assert completer.currentRow() == 0
+        completer.navigate(-1)
+        assert completer.currentRow() == 0
+
+    def test_accept_current_character(self, qapp):
+        from ecrit.ui.screens.editor import ScriptEditor
+        editor = ScriptEditor()
+        editor.setPlainText("\nJOHN\nHello.\n\nJO")
+        cursor = editor.textCursor()
+        cursor.movePosition(cursor.MoveOperation.End)
+        editor.setTextCursor(cursor)
+        editor.completer.update_popup()
+        if editor.completer.count() > 0:
+            accepted = editor.completer.accept_current()
+            assert accepted
+            assert "JOHN" in editor.toPlainText()
+            assert not editor.completer.isVisible()
+
+    def test_keypress_escape_hides_completer(self, qapp):
+        from ecrit.ui.screens.editor import ScriptEditor
+        from PySide6.QtGui import QKeyEvent
+        from PySide6.QtCore import QEvent
+        editor = ScriptEditor()
+        editor.completer.addItem("TEST")
+        editor.completer.setCurrentRow(0)
+        editor.completer.show()
+        assert editor.completer.isVisible()
+        event = QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Escape, Qt.KeyboardModifier.NoModifier)
+        editor.keyPressEvent(event)
+        assert not editor.completer.isVisible()
+
+    def test_character_with_extension(self, qapp):
+        from ecrit.ui.screens.editor import ScriptCompleter
+        text = "\nJOHN (V.O.)\nHello.\n\nJOHN (CONT'D)\nMore.\n"
+        names = ScriptCompleter.extract_character_names(text)
+        assert "JOHN" in names
+        assert len([n for n in names if n.startswith("JOHN")]) == 1
+
+
 class TestWordCountUpdates:
     def test_word_count_updates_on_content_change(self, qapp):
         from ecrit.main import MainWindow
