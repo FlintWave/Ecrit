@@ -554,6 +554,50 @@ class TestCompanionStatusCallback:
         assert dialog._device_sync._on_status_change is not None
 
 
+class TestProofreadRefresh:
+    def test_switch_to_proofread_copies_manuscript(self, qapp):
+        from ecrit.ui.screens.editor import EditorScreen
+        editor = EditorScreen()
+        editor.manuscript.editor.setPlainText("INT. TEST - DAY\n\nSome action here.")
+        editor.switch_phase("proofread")
+        assert "INT. TEST" in editor.proofread.script_view.toPlainText()
+
+    def test_switch_to_deliver_copies_manuscript(self, qapp):
+        from ecrit.ui.screens.editor import EditorScreen
+        editor = EditorScreen()
+        editor.manuscript.editor.setPlainText("INT. OFFICE - NIGHT\n\nDialogue here.")
+        editor.switch_phase("deliver")
+
+
+class TestPreferencesPersistence:
+    def test_save_and_load_preferences(self, tmp_path):
+        from ecrit.stores.app_state import AppState
+        state = AppState()
+        with patch.object(state, "_prefs_path", return_value=tmp_path / "prefs.json"):
+            state.save_preferences({"font_size": 14, "word_target": 3000})
+            loaded = state.load_preferences()
+        assert loaded["font_size"] == 14
+        assert loaded["word_target"] == 3000
+
+    def test_load_missing_prefs_returns_empty(self, tmp_path):
+        from ecrit.stores.app_state import AppState
+        state = AppState()
+        with patch.object(state, "_prefs_path", return_value=tmp_path / "nonexistent.json"):
+            loaded = state.load_preferences()
+        assert loaded == {}
+
+    def test_save_merges_existing(self, tmp_path):
+        from ecrit.stores.app_state import AppState
+        state = AppState()
+        prefs_path = tmp_path / "prefs.json"
+        with patch.object(state, "_prefs_path", return_value=prefs_path):
+            state.save_preferences({"font_size": 14})
+            state.save_preferences({"word_target": 3000})
+            loaded = state.load_preferences()
+        assert loaded["font_size"] == 14
+        assert loaded["word_target"] == 3000
+
+
 class TestEpisodeFieldName:
     def test_episode_uses_script_file(self):
         from ecrit.screenplay.series_projects import Episode

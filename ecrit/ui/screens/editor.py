@@ -1260,6 +1260,12 @@ class EditorScreen(QWidget):
     def switch_phase(self, phase: str):
         self._current_phase = phase
         self.reading_mode.hide()
+        if phase == "proofread":
+            self.proofread.script_view.setPlainText(
+                self.manuscript.editor.toPlainText()
+            )
+        elif phase == "deliver":
+            self.deliver.set_script(self.manuscript.editor.toPlainText())
         for name, widget in self.phases.items():
             widget.setVisible(name == phase)
 

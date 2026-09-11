@@ -285,4 +285,33 @@ class AppState:
         self.current_phase = phase
         self.notify()
 
+    def _prefs_path(self) -> Path:
+        config_dir = Path.home() / ".config" / "ecrit"
+        config_dir.mkdir(parents=True, exist_ok=True)
+        return config_dir / "preferences.json"
+
+    def save_preferences(self, prefs: dict) -> bool:
+        try:
+            path = self._prefs_path()
+            existing = {}
+            if path.exists():
+                try:
+                    existing = json.loads(path.read_text(encoding="utf-8"))
+                except Exception:
+                    pass
+            existing.update(prefs)
+            path.write_text(json.dumps(existing, indent=2), encoding="utf-8")
+            return True
+        except Exception:
+            return False
+
+    def load_preferences(self) -> dict:
+        try:
+            path = self._prefs_path()
+            if path.exists():
+                return json.loads(path.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+        return {}
+
 STATE = AppState()

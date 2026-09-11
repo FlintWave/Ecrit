@@ -174,8 +174,34 @@ class MainWindow(QMainWindow):
         self._sprint_status_timer.timeout.connect(self._update_sprint_label)
         self._sprint_status_timer.start()
 
+        self._load_saved_preferences()
         self._apply_theme()
         self._go_dashboard()
+
+    def _load_saved_preferences(self):
+        prefs = STATE.load_preferences()
+        if not prefs:
+            return
+        STATE.author_name = prefs.get("author_name", STATE.author_name)
+        STATE.author_email = prefs.get("author_email", STATE.author_email)
+        if "language" in prefs:
+            STATE.language = prefs["language"]
+            set_language(prefs["language"])
+        if "font_size" in prefs:
+            from PySide6.QtGui import QFont
+            font = QFont("Courier Prime", prefs["font_size"])
+            font.setStyleHint(QFont.StyleHint.Monospace)
+            self.editor.manuscript.editor.setFont(font)
+        if "auto_save" in prefs:
+            if prefs["auto_save"]:
+                self.editor.manuscript.editor._save_timer.setInterval(1000)
+            else:
+                self.editor.manuscript.editor._save_timer.setInterval(0)
+                self.editor.manuscript.editor._save_timer.stop()
+        if "typewriter" in prefs:
+            self.editor.manuscript.editor._typewriter = prefs["typewriter"]
+        if "line_numbers" in prefs:
+            self.editor.manuscript.editor.set_line_numbers_visible(prefs["line_numbers"])
 
     def _apply_theme(self):
         t = theme.current()
@@ -815,6 +841,16 @@ class MainWindow(QMainWindow):
         self.editor.manuscript.editor.set_line_numbers_visible(
             settings.get("line_numbers", False)
         )
+        STATE.save_preferences({
+            "author_name": STATE.author_name,
+            "author_email": STATE.author_email,
+            "font_size": font_size,
+            "word_target": word_target,
+            "auto_save": auto_save,
+            "typewriter": settings.get("typewriter", True),
+            "line_numbers": settings.get("line_numbers", False),
+            "language": STATE.language,
+        })
 
     def _on_plugin_installed(self, plugin_id: str):
         if hasattr(self._settings_dialog, '_module_registry') and self._settings_dialog._module_registry:
