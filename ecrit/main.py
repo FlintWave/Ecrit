@@ -220,6 +220,8 @@ class MainWindow(QMainWindow):
 
     def _on_content_changed(self):
         STATE.script_content = self.editor.manuscript.editor.toPlainText()
+        words = len(STATE.script_content.split())
+        self.editor.status_bar.words_label.setText(f"{words:,} words")
         from ecrit.screenplay.module_system import HOOK_BEFORE_SAVE, HOOK_AFTER_SAVE
         self._module_registry.call_hook(HOOK_BEFORE_SAVE, STATE.script_content)
         saved = STATE.save_script()
@@ -457,8 +459,8 @@ class MainWindow(QMainWindow):
             episodes = seasons[season].episodes
             if episode < len(episodes):
                 ep = episodes[episode]
-                if ep.script_path:
-                    self._open_project(ep.script_path)
+                if ep.script_file:
+                    self._open_project(ep.script_file)
 
     def _on_series_project_changed(self):
         if not STATE.current_project_path:

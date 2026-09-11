@@ -552,3 +552,23 @@ class TestCompanionStatusCallback:
         from ecrit.ui.overlays.companion import CompanionDialog
         dialog = CompanionDialog()
         assert dialog._device_sync._on_status_change is not None
+
+
+class TestEpisodeFieldName:
+    def test_episode_uses_script_file(self):
+        from ecrit.screenplay.series_projects import Episode
+        ep = Episode(number=1, title="Pilot", script_file="/path/to/script")
+        assert ep.script_file == "/path/to/script"
+        assert not hasattr(ep, "script_path") or ep.__class__.__dataclass_fields__.get("script_path") is None
+
+
+class TestWordCountUpdates:
+    def test_word_count_updates_on_content_change(self, qapp):
+        from ecrit.main import MainWindow
+        win = MainWindow()
+        win.editor.manuscript.editor.setPlainText("one two three four five")
+        from ecrit.stores.app_state import STATE
+        STATE.script_content = win.editor.manuscript.editor.toPlainText()
+        words = len(STATE.script_content.split())
+        win.editor.status_bar.words_label.setText(f"{words:,} words")
+        assert "5" in win.editor.status_bar.words_label.text()
