@@ -1272,6 +1272,7 @@ class EditorScreen(QWidget):
         self._scratchpad_shortcut.activated.connect(self.toggle_scratchpad)
         self.manuscript.editor.text_cut.connect(self.scratchpad.add_text)
         self.manuscript.editor.cursor_info_changed.connect(self._on_cursor_info_changed)
+        self.manuscript.scene_nav.scene_selected.connect(self._on_scene_selected)
 
     def switch_phase(self, phase: str):
         self._current_phase = phase
@@ -1309,6 +1310,25 @@ class EditorScreen(QWidget):
     def _on_cursor_info_changed(self, page: int, scene_heading: str):
         self.status_bar.page_label.setText(f"Page {page} of {self._total_pages}")
         self.status_bar.scene_label.setText(scene_heading)
+
+    def _on_scene_selected(self, row: int):
+        scenes = self.manuscript.scene_nav._scenes_data
+        if row < 0 or row >= len(scenes):
+            return
+        heading = scenes[row].get("heading", "")
+        if not heading:
+            return
+        doc = self.manuscript.editor.document()
+        block = doc.begin()
+        while block.isValid():
+            if block.text().strip() == heading:
+                cursor = self.manuscript.editor.textCursor()
+                cursor.setPosition(block.position())
+                self.manuscript.editor.setTextCursor(cursor)
+                self.manuscript.editor.centerCursor()
+                self.manuscript.editor.setFocus()
+                return
+            block = block.next()
 
     def load_project(self, project_data: dict):
         script = project_data.get("script", "")

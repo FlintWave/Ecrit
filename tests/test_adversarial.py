@@ -669,6 +669,76 @@ class TestCursorInfoTracking:
         assert last_scene == "EXT. PARK - DAY"
 
 
+class TestSceneNavigation:
+    def test_scene_selected_connected(self, qapp):
+        from ecrit.ui.screens.editor import EditorScreen
+        screen = EditorScreen()
+        assert hasattr(screen, "_on_scene_selected")
+        assert callable(screen._on_scene_selected)
+
+    def test_scene_selected_scrolls_editor(self, qapp):
+        from ecrit.ui.screens.editor import EditorScreen
+        screen = EditorScreen()
+        script = "INT. HOUSE - NIGHT\n\nDialogue here.\n\nEXT. PARK - DAY\n\nMore action."
+        screen.manuscript.editor.setPlainText(script)
+        screen.manuscript.scene_nav._scenes_data = [
+            {"heading": "INT. HOUSE - NIGHT", "page": 1},
+            {"heading": "EXT. PARK - DAY", "page": 1},
+        ]
+        screen._on_scene_selected(1)
+        cursor = screen.manuscript.editor.textCursor()
+        block_text = cursor.block().text().strip()
+        assert block_text == "EXT. PARK - DAY"
+
+    def test_scene_selected_invalid_row(self, qapp):
+        from ecrit.ui.screens.editor import EditorScreen
+        screen = EditorScreen()
+        screen.manuscript.scene_nav._scenes_data = []
+        screen._on_scene_selected(-1)
+        screen._on_scene_selected(99)
+
+
+class TestExportOptsWiring:
+    def test_export_opts_default(self, qapp):
+        from ecrit.ui.screens.editor import DeliverPhase
+        d = DeliverPhase()
+        assert d._export_opts["title_page"] is True
+        assert d._export_opts["scene_numbers"] is True
+
+    def test_export_opts_toggle(self, qapp):
+        from ecrit.ui.screens.editor import DeliverPhase
+        d = DeliverPhase()
+        d._toggle_export_opt("scene_numbers", False)
+        assert d._export_opts["scene_numbers"] is False
+
+    def test_export_script_passes_opts(self, qapp):
+        from ecrit.main import MainWindow
+        win = MainWindow()
+        win.editor.deliver._export_opts["title_page"] = False
+        win.editor.deliver._export_opts["scene_numbers"] = False
+        win.stack.setCurrentWidget(win.editor)
+        win.editor.manuscript.editor.setPlainText("INT. OFFICE - DAY\n\nHello.")
+        with patch("ecrit.export.pdf_export.export_pdf") as mock_export:
+            mock_export.return_value = ""
+            win._export_script("pdf")
+            mock_export.assert_called_once()
+            _, kwargs = mock_export.call_args
+            assert kwargs["include_title_page"] is False
+            assert kwargs["scene_numbers"] is False
+
+
+class TestTotalPagesUpdates:
+    def test_total_pages_updates_on_content_change(self, qapp):
+        from ecrit.main import MainWindow
+        win = MainWindow()
+        big_script = "\n".join([f"Line {i}" for i in range(200)])
+        win.editor.manuscript.editor.setPlainText(big_script)
+        from ecrit.stores.app_state import STATE
+        STATE.script_content = big_script
+        win._on_content_changed()
+        assert win.editor._total_pages >= 3
+
+
 class TestWordCountUpdates:
     def test_word_count_updates_on_content_change(self, qapp):
         from ecrit.main import MainWindow

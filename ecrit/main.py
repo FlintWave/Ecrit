@@ -17,8 +17,6 @@ from ecrit.ui.overlays.shortcuts import ShortcutsDialog
 from ecrit.ui.overlays.settings import SettingsDialog
 from ecrit.ui.overlays.command_palette import CommandPalette
 from ecrit.ui.overlays.sprint_timer import SprintTimerWidget
-from ecrit.ui.overlays.reading_mode import ReadingMode
-from ecrit.ui.overlays.scratchpad import Scratchpad
 from ecrit.ui.overlays.character_sheet import CharacterSheet
 from ecrit.ui.overlays.compare_drafts import CompareDrafts
 from ecrit.ui.overlays.snapshots import (
@@ -274,6 +272,8 @@ class MainWindow(QMainWindow):
         STATE.script_content = self.editor.manuscript.editor.toPlainText()
         words = len(STATE.script_content.split())
         self.editor.status_bar.words_label.setText(f"{words:,} words")
+        lines = STATE.script_content.count('\n') + 1
+        self.editor._total_pages = max(1, lines // 55)
         from ecrit.screenplay.module_system import HOOK_BEFORE_SAVE, HOOK_AFTER_SAVE
         self._module_registry.call_hook(HOOK_BEFORE_SAVE, STATE.script_content)
         saved = STATE.save_script()
@@ -763,9 +763,14 @@ class MainWindow(QMainWindow):
         title = self._editor_title_bar.context_label.text() or "Untitled"
         from ecrit.screenplay.module_system import HOOK_BEFORE_EXPORT, HOOK_AFTER_EXPORT
         self._module_registry.call_hook(HOOK_BEFORE_EXPORT, kind, content)
+        export_opts = self.editor.deliver._export_opts
         if kind == "pdf":
             from ecrit.export.pdf_export import export_pdf
-            export_pdf(content, title=title, parent=self)
+            export_pdf(
+                content, title=title, parent=self,
+                include_title_page=export_opts.get("title_page", True),
+                scene_numbers=export_opts.get("scene_numbers", True),
+            )
         elif kind == "odt":
             from ecrit.export.odt_export import export_odt
             export_odt(content, title=title, parent=self)
