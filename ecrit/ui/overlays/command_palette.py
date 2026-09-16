@@ -34,6 +34,7 @@ COMMANDS = [
     ("Export PDF", "export", "Export script as PDF"),
     ("Export ODT", "export", "Export script as ODT"),
     ("Export Fountain", "export", "Export as .fountain file"),
+    ("Export EPUB", "export", "Export as EPUB ebook"),
     ("Production Reports", "tool", "Generate scene, cast, location reports"),
     ("Logline Builder", "tool", "Build a logline from templates"),
     ("Series Manager", "tool", "Manage episodes, seasons, and series bible"),
@@ -47,6 +48,20 @@ COMMANDS = [
     ("Generate Character Name", "tool", "Generate a random character name"),
     ("Focus Mode", "tool", "Toggle paragraph focus dimming"),
     ("Import Final Draft", "file", "Import a .fdx Final Draft file"),
+    ("Tag Current Scene", "tool", "Add a tag to the current scene"),
+    ("Browse Autosaves", "tool", "Browse and restore autosave snapshots"),
+    ("Create Autosave Snapshot", "tool", "Manually create an autosave snapshot"),
+    ("Add Bookmark", "tool", "Add a named bookmark at current line"),
+    ("Remove Bookmark", "tool", "Remove bookmark at current line"),
+    ("Next Bookmark", "tool", "Jump to next bookmark (Ctrl+])"),
+    ("Previous Bookmark", "tool", "Jump to previous bookmark (Ctrl+[)"),
+    ("Clear All Bookmarks", "tool", "Remove all bookmarks"),
+    ("Shorten Script", "tool", "Find orphans/widows to save pages"),
+    ("Annotations", "tool", "View and manage line-anchored notes"),
+    ("Script Analytics", "tool", "Charts and statistics for your script"),
+    ("Spell Check", "tool", "Check spelling in your screenplay"),
+    ("Title Page Template", "tool", "Choose a title page template"),
+    ("Character Cards", "tool", "Manage character bios and relationships"),
 ]
 
 
