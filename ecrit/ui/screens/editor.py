@@ -13,6 +13,7 @@ from PySide6.QtGui import (
 )
 
 from ecrit.ui.styles import theme
+from ecrit.ui.icons import IconButton
 from ecrit.ui.components.status_bar import StatusBar
 from ecrit.ui.overlays.find_replace import FindReplaceBar
 from ecrit.ui.overlays.reading_mode import ReadingMode
@@ -878,14 +879,14 @@ class OutlinePhase(QWidget):
         title.setStyleSheet("font-size: 20px; font-weight: 500;")
         toolbar.addWidget(title)
 
-        layout_h = QPushButton("→")
+        layout_h = IconButton("arrow-right", icon_size=16)
         layout_h.setObjectName("secondary")
         layout_h.setFixedSize(28, 28)
         layout_h.setToolTip("Horizontal layout")
         layout_h.clicked.connect(lambda: self._relayout("horizontal"))
         toolbar.addWidget(layout_h)
 
-        layout_v = QPushButton("↓")
+        layout_v = IconButton("arrow-down", icon_size=16)
         layout_v.setObjectName("secondary")
         layout_v.setFixedSize(28, 28)
         layout_v.setToolTip("Vertical layout")
@@ -914,14 +915,14 @@ class OutlinePhase(QWidget):
         zoom_bar = QHBoxLayout()
         zoom_bar.setContentsMargins(20, 0, 20, 12)
         zoom_bar.addStretch()
-        self.zoom_out = QPushButton("−")
+        self.zoom_out = IconButton("minus", icon_size=16)
         self.zoom_out.setObjectName("secondary")
         self.zoom_out.setFixedSize(28, 28)
         self.zoom_out.clicked.connect(lambda: self._zoom(-0.1))
         zoom_bar.addWidget(self.zoom_out)
         self.zoom_label = QLabel("100%")
         zoom_bar.addWidget(self.zoom_label)
-        self.zoom_in = QPushButton("+")
+        self.zoom_in = IconButton("plus", icon_size=16)
         self.zoom_in.setObjectName("secondary")
         self.zoom_in.setFixedSize(28, 28)
         self.zoom_in.clicked.connect(lambda: self._zoom(0.1))

@@ -5,6 +5,8 @@ from PySide6.QtWidgets import QApplication, QMainWindow, QPushButton, QStackedWi
 from PySide6.QtCore import Qt, QTimer, Signal as QtSignal
 from PySide6.QtGui import QShortcut, QKeySequence
 
+from ecrit.ui.icons import IconButton
+
 from ecrit.ui.styles import theme
 from ecrit.ui.styles.stylesheet import generate
 from ecrit.ui.components.title_bar import TitleBar
@@ -70,7 +72,7 @@ class MainWindow(QMainWindow):
         self.stack = QStackedWidget()
         root.addWidget(self.stack, 1)
 
-        self._home_btn = QPushButton("⌂", self)
+        self._home_btn = IconButton("home", icon_size=20, parent=self)
         self._home_btn.setObjectName("homeBtn")
         self._home_btn.setFixedSize(40, 40)
         self._home_btn.setToolTip("Dashboard")

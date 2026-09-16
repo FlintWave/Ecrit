@@ -3,6 +3,8 @@
 from PySide6.QtWidgets import QWidget, QHBoxLayout, QLabel, QPushButton
 from PySide6.QtCore import Qt, Signal
 
+from ecrit.ui.icons import IconButton
+
 
 class StatusBar(QWidget):
     find_clicked = Signal()
@@ -85,7 +87,7 @@ class StatusBar(QWidget):
         self.dialect_label.setStyleSheet("font-family: ui-monospace, Menlo, monospace; font-size: 11px;")
         layout.addWidget(self.dialect_label)
 
-        self.home_btn = QPushButton("⌂")
+        self.home_btn = IconButton("home", icon_size=16)
         self.home_btn.setObjectName("homeBtn")
         self.home_btn.setFixedSize(34, 22)
         self.home_btn.setToolTip("Dashboard")

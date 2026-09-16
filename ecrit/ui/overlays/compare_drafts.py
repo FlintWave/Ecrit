@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, Signal
 
 from ecrit.ui.styles import theme
+from ecrit.ui.icons import IconButton
 
 
 class CompareDrafts(QDialog):
@@ -33,7 +34,7 @@ class CompareDrafts(QDialog):
         self.view_mode.clicked.connect(self._toggle_view)
         header.addWidget(self.view_mode)
 
-        close_btn = QPushButton("×")
+        close_btn = IconButton("x-mark")
         close_btn.setObjectName("iconBtn")
         close_btn.setFixedSize(28, 28)
         close_btn.clicked.connect(self.close)

@@ -6,6 +6,8 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, Signal
 
+from ecrit.ui.icons import IconButton
+
 class FindReplaceBar(QFrame):
     find_next = Signal(str, bool, bool)
     find_prev = Signal(str, bool, bool)
@@ -38,19 +40,19 @@ class FindReplaceBar(QFrame):
         self.match_label.setFixedWidth(60)
         find_row.addWidget(self.match_label)
 
-        prev_btn = QPushButton("↑")
+        prev_btn = IconButton("chevron-up", icon_size=16)
         prev_btn.setObjectName("secondary")
         prev_btn.setFixedSize(28, 28)
         prev_btn.clicked.connect(self._on_find_prev)
         find_row.addWidget(prev_btn)
 
-        next_btn = QPushButton("↓")
+        next_btn = IconButton("chevron-down", icon_size=16)
         next_btn.setObjectName("secondary")
         next_btn.setFixedSize(28, 28)
         next_btn.clicked.connect(self._on_find_next)
         find_row.addWidget(next_btn)
 
-        close_btn = QPushButton("×")
+        close_btn = IconButton("x-mark")
         close_btn.setObjectName("iconBtn")
         close_btn.setFixedSize(24, 24)
         close_btn.clicked.connect(self.toggle)

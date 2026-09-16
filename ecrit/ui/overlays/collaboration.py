@@ -11,6 +11,7 @@ from PySide6.QtGui import QGuiApplication
 from ecrit.i18n import tr
 from ecrit.collab.session import CollabSession, SessionState, CollabRole
 from ecrit.collab.p2p import ConnectionToken
+from ecrit.ui.icons import IconButton
 
 
 class CollaborationDialog(QDialog):
@@ -40,7 +41,7 @@ class CollaborationDialog(QDialog):
         self.status_label.setObjectName("dashMuted")
         header.addWidget(self.status_label)
 
-        close_btn = QPushButton("×")
+        close_btn = IconButton("x-mark")
         close_btn.setObjectName("iconBtn")
         close_btn.setFixedSize(28, 28)
         close_btn.clicked.connect(self.close)

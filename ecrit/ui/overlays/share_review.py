@@ -7,6 +7,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, Signal
 
+from ecrit.ui.icons import IconButton
 
 
 class ShareReviewDialog(QDialog):
@@ -31,7 +32,7 @@ class ShareReviewDialog(QDialog):
         title.setStyleSheet("font-size: 20px; font-weight: 500;")
         header.addWidget(title)
         header.addStretch()
-        close_btn = QPushButton("×")
+        close_btn = IconButton("x-mark")
         close_btn.setObjectName("iconBtn")
         close_btn.setFixedSize(28, 28)
         close_btn.clicked.connect(self.close)

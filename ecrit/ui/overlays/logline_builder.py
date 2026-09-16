@@ -7,6 +7,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, Signal
 
 from ecrit.ui.styles import theme
+from ecrit.ui.icons import IconButton
 from ecrit.screenplay.logline_builder import (
     LOGLINE_TEMPLATES,
     build_logline,
@@ -43,7 +44,7 @@ class LoglineBuilderDialog(QDialog):
         title.setStyleSheet("font-size: 20px; font-weight: 500;")
         header.addWidget(title)
         header.addStretch()
-        close_btn = QPushButton("×")
+        close_btn = IconButton("x-mark")
         close_btn.setObjectName("iconBtn")
         close_btn.setFixedSize(28, 28)
         close_btn.clicked.connect(self.close)

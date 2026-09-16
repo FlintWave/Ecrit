@@ -7,6 +7,8 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, Signal
 from datetime import datetime
 
+from ecrit.ui.icons import IconButton
+
 
 class ContinueWritingCard(QFrame):
     open_clicked = Signal()
@@ -175,7 +177,7 @@ class Dashboard(QWidget):
         header.addWidget(self.date_label)
         header.addStretch()
 
-        settings_btn = QPushButton("⚙")
+        settings_btn = IconButton("cog-6-tooth", icon_size=20)
         settings_btn.setObjectName("iconBtn")
         settings_btn.setFixedSize(36, 36)
         settings_btn.setToolTip("Settings")
@@ -201,7 +203,8 @@ class Dashboard(QWidget):
         new_btn.clicked.connect(self.new_project.emit)
         right_stack.addWidget(new_btn)
 
-        import_btn = QPushButton("↓ Import script")
+        import_btn = IconButton("arrow-down-tray", icon_size=16)
+        import_btn.setText(" Import script")
         import_btn.setObjectName("secondary")
         import_btn.setFixedHeight(44)
         import_btn.clicked.connect(self.import_script.emit)

@@ -5,6 +5,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, Signal
 
+from ecrit.ui.icons import IconButton
 
 
 class Scratchpad(QFrame):
@@ -26,7 +27,7 @@ class Scratchpad(QFrame):
         header.addWidget(title)
         header.addStretch()
 
-        close_btn = QPushButton("×")
+        close_btn = IconButton("x-mark")
         close_btn.setObjectName("iconBtn")
         close_btn.setFixedSize(22, 22)
         close_btn.clicked.connect(self.closed.emit)
