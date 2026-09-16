@@ -7,8 +7,6 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, Signal
 from datetime import datetime
 
-from ecrit.ui.styles import theme
-
 
 class ContinueWritingCard(QFrame):
     open_clicked = Signal()

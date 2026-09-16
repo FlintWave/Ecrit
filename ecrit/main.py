@@ -259,6 +259,10 @@ class MainWindow(QMainWindow):
     def _apply_theme(self):
         t = theme.current()
         self.setStyleSheet(generate(t))
+        self._editor_title_bar.set_wordmark_accent()
+        self.editor.manuscript.editor.highlighter._update_formats()
+        self.editor.manuscript.editor.highlighter.rehighlight()
+        self.editor.manuscript.editor.completer._apply_theme()
 
     def _go_dashboard(self):
         if self.stack.currentWidget() is self.editor and STATE.current_project_path:
