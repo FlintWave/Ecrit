@@ -3,7 +3,8 @@
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QLineEdit, QCheckBox, QComboBox, QTabWidget, QWidget,
-    QFrame, QFileDialog, QListWidget, QListWidgetItem, QGridLayout
+    QFrame, QFileDialog, QListWidget, QListWidgetItem, QGridLayout,
+    QSpinBox
 )
 from PySide6.QtCore import Qt, Signal
 
@@ -149,6 +150,21 @@ class SettingsDialog(QDialog):
         self.auto_save_check.setChecked(True)
         behavior_group.add_widget(self.auto_save_check)
         e_layout.addWidget(behavior_group)
+
+        autosave_group = _FormGroup("Autosave Snapshots")
+        self.autosave_enabled_check = QCheckBox("Enable periodic autosave snapshots")
+        self.autosave_enabled_check.setStyleSheet("background: transparent;")
+        self.autosave_enabled_check.setChecked(True)
+        autosave_group.add_widget(self.autosave_enabled_check)
+
+        self.autosave_interval_spin = QSpinBox()
+        self.autosave_interval_spin.setRange(1, 60)
+        self.autosave_interval_spin.setValue(5)
+        self.autosave_interval_spin.setSuffix(" min")
+        self.autosave_interval_spin.setFixedHeight(34)
+        self.autosave_interval_spin.setFixedWidth(100)
+        autosave_group.add_row("Snapshot interval", self.autosave_interval_spin)
+        e_layout.addWidget(autosave_group)
 
         typography_group = _FormGroup("Typography & Goals")
         self.font_size = QComboBox()
@@ -407,6 +423,11 @@ class SettingsDialog(QDialog):
             if self.language_combo.itemData(i) == STATE.language:
                 self.language_combo.setCurrentIndex(i)
                 break
+        prefs = STATE.load_preferences()
+        if "autosave_interval" in prefs:
+            self.autosave_interval_spin.setValue(prefs["autosave_interval"])
+        if "autosave_enabled" in prefs:
+            self.autosave_enabled_check.setChecked(prefs["autosave_enabled"])
 
     def closeEvent(self, event):
         try:
@@ -421,5 +442,7 @@ class SettingsDialog(QDialog):
             "typewriter": self.typewriter_check.isChecked(),
             "line_numbers": self.line_numbers_check.isChecked(),
             "auto_save": self.auto_save_check.isChecked(),
+            "autosave_interval": self.autosave_interval_spin.value(),
+            "autosave_enabled": self.autosave_enabled_check.isChecked(),
         })
         super().closeEvent(event)

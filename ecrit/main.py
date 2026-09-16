@@ -32,6 +32,10 @@ from ecrit.ui.overlays.marketplace import MarketplaceDialog
 from ecrit.ui.overlays.collaboration import CollaborationDialog
 from ecrit.ui.overlays.companion import CompanionDialog
 from ecrit.screenplay.series_projects import SeriesProject
+from ecrit.screenplay.autosave import AutosaveManager
+from ecrit.screenplay.annotations import AnnotationManager
+from ecrit.screenplay.character_cards import CharacterCardManager
+from ecrit.screenplay.title_templates import TitleTemplateManager
 from ecrit.export.share_review import generate_review_html, generate_share_link, list_shares
 from ecrit.collab.session import CollabSession
 from ecrit.i18n import set_language
@@ -89,6 +93,7 @@ class MainWindow(QMainWindow):
         self.editor.export_pdf_requested.connect(lambda: self._export_script("pdf"))
         self.editor.export_odt_requested.connect(lambda: self._export_script("odt"))
         self.editor.export_fountain_requested.connect(lambda: self._export_script("fountain"))
+        self.editor.export_epub_requested.connect(lambda: self._export_script("epub"))
         self.editor.status_bar.typewriter_toggled.connect(self._on_typewriter_toggled)
         self.editor.status_bar.focus_toggled.connect(self._on_focus_toggled)
         self.editor.manuscript.scene_nav.scenes_renumbered.connect(self._on_scenes_renumbered)
@@ -165,6 +170,17 @@ class MainWindow(QMainWindow):
         self._companion_dialog.reader_export_requested.connect(self._on_companion_reader)
         self._companion_dialog.wifi_transfer_requested.connect(self._on_wifi_transfer)
 
+        self._autosave_manager = AutosaveManager()
+        self._last_autosave_hash = ""
+        self._autosave_timer = QTimer(self)
+        self._autosave_timer.setInterval(self._autosave_manager._interval_minutes * 60000)
+        self._autosave_timer.timeout.connect(self._on_autosave_tick)
+
+        self._annotation_manager = AnnotationManager()
+        self._character_card_manager = CharacterCardManager()
+        self._title_template_manager = TitleTemplateManager()
+        self._spell_checker = None
+
         self._cmd_palette_shortcut = QShortcut(QKeySequence("Ctrl+K"), self)
         self._cmd_palette_shortcut.activated.connect(self._show_command_palette)
 
@@ -179,6 +195,15 @@ class MainWindow(QMainWindow):
 
         self._fullscreen_shortcut = QShortcut(QKeySequence("F11"), self)
         self._fullscreen_shortcut.activated.connect(self._toggle_fullscreen)
+
+        self._next_bookmark_shortcut = QShortcut(QKeySequence("Ctrl+]"), self)
+        self._next_bookmark_shortcut.activated.connect(self._next_bookmark)
+
+        self._prev_bookmark_shortcut = QShortcut(QKeySequence("Ctrl+["), self)
+        self._prev_bookmark_shortcut.activated.connect(self._prev_bookmark)
+
+        self.editor.manuscript.bookmark_rail.bookmark_clicked.connect(self._goto_line)
+        self.editor.manuscript.bookmark_rail.clear_btn.clicked.connect(self._clear_bookmarks)
 
         for i in range(1, 6):
             shortcut = QShortcut(QKeySequence(f"Ctrl+{i}"), self)
@@ -219,6 +244,11 @@ class MainWindow(QMainWindow):
             self.editor.manuscript.editor._typewriter = prefs["typewriter"]
         if "line_numbers" in prefs:
             self.editor.manuscript.editor.set_line_numbers_visible(prefs["line_numbers"])
+        if "autosave_interval" in prefs:
+            self._autosave_manager.set_interval(prefs["autosave_interval"])
+            self._autosave_timer.setInterval(self._autosave_manager._interval_minutes * 60000)
+        if "autosave_enabled" in prefs:
+            self._autosave_manager.set_enabled(prefs["autosave_enabled"])
 
     def _apply_theme(self):
         t = theme.current()
@@ -228,6 +258,7 @@ class MainWindow(QMainWindow):
         if self.stack.currentWidget() is self.editor and STATE.current_project_path:
             STATE.script_content = self.editor.manuscript.editor.toPlainText()
             STATE.save_script()
+        self._autosave_timer.stop()
         self._swap_title_bar(show_phases=False)
         self.title_bar.set_context("")
         self.stack.setCurrentWidget(self.dashboard)
@@ -265,6 +296,9 @@ class MainWindow(QMainWindow):
             self.editor.manuscript.editor.content_changed.connect(self._on_content_changed)
             self.editor.manuscript.editor.text_modified.connect(self._on_text_modified)
             self.stack.setCurrentWidget(self.editor)
+            self._last_autosave_hash = hash(STATE.script_content)
+            if self._autosave_manager._enabled:
+                self._autosave_timer.start()
 
     def _on_text_modified(self):
         self._editor_title_bar.save_dot.set_saved(False)
@@ -373,6 +407,7 @@ class MainWindow(QMainWindow):
             "Export PDF": lambda: self._export_script("pdf"),
             "Export ODT": lambda: self._export_script("odt"),
             "Export Fountain": lambda: self._export_script("fountain"),
+            "Export EPUB": lambda: self._export_script("epub"),
             "Production Reports": self._show_reports,
             "Logline Builder": self._show_logline_builder,
             "Series Manager": self._show_series_manager,
@@ -386,6 +421,20 @@ class MainWindow(QMainWindow):
             "Generate Character Name": self._generate_character_name,
             "Focus Mode": self._toggle_focus_mode,
             "Import Final Draft": self._import_script,
+            "Browse Autosaves": self._browse_autosaves,
+            "Create Autosave Snapshot": self._create_autosave_snapshot,
+            "Tag Current Scene": self._show_tag_picker,
+            "Add Bookmark": self._add_bookmark,
+            "Remove Bookmark": self._remove_bookmark,
+            "Next Bookmark": self._next_bookmark,
+            "Previous Bookmark": self._prev_bookmark,
+            "Clear All Bookmarks": self._clear_bookmarks,
+            "Shorten Script": self._show_orphan_finder,
+            "Annotations": self._show_annotations,
+            "Script Analytics": self._show_analytics,
+            "Spell Check": self._run_spell_check,
+            "Title Page Template": self._show_title_templates,
+            "Character Cards": self._show_character_cards,
         }
         handler = handlers.get(name)
         if handler:
@@ -467,6 +516,31 @@ class MainWindow(QMainWindow):
         create_snapshot(STATE.current_project_path)
         self._snapshots_dialog.set_project(STATE.current_project_path)
         self._snapshots_dialog.exec()
+
+    def _on_autosave_tick(self):
+        if not STATE.current_project_path or not self._autosave_manager._enabled:
+            return
+        content = self.editor.manuscript.editor.toPlainText()
+        content_hash = hash(content)
+        if content_hash == self._last_autosave_hash:
+            return
+        self._autosave_manager.create_snapshot(content, STATE.current_project_path)
+        self._last_autosave_hash = content_hash
+
+    def _create_autosave_snapshot(self):
+        if not STATE.current_project_path:
+            return
+        content = self.editor.manuscript.editor.toPlainText()
+        self._autosave_manager.create_snapshot(content, STATE.current_project_path, label="manual")
+        self._last_autosave_hash = hash(content)
+
+    def _browse_autosaves(self):
+        if not STATE.current_project_path:
+            return
+        from ecrit.ui.overlays.autosave_browser import AutosaveBrowserDialog
+        dialog = AutosaveBrowserDialog(self._autosave_manager, STATE.current_project_path, self)
+        dialog.snapshot_restored.connect(self._on_snapshot_restored)
+        dialog.exec()
 
     def _show_compare_drafts(self):
         if self.stack.currentWidget() is not self.editor or not STATE.current_project_path:
@@ -786,6 +860,9 @@ class MainWindow(QMainWindow):
         elif kind == "fountain":
             from ecrit.export.fountain_export import export_fountain
             export_fountain(content, title=title, parent=self)
+        elif kind == "epub":
+            from ecrit.export.epub_export import export_epub
+            export_epub(content, title=title, parent=self)
         self._module_registry.call_hook(HOOK_AFTER_EXPORT, kind, content)
 
     def _import_script(self):
@@ -854,6 +931,197 @@ class MainWindow(QMainWindow):
             cursor.insertText(name)
             self.editor.manuscript.editor.setTextCursor(cursor)
 
+    def _add_bookmark(self):
+        if self.stack.currentWidget() is not self.editor:
+            return
+        line = self.editor.manuscript.editor.textCursor().blockNumber() + 1
+        from PySide6.QtWidgets import QInputDialog
+        name, ok = QInputDialog.getText(self, "Add Bookmark", "Bookmark name:")
+        if ok and name.strip():
+            mgr = self.editor.manuscript.bookmark_manager
+            mgr.add(name.strip(), line)
+            self.editor.manuscript.bookmark_rail.refresh()
+            self.editor.manuscript.editor._update_line_number_area_width()
+            self.editor.manuscript.editor._update_line_number_area_visibility()
+            self.editor.manuscript.editor.viewport().update()
+
+    def _remove_bookmark(self):
+        if self.stack.currentWidget() is not self.editor:
+            return
+        line = self.editor.manuscript.editor.textCursor().blockNumber() + 1
+        mgr = self.editor.manuscript.bookmark_manager
+        bm = mgr.get_by_line(line)
+        if bm:
+            mgr.remove(bm.name)
+            self.editor.manuscript.bookmark_rail.refresh()
+            self.editor.manuscript.editor._update_line_number_area_width()
+            self.editor.manuscript.editor._update_line_number_area_visibility()
+            self.editor.manuscript.editor.viewport().update()
+
+    def _next_bookmark(self):
+        if self.stack.currentWidget() is not self.editor:
+            return
+        line = self.editor.manuscript.editor.textCursor().blockNumber() + 1
+        mgr = self.editor.manuscript.bookmark_manager
+        bm = mgr.jump_next(line)
+        if bm:
+            self._goto_line(bm.line)
+
+    def _prev_bookmark(self):
+        if self.stack.currentWidget() is not self.editor:
+            return
+        line = self.editor.manuscript.editor.textCursor().blockNumber() + 1
+        mgr = self.editor.manuscript.bookmark_manager
+        bm = mgr.jump_prev(line)
+        if bm:
+            self._goto_line(bm.line)
+
+    def _clear_bookmarks(self):
+        if self.stack.currentWidget() is not self.editor:
+            return
+        mgr = self.editor.manuscript.bookmark_manager
+        mgr.clear()
+        self.editor.manuscript.bookmark_rail.refresh()
+        self.editor.manuscript.editor._update_line_number_area_width()
+        self.editor.manuscript.editor._update_line_number_area_visibility()
+        self.editor.manuscript.editor.viewport().update()
+
+    def _goto_line(self, line: int):
+        editor = self.editor.manuscript.editor
+        block = editor.document().findBlockByNumber(line - 1)
+        if block.isValid():
+            cursor = editor.textCursor()
+            cursor.setPosition(block.position())
+            editor.setTextCursor(cursor)
+            editor.centerCursor()
+            editor.setFocus()
+
+    def _show_orphan_finder(self):
+        if self.stack.currentWidget() is not self.editor:
+            return
+        content = self.editor.manuscript.editor.toPlainText()
+        from ecrit.screenplay.orphan_finder import OrphanFinder, get_summary
+        finder = OrphanFinder()
+        issues = finder.analyze(content)
+        summary = get_summary(issues)
+        from ecrit.ui.overlays.orphan_finder_dialog import OrphanFinderDialog
+        dlg = OrphanFinderDialog(self)
+        dlg.set_issues(issues, summary)
+        dlg.goto_line.connect(self._goto_line)
+        dlg.exec()
+
+    def _show_annotations(self):
+        if self.stack.currentWidget() is not self.editor:
+            return
+        from ecrit.ui.overlays.annotations_panel import AnnotationsPanel
+        dlg = AnnotationsPanel(self._annotation_manager, self)
+        dlg.goto_line.connect(self._goto_line)
+        dlg.exec()
+
+    def _show_analytics(self):
+        if self.stack.currentWidget() is not self.editor:
+            return
+        content = self.editor.manuscript.editor.toPlainText()
+        from ecrit.screenplay.analytics import ScriptAnalytics
+        analytics = ScriptAnalytics()
+        data = analytics.analyze(content)
+        from ecrit.ui.overlays.analytics_dialog import AnalyticsDialog
+        dlg = AnalyticsDialog(self)
+        dlg.set_analytics(data)
+        dlg.exec()
+
+    def _run_spell_check(self):
+        if self.stack.currentWidget() is not self.editor:
+            return
+        content = self.editor.manuscript.editor.toPlainText()
+        from ecrit.screenplay.spellcheck import SpellChecker
+        if self._spell_checker is None:
+            self._spell_checker = SpellChecker()
+        issues = self._spell_checker.check_text(content)
+        from ecrit.ui.overlays.spellcheck_dialog import SpellCheckDialog
+        dlg = SpellCheckDialog(self)
+        dlg.set_issues(issues)
+        dlg.goto_line.connect(self._goto_line)
+        dlg.word_added.connect(self._on_spell_word_added)
+        dlg.exec()
+
+    def _on_spell_word_added(self, word: str):
+        if self._spell_checker:
+            self._spell_checker.add_word(word)
+
+    def _show_title_templates(self):
+        from ecrit.ui.overlays.title_template_dialog import TitleTemplateDialog
+        dlg = TitleTemplateDialog(self._title_template_manager, self)
+        dlg.template_applied.connect(self._on_title_template_applied)
+        dlg.exec()
+
+    def _on_title_template_applied(self, fountain_text: str):
+        if self.stack.currentWidget() is not self.editor:
+            return
+        editor = self.editor.manuscript.editor
+        content = editor.toPlainText()
+        if content.startswith("Title:") or content.startswith("title:"):
+            lines = content.split("\n")
+            end = 0
+            for i, line in enumerate(lines):
+                if line.strip() == "" and i > 0:
+                    end = i + 1
+                    break
+            content = fountain_text + "\n" + "\n".join(lines[end:])
+        else:
+            content = fountain_text + "\n" + content
+        editor.setPlainText(content)
+
+    def _show_character_cards(self):
+        if self.stack.currentWidget() is not self.editor:
+            return
+        from ecrit.ui.overlays.character_cards_panel import CharacterCardsPanel
+        if STATE.current_project_path:
+            self._character_card_manager.load(STATE.current_project_path)
+        dlg = CharacterCardsPanel(self._character_card_manager, self)
+        dlg.set_script_content(self.editor.manuscript.editor.toPlainText())
+        dlg.refresh()
+        dlg.card_updated.connect(self._on_character_card_updated)
+        dlg.exec()
+
+    def _on_character_card_updated(self):
+        if STATE.current_project_path:
+            self._character_card_manager.save(STATE.current_project_path)
+
+    def _show_tag_picker(self):
+        if self.stack.currentWidget() is not self.editor:
+            return
+        nav = self.editor.manuscript.scene_nav
+        from PySide6.QtWidgets import QDialog, QVBoxLayout, QListWidget, QListWidgetItem
+        from PySide6.QtCore import Qt
+        from PySide6.QtGui import QColor
+        dlg = QDialog(self)
+        dlg.setWindowTitle("Tag Current Scene")
+        dlg.setFixedSize(300, 360)
+        dlg.setModal(True)
+        t = theme.current()
+        dlg.setStyleSheet(
+            f"background: {t.surface}; color: {t.text}; "
+            f"border: 1px solid {t.neutral_700}; border-radius: {t.radius_md}px;"
+        )
+        lay = QVBoxLayout(dlg)
+        tag_list = QListWidget()
+        for tag in nav.tag_manager.get_available_tags():
+            item = QListWidgetItem(f"{tag.name}  ({tag.category})")
+            item.setData(Qt.ItemDataRole.UserRole, tag)
+            item.setForeground(QColor(tag.color))
+            tag_list.addItem(item)
+        lay.addWidget(tag_list)
+
+        def on_pick(item):
+            tag = item.data(Qt.ItemDataRole.UserRole)
+            if tag:
+                nav.add_tag_to_current_scene(tag)
+            dlg.close()
+
+        tag_list.itemActivated.connect(on_pick)
+        dlg.exec()
+
     def _toggle_theme(self):
         theme.toggle()
         self._apply_theme()
@@ -906,6 +1174,15 @@ class MainWindow(QMainWindow):
         self.editor.manuscript.editor.set_line_numbers_visible(
             settings.get("line_numbers", False)
         )
+        autosave_interval = settings.get("autosave_interval", 5)
+        autosave_enabled = settings.get("autosave_enabled", True)
+        self._autosave_manager.set_interval(autosave_interval)
+        self._autosave_manager.set_enabled(autosave_enabled)
+        self._autosave_timer.setInterval(autosave_interval * 60000)
+        if autosave_enabled and STATE.current_project_path:
+            self._autosave_timer.start()
+        else:
+            self._autosave_timer.stop()
         STATE.save_preferences({
             "author_name": STATE.author_name,
             "author_email": STATE.author_email,
@@ -915,6 +1192,8 @@ class MainWindow(QMainWindow):
             "typewriter": settings.get("typewriter", True),
             "line_numbers": settings.get("line_numbers", False),
             "language": STATE.language,
+            "autosave_interval": autosave_interval,
+            "autosave_enabled": autosave_enabled,
         })
 
     def _on_plugin_installed(self, plugin_id: str):

@@ -29,6 +29,8 @@ from ecrit.screenplay.revisions import (
     RevisionTracker, get_revision_color_hex,
 )
 from ecrit.screenplay.contest_presets import CONTEST_PRESETS, validate_against_preset
+from ecrit.screenplay.scene_tags import SceneTag, SceneTagManager
+from ecrit.screenplay.bookmarks import BookmarkManager
 
 
 class FountainHighlighter(QSyntaxHighlighter):
@@ -275,6 +277,7 @@ class ScriptEditor(QPlainTextEdit):
         self._focus_mode = False
         self._show_line_numbers = False
         self._line_number_area = LineNumberArea(self)
+        self._bookmark_manager: BookmarkManager | None = None
 
         self._save_timer = QTimer()
         self._save_timer.setSingleShot(True)
@@ -291,13 +294,21 @@ class ScriptEditor(QPlainTextEdit):
     def set_line_numbers_visible(self, visible: bool):
         self._show_line_numbers = visible
         self._update_line_number_area_width()
-        self._line_number_area.setVisible(visible)
+        self._update_line_number_area_visibility()
+
+    def _update_line_number_area_visibility(self):
+        has_bookmarks = self._bookmark_manager and self._bookmark_manager.get_all()
+        self._line_number_area.setVisible(self._show_line_numbers or bool(has_bookmarks))
 
     def line_number_area_width(self) -> int:
-        if not self._show_line_numbers:
+        has_bookmarks = self._bookmark_manager and self._bookmark_manager.get_all()
+        if not self._show_line_numbers and not has_bookmarks:
             return 0
+        bookmark_gutter = 14 if has_bookmarks else 0
+        if not self._show_line_numbers:
+            return bookmark_gutter
         digits = max(1, len(str(self.blockCount())))
-        return 8 + self.fontMetrics().horizontalAdvance("9") * (digits + 1)
+        return 8 + self.fontMetrics().horizontalAdvance("9") * (digits + 1) + bookmark_gutter
 
     def _update_line_number_area_width(self, _new_count: int = 0):
         self.setViewportMargins(self.line_number_area_width(), 0, 0, 0)
@@ -316,25 +327,47 @@ class ScriptEditor(QPlainTextEdit):
         self._line_number_area.setGeometry(cr.left(), cr.top(), self.line_number_area_width(), cr.height())
 
     def line_number_area_paint(self, event):
-        if not self._show_line_numbers:
+        has_bookmarks = self._bookmark_manager and self._bookmark_manager.get_all()
+        if not self._show_line_numbers and not has_bookmarks:
             return
         p = QPainter(self._line_number_area)
         t = theme.current()
         p.fillRect(event.rect(), QColor(t.surface))
 
+        bookmarked_lines: dict[int, str] = {}
+        if self._bookmark_manager:
+            for bm in self._bookmark_manager.get_all():
+                bookmarked_lines[bm.line] = bm.color
+
         block = self.firstVisibleBlock()
         block_number = block.blockNumber()
         top = int(self.blockBoundingGeometry(block).translated(self.contentOffset()).top())
         bottom = top + int(self.blockBoundingRect(block).height())
+        fh = self.fontMetrics().height()
+        bookmark_gutter = 14 if has_bookmarks else 0
 
         while block.isValid() and top <= event.rect().bottom():
             if block.isVisible() and bottom >= event.rect().top():
-                p.setPen(QColor(t.neutral_500))
-                p.drawText(
-                    0, top, self._line_number_area.width() - 4,
-                    self.fontMetrics().height(),
-                    Qt.AlignmentFlag.AlignRight, str(block_number + 1),
-                )
+                line_1 = block_number + 1
+
+                if line_1 in bookmarked_lines:
+                    color = QColor(bookmarked_lines[line_1])
+                    p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+                    p.setBrush(color)
+                    p.setPen(Qt.PenStyle.NoPen)
+                    dot_size = 6
+                    cx = bookmark_gutter // 2
+                    cy = top + fh // 2
+                    p.drawEllipse(cx - dot_size // 2, cy - dot_size // 2, dot_size, dot_size)
+                    p.setRenderHint(QPainter.RenderHint.Antialiasing, False)
+
+                if self._show_line_numbers:
+                    p.setPen(QColor(t.neutral_500))
+                    p.drawText(
+                        bookmark_gutter, top, self._line_number_area.width() - 4 - bookmark_gutter,
+                        fh,
+                        Qt.AlignmentFlag.AlignRight, str(line_1),
+                    )
             block = block.next()
             top = bottom
             bottom = top + int(self.blockBoundingRect(block).height())
@@ -465,16 +498,21 @@ class ScriptEditor(QPlainTextEdit):
 
 
 class SceneNavigator(QFrame):
-    """Left rail: scene list with scene number management."""
+    """Left rail: scene list with scene number management and tag filtering."""
 
     scene_selected = Signal(int)
     scenes_renumbered = Signal()
+
+    TAG_DOT_ROLE = Qt.ItemDataRole.UserRole + 1
+    SCENE_INDEX_ROLE = Qt.ItemDataRole.UserRole + 2
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setObjectName("rail")
         self._scene_numbers: list[SceneNumber] = []
         self._scenes_data: list[dict] = []
+        self.tag_manager = SceneTagManager()
+        self._active_filter: str = ""
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 8, 0, 0)
@@ -494,11 +532,48 @@ class SceneNavigator(QFrame):
         header_row.addWidget(self.renumber_btn)
         layout.addLayout(header_row)
 
+        self.filter_combo = QComboBox()
+        self.filter_combo.setFixedHeight(26)
+        self.filter_combo.setContentsMargins(8, 0, 8, 0)
+        self._rebuild_filter_combo()
+        self.filter_combo.currentIndexChanged.connect(self._on_filter_changed)
+        filter_row = QHBoxLayout()
+        filter_row.setContentsMargins(8, 2, 8, 4)
+        filter_row.addWidget(self.filter_combo)
+        layout.addLayout(filter_row)
+
         self.scene_list = QListWidget()
-        self.scene_list.currentRowChanged.connect(self.scene_selected.emit)
+        self.scene_list.currentRowChanged.connect(self._on_row_changed)
         self.scene_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.scene_list.customContextMenuRequested.connect(self._show_context_menu)
         layout.addWidget(self.scene_list)
+
+    def _rebuild_filter_combo(self):
+        current = self.filter_combo.currentData()
+        self.filter_combo.blockSignals(True)
+        self.filter_combo.clear()
+        self.filter_combo.addItem("All Scenes", "")
+        for tag in self.tag_manager.get_available_tags():
+            self.filter_combo.addItem(f"{tag.name}", tag.name)
+        if current:
+            idx = self.filter_combo.findData(current)
+            if idx >= 0:
+                self.filter_combo.setCurrentIndex(idx)
+        self.filter_combo.blockSignals(False)
+
+    def _on_filter_changed(self, _index: int):
+        self._active_filter = self.filter_combo.currentData() or ""
+        self.update_scenes(self._scenes_data)
+
+    def _on_row_changed(self, row: int):
+        if row < 0:
+            return
+        item = self.scene_list.item(row)
+        if item is None:
+            return
+        real_index = item.data(self.SCENE_INDEX_ROLE)
+        if real_index is not None:
+            self.scene_selected.emit(real_index)
 
     def set_script(self, script: str):
         self._scene_numbers = assign_scene_numbers(script)
@@ -506,7 +581,16 @@ class SceneNavigator(QFrame):
     def update_scenes(self, scenes: list):
         self._scenes_data = scenes
         self.scene_list.clear()
+
+        if self._active_filter:
+            visible_indices = set(self.tag_manager.get_scenes_by_tag(self._active_filter))
+        else:
+            visible_indices = None
+
         for i, sc in enumerate(scenes):
+            if visible_indices is not None and i not in visible_indices:
+                continue
+
             heading = sc.get("heading", "")
             page = sc.get("page", 0)
             num_str = ""
@@ -515,25 +599,87 @@ class SceneNavigator(QFrame):
                 sn = self._scene_numbers[i]
                 num_str = f"#{sn.number}  "
                 lock_mark = " \U0001f512" if sn.locked else ""
-            item = QListWidgetItem(f"{num_str}{heading}  p.{page}{lock_mark}")
+
+            tags = self.tag_manager.get_tags(i)
+            tag_dots = "".join(f" ●" for _ in tags) if tags else ""
+            label = f"{num_str}{heading}  p.{page}{lock_mark}{tag_dots}"
+
+            item = QListWidgetItem(label)
+            item.setData(self.SCENE_INDEX_ROLE, i)
+            if tags:
+                item.setData(self.TAG_DOT_ROLE, tags)
+                first_color = tags[0].color
+                item.setForeground(QColor(first_color))
             self.scene_list.addItem(item)
 
     def _show_context_menu(self, pos):
         row = self.scene_list.currentRow()
-        if row < 0 or row >= len(self._scene_numbers):
+        if row < 0:
             return
-        sn = self._scene_numbers[row]
+        item = self.scene_list.item(row)
+        if item is None:
+            return
+        scene_idx = item.data(self.SCENE_INDEX_ROLE)
+        if scene_idx is None:
+            return
+
         menu = QMenu(self)
-        if sn.locked:
-            action = menu.addAction("Unlock Scene Number")
-            action.triggered.connect(lambda: self._toggle_lock(row, lock=False))
-        else:
-            action = menu.addAction("Lock Scene Number")
-            action.triggered.connect(lambda: self._toggle_lock(row, lock=True))
+
+        if scene_idx < len(self._scene_numbers):
+            sn = self._scene_numbers[scene_idx]
+            if sn.locked:
+                action = menu.addAction("Unlock Scene Number")
+                action.triggered.connect(lambda: self._toggle_lock(scene_idx, lock=False))
+            else:
+                action = menu.addAction("Lock Scene Number")
+                action.triggered.connect(lambda: self._toggle_lock(scene_idx, lock=True))
+            menu.addSeparator()
+
+        add_menu = menu.addMenu("Add Tag")
+        existing_names = {t.name for t in self.tag_manager.get_tags(scene_idx)}
+        categories: dict[str, list[SceneTag]] = {}
+        for tag in self.tag_manager.get_available_tags():
+            categories.setdefault(tag.category or "other", []).append(tag)
+        for cat, cat_tags in categories.items():
+            cat_menu = add_menu.addMenu(cat.title())
+            for tag in cat_tags:
+                a = cat_menu.addAction(tag.name)
+                a.setEnabled(tag.name not in existing_names)
+                t = tag
+                a.triggered.connect(lambda _checked=False, _t=t: self._add_tag_to_scene(scene_idx, _t))
+
+        current_tags = self.tag_manager.get_tags(scene_idx)
+        if current_tags:
+            remove_menu = menu.addMenu("Remove Tag")
+            for tag in current_tags:
+                a = remove_menu.addAction(tag.name)
+                tname = tag.name
+                a.triggered.connect(lambda _checked=False, _n=tname: self._remove_tag_from_scene(scene_idx, _n))
+
         menu.addSeparator()
         renumber_action = menu.addAction("Renumber All Unlocked")
         renumber_action.triggered.connect(self._renumber_all)
         menu.exec(self.scene_list.mapToGlobal(pos))
+
+    def _add_tag_to_scene(self, scene_index: int, tag: SceneTag):
+        self.tag_manager.add_tag(scene_index, tag)
+        self._rebuild_filter_combo()
+        self.update_scenes(self._scenes_data)
+
+    def _remove_tag_from_scene(self, scene_index: int, tag_name: str):
+        self.tag_manager.remove_tag(scene_index, tag_name)
+        self.update_scenes(self._scenes_data)
+
+    def add_tag_to_current_scene(self, tag: SceneTag):
+        row = self.scene_list.currentRow()
+        if row < 0:
+            return
+        item = self.scene_list.item(row)
+        if item is None:
+            return
+        scene_idx = item.data(self.SCENE_INDEX_ROLE)
+        if scene_idx is not None:
+            self._add_tag_to_scene(scene_idx, tag)
 
     def _toggle_lock(self, index: int, lock: bool):
         if lock:
@@ -965,17 +1111,78 @@ class OutlineCanvas(QWidget):
         self.update()
 
 
+class BookmarkRail(QFrame):
+    bookmark_clicked = Signal(int)
+
+    def __init__(self, bookmark_manager: BookmarkManager, parent=None):
+        super().__init__(parent)
+        self.setObjectName("rail")
+        self._manager = bookmark_manager
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 8, 0, 0)
+        layout.setSpacing(0)
+
+        header_row = QHBoxLayout()
+        header_row.setContentsMargins(12, 0, 8, 4)
+        header = QLabel("BOOKMARKS")
+        header.setObjectName("kicker")
+        header_row.addWidget(header)
+        header_row.addStretch()
+
+        self.clear_btn = QPushButton("Clear")
+        self.clear_btn.setObjectName("ghost")
+        self.clear_btn.setFixedHeight(24)
+        header_row.addWidget(self.clear_btn)
+        layout.addLayout(header_row)
+
+        self.bookmark_list = QListWidget()
+        self.bookmark_list.itemClicked.connect(self._on_item_clicked)
+        layout.addWidget(self.bookmark_list)
+
+    def refresh(self):
+        self.bookmark_list.clear()
+        t = theme.current()
+        for bm in self._manager.get_all():
+            item = QListWidgetItem(f"●  {bm.name}  L{bm.line}")
+            item.setData(Qt.ItemDataRole.UserRole, bm.line)
+            item.setForeground(QColor(bm.color))
+            self.bookmark_list.addItem(item)
+
+    def _on_item_clicked(self, item):
+        line = item.data(Qt.ItemDataRole.UserRole)
+        if line is not None:
+            self.bookmark_clicked.emit(line)
+
+
 class ManuscriptPhase(QWidget):
-    """Manuscript phase: scene nav + script editor + character rail."""
+    """Manuscript phase: scene nav + bookmark rail + script editor + character rail."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.bookmark_manager = BookmarkManager()
+
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
+        left_column = QWidget()
+        left_layout = QVBoxLayout(left_column)
+        left_layout.setContentsMargins(0, 0, 0, 0)
+        left_layout.setSpacing(0)
+
         self.scene_nav = SceneNavigator()
-        self.scene_nav.setFixedWidth(216)
+        left_layout.addWidget(self.scene_nav, 3)
+
+        left_divider = QFrame()
+        left_divider.setObjectName("railDivider")
+        left_divider.setFixedHeight(1)
+        left_layout.addWidget(left_divider)
+
+        self.bookmark_rail = BookmarkRail(self.bookmark_manager)
+        left_layout.addWidget(self.bookmark_rail, 1)
+
+        left_column.setFixedWidth(216)
 
         self.divider_l = QFrame()
         self.divider_l.setObjectName("railDivider")
@@ -999,6 +1206,7 @@ class ManuscriptPhase(QWidget):
         page_layout.setContentsMargins(0, 0, 0, 0)
 
         self.editor = ScriptEditor()
+        self.editor._bookmark_manager = self.bookmark_manager
         page_layout.addWidget(self.editor)
 
         center_layout.addWidget(self.page_frame)
@@ -1011,7 +1219,7 @@ class ManuscriptPhase(QWidget):
         self.char_rail.setFixedWidth(264)
 
         splitter = QSplitter(Qt.Orientation.Horizontal)
-        splitter.addWidget(self.scene_nav)
+        splitter.addWidget(left_column)
         splitter.addWidget(self.divider_l)
         splitter.addWidget(center)
         splitter.addWidget(self.divider_r)
@@ -1135,6 +1343,7 @@ class DeliverPhase(QWidget):
     export_pdf_requested = Signal()
     export_odt_requested = Signal()
     export_fountain_requested = Signal()
+    export_epub_requested = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -1295,6 +1504,12 @@ class DeliverPhase(QWidget):
         fountain_btn.clicked.connect(self.export_fountain_requested.emit)
         rail_layout.addWidget(fountain_btn)
 
+        epub_btn = QPushButton("EPUB (.epub)")
+        epub_btn.setObjectName("secondary")
+        epub_btn.setFixedHeight(36)
+        epub_btn.clicked.connect(self.export_epub_requested.emit)
+        rail_layout.addWidget(epub_btn)
+
         scroll.setWidget(rail)
         layout.addWidget(scroll)
 
@@ -1405,6 +1620,7 @@ class EditorScreen(QWidget):
     export_pdf_requested = Signal()
     export_odt_requested = Signal()
     export_fountain_requested = Signal()
+    export_epub_requested = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -1433,6 +1649,7 @@ class EditorScreen(QWidget):
         self.deliver.export_pdf_requested.connect(self.export_pdf_requested.emit)
         self.deliver.export_odt_requested.connect(self.export_odt_requested.emit)
         self.deliver.export_fountain_requested.connect(self.export_fountain_requested.emit)
+        self.deliver.export_epub_requested.connect(self.export_epub_requested.emit)
 
         self.manuscript.char_rail.character_activated.connect(self.character_activated.emit)
 
