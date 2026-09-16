@@ -1,4 +1,4 @@
-updated: "2026-09-09"
+updated: "2026-09-16"
 
 features:
   rust-core:
@@ -47,7 +47,7 @@ features:
 
   import-screen:
     status: done
-    notes: "File dialog to import .fountain files, creates project and opens in editor"
+    notes: "File dialog to import .fountain and .fdx files, creates project and opens in editor"
 
   settings-modal:
     status: done
@@ -160,3 +160,67 @@ features:
   share-for-review:
     status: done
     notes: "Self-contained HTML generation with watermark overlay, Fountain-to-HTML parsing, XSS-safe output. ShareReviewDialog with watermark config, generated shares management."
+
+  # ── v1.5 Platform features ──────────────────────────────────────
+
+  i18n:
+    status: done
+    notes: "Translator class with JSON-based translations, 6 languages (en, fr, es, de, ja, pt), settings integration for language switching"
+
+  plugin-marketplace:
+    status: done
+    notes: "Plugin API with manifest loading, sandboxed execution, and marketplace UI for browsing/installing community plugins"
+
+  android-companion:
+    status: done
+    notes: "LAN device sync, reader-optimized HTML export, and bundle packaging for companion app"
+
+  real-time-collaboration:
+    status: done
+    notes: "CRDT-based conflict resolution, P2P networking with LAN discovery, session management with presence indicators"
+
+  fdx-import:
+    status: done
+    notes: "Final Draft .fdx XML import with element type mapping to Fountain format"
+
+  # ── v2.0 Craft Tools ────────────────────────────────────────────
+
+  bookmarks:
+    status: done
+    notes: "BookmarkManager with add/remove/toggle/jump-next, persistent JSON storage per project"
+
+  scene-tags:
+    status: done
+    notes: "Color-coded tags per scene with filter support, TagManager with JSON persistence"
+
+  autosave:
+    status: done
+    notes: "Periodic automatic snapshots with configurable interval, AutosaveBrowser overlay for visual restoration"
+
+  epub-export:
+    status: done
+    notes: "EPUB 3 export with metadata, NCX table of contents, styled XHTML chapters, and cover page"
+
+  orphan-finder:
+    status: done
+    notes: "Detect characters in dialogue not present in character sheets, dialog with match results and add/ignore actions"
+
+  annotations:
+    status: done
+    notes: "Line-anchored margin notes with AnnotationsPanel for browsing, filtering, and jumping to annotated lines"
+
+  analytics:
+    status: done
+    notes: "Dialogue-to-action ratio, pacing analysis, scene length distribution, complexity scoring with visual charts"
+
+  spellcheck:
+    status: done
+    notes: "Edit-distance spell checker with Fountain-aware word extraction, skipping headings/transitions/parentheticals"
+
+  title-templates:
+    status: done
+    notes: "Genre-specific title page templates (thriller, comedy, drama, horror, sci-fi) with field auto-population"
+
+  character-cards:
+    status: done
+    notes: "Compact relationship-map cards with image placeholder, role, arc summary, and quick-edit panel"

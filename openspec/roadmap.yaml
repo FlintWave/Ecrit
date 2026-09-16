@@ -1,5 +1,5 @@
 project: ecrit
-version: "0.1.0"
+version: "26.09.0"
 description: "Screenplay writing app for Fountain and Fountain-derived dialects"
 
 milestones:
@@ -78,3 +78,30 @@ milestones:
       - structure-templates
       - revisions-wga
       - scene-numbers
+
+  - id: v1.5
+    title: Platform
+    status: done
+    target: "2026-Q2"
+    features:
+      - i18n
+      - plugin-marketplace
+      - android-companion
+      - real-time-collaboration
+      - fdx-import
+
+  - id: v2.0
+    title: Craft Tools
+    status: done
+    target: "2026-Q3"
+    features:
+      - bookmarks
+      - scene-tags
+      - autosave
+      - epub-export
+      - orphan-finder
+      - annotations
+      - analytics
+      - spellcheck
+      - title-templates
+      - character-cards
