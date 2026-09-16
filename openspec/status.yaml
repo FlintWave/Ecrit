@@ -165,7 +165,7 @@ features:
 
   i18n:
     status: done
-    notes: "Translator class with JSON-based translations, 7 languages (en, fr, es, de, ja, ko, zh), settings integration for language switching"
+    notes: "Translator class with JSON-based translations, 6 languages (en, fr, es, de, ja, pt), settings integration for language switching"
 
   plugin-marketplace:
     status: done

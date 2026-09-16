@@ -35,7 +35,7 @@
 - **Outline** — Visual node graph with drag-and-drop scene cards, act breaks, and structure templates (Save the Cat, Hero’s Journey, Three-Act, and more)
 - **Manuscript** — Courier Prime script editor with full Fountain syntax highlighting, typewriter scrolling, auto-save, and scene numbering
 - **Proofread** — Read-only view with an issues rail for flagging problems
-- **Deliver** — Preview with PDF/ODT/Fountain export, WGA revision tracking, and contest preset validation
+- **Deliver** — Preview with PDF/ODT/Fountain/EPUB export, WGA revision tracking, and contest preset validation
 
 ### Writing Tools
 
@@ -76,7 +76,7 @@
 - **Real-time Collaboration** — LAN-based peer-to-peer editing with CRDT conflict resolution and presence indicators
 - **Plugin Marketplace** — Browse, install, and manage community plugins with a built-in marketplace UI
 - **Android Companion** — Sync screenplay bundles to a companion reader app via LAN or file export
-- **Localization** — Full i18n system with translation support (English, French, Spanish, German, Japanese, Korean, Chinese)
+- **Localization** — Full i18n system with translation support (English, French, Spanish, German, Japanese, Portuguese)
 
 ### Export Formats
 
@@ -86,8 +86,9 @@
 | **ODT** | ODF-spec compliant for LibreOffice/Word |
 | **Fountain** | Plain `.fountain` text |
 | **EPUB** | EPUB 3 e-book export with metadata, table of contents, and styled chapters |
-| **FDX** | Import from Final Draft `.fdx` files |
 | **HTML** | Watermarked review copies with dark mode |
+
+Écrit can also **import** from Final Draft (`.fdx`) and Fountain (`.fountain`) files.
 
 ### Themes
 
@@ -142,7 +143,7 @@ ecrit
 
 ### Importing Existing Scripts
 
-Use **Import Script** from the Dashboard or Command Palette to open any `.fountain` file as a new project.
+Use **Import Script** from the Dashboard or Command Palette to open `.fountain` or Final Draft `.fdx` files as a new project.
 
 ---
 
