@@ -7,7 +7,6 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, Signal
 
-from ecrit.ui.styles import theme
 
 
 class ShareReviewDialog(QDialog):
@@ -23,7 +22,6 @@ class ShareReviewDialog(QDialog):
 
         self._shares: list[dict] = []
 
-        t = theme.current()
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
 
@@ -53,7 +51,7 @@ class ShareReviewDialog(QDialog):
             "Includes a watermark overlay for confidentiality."
         )
         desc.setWordWrap(True)
-        desc.setStyleSheet(f"color: {t.neutral_500}; font-size: 13px;")
+        desc.setObjectName("dashMuted")
         form.addWidget(desc)
 
         watermark_label = QLabel("Watermark Text")

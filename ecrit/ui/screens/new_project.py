@@ -61,18 +61,13 @@ class FormatCard(QFrame):
         layout = QVBoxLayout(self)
         layout.setSpacing(4)
 
-        t = theme.current()
-
         label = FORMAT_LABELS.get(format_id, format_id)
         name = QLabel(label)
         name.setStyleSheet("font-size: 14px; font-weight: 500; background: transparent;")
         layout.addWidget(name)
 
         fid = QLabel(format_id)
-        fid.setStyleSheet(
-            f"font-family: ui-monospace, Menlo, monospace; font-size: 11px; "
-            f"color: {t.neutral_500}; background: transparent;"
-        )
+        fid.setObjectName("dashMonoMuted")
         layout.addWidget(fid)
 
     def set_selected(self, selected: bool):
@@ -102,8 +97,6 @@ class NewProjectWizard(QWidget):
         self._build_ui()
 
     def _build_ui(self):
-        t = theme.current()
-
         scroll = QScrollArea(self)
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
@@ -123,7 +116,7 @@ class NewProjectWizard(QWidget):
         inner_layout.addWidget(title)
 
         subtitle = QLabel("Set up your screenplay, then start writing.")
-        subtitle.setStyleSheet(f"color: {t.neutral_500}; font-size: 14px;")
+        subtitle.setObjectName("dashMuted")
         inner_layout.addWidget(subtitle)
 
         inner_layout.addSpacing(8)

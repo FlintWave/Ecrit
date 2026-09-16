@@ -17,14 +17,13 @@ class AnalyticsDialog(QDialog):
         self.setMinimumSize(800, 560)
         self.setModal(True)
 
-        t = theme.current()
         layout = QVBoxLayout(self)
         layout.setContentsMargins(24, 20, 24, 20)
         layout.setSpacing(12)
 
         header = QHBoxLayout()
         title = QLabel("Script Analytics")
-        title.setStyleSheet(f"font-size: 18px; font-weight: bold; color: {t.text};")
+        title.setStyleSheet("font-size: 18px; font-weight: bold;")
         header.addWidget(title)
         header.addStretch()
         layout.addLayout(header)

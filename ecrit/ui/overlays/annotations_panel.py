@@ -7,7 +7,6 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor
 
-from ecrit.ui.styles import theme
 from ecrit.screenplay.annotations import AnnotationManager, Annotation
 
 
@@ -21,19 +20,18 @@ class AnnotationsPanel(QDialog):
         self.setMinimumSize(420, 500)
         self.setModal(True)
 
-        t = theme.current()
         layout = QVBoxLayout(self)
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(10)
 
         header = QHBoxLayout()
         title = QLabel("Annotations")
-        title.setStyleSheet(f"font-size: 16px; font-weight: bold; color: {t.text};")
+        title.setStyleSheet("font-size: 16px; font-weight: bold;")
         header.addWidget(title)
         header.addStretch()
 
         self._count_label = QLabel()
-        self._count_label.setStyleSheet(f"color: {t.neutral_400}; font-size: 12px;")
+        self._count_label.setObjectName("countBadge")
         header.addWidget(self._count_label)
         layout.addLayout(header)
 

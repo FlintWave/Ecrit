@@ -8,7 +8,6 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, Signal
 
-from ecrit.ui.styles import theme
 from ecrit.screenplay.autosave import AutosaveManager
 
 
@@ -24,7 +23,6 @@ class AutosaveBrowserDialog(QDialog):
         self._manager = manager
         self._project_path = project_path
 
-        t = theme.current()
         layout = QVBoxLayout(self)
         layout.setContentsMargins(20, 16, 20, 16)
         layout.setSpacing(12)
@@ -42,7 +40,7 @@ class AutosaveBrowserDialog(QDialog):
         layout.addLayout(header)
 
         info = QLabel(f"Snapshots saved every {manager._interval_minutes} min")
-        info.setStyleSheet(f"color: {t.neutral_500}; font-size: 12px;")
+        info.setObjectName("dashMutedSmall")
         layout.addWidget(info)
 
         self.snap_list = QListWidget()

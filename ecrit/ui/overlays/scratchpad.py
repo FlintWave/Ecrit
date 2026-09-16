@@ -5,7 +5,6 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, Signal
 
-from ecrit.ui.styles import theme
 
 
 class Scratchpad(QFrame):
@@ -17,7 +16,6 @@ class Scratchpad(QFrame):
         self.setObjectName("rail")
         self.setFixedWidth(300)
 
-        t = theme.current()
         layout = QVBoxLayout(self)
         layout.setContentsMargins(12, 12, 12, 12)
         layout.setSpacing(8)
@@ -37,16 +35,12 @@ class Scratchpad(QFrame):
 
         hint = QLabel("Cut text lands here. Drag back to the script when ready.")
         hint.setWordWrap(True)
-        hint.setStyleSheet(f"color: {t.neutral_500}; font-size: 12px;")
+        hint.setObjectName("dashMutedSmall")
         layout.addWidget(hint)
 
         self.text_area = QTextEdit()
         self.text_area.setPlaceholderText("Nothing here yet...")
-        self.text_area.setStyleSheet(
-            f"font-family: 'Courier Prime', Courier, monospace; font-size: 13px; "
-            f"background: transparent; border: 1px solid {t.divider}; border-radius: 6px; "
-            f"padding: 8px;"
-        )
+        self.text_area.setObjectName("scratchpadEditor")
         layout.addWidget(self.text_area, 1)
 
         buttons = QHBoxLayout()

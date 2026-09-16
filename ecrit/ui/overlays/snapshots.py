@@ -10,7 +10,6 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, Signal
 
-from ecrit.ui.styles import theme
 
 
 def _run_git(project_path: str, *args) -> str:
@@ -103,7 +102,6 @@ class SnapshotsDialog(QDialog):
 
         self._project_path = ""
 
-        t = theme.current()
         layout = QVBoxLayout(self)
         layout.setContentsMargins(20, 16, 20, 16)
         layout.setSpacing(12)
@@ -151,7 +149,6 @@ class SnapshotsDialog(QDialog):
 
     def _refresh(self):
         self.snap_list.clear()
-        t = theme.current()
         snapshots = list_snapshots(self._project_path)
         for s in snapshots:
             item = QListWidgetItem(f"{s['date']}  —  {s['label']}")

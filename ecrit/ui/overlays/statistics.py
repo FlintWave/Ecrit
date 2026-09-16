@@ -7,7 +7,6 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt
 
-from ecrit.ui.styles import theme
 
 
 class StatRow(QFrame):
@@ -16,9 +15,8 @@ class StatRow(QFrame):
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 4, 0, 4)
 
-        t = theme.current()
         lbl = QLabel(label)
-        lbl.setStyleSheet(f"color: {t.neutral_500}; font-size: 13px;")
+        lbl.setObjectName("dashMuted")
         layout.addWidget(lbl)
 
         layout.addStretch()
@@ -39,7 +37,6 @@ class StatsDialog(QDialog):
         self.setMinimumSize(520, 480)
         self.setModal(True)
 
-        t = theme.current()
         layout = QVBoxLayout(self)
         layout.setContentsMargins(24, 20, 24, 20)
         layout.setSpacing(16)

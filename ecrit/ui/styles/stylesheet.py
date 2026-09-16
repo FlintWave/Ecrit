@@ -459,6 +459,78 @@ QMenu::separator {{
     border: 1px solid {t.neutral_700};
     border-radius: 4px;
 }}
+
+/* ═══ Form Groups (Settings) ═══ */
+#formGroup {{
+    background: {t.neutral_100 if t.name == "organic" else t.neutral_900};
+    border-radius: 8px;
+}}
+#formGroup QLabel {{
+    background: transparent;
+}}
+
+/* ═══ Keyboard Shortcut Keys ═══ */
+#kbdKey {{
+    font-family: ui-monospace, Menlo, monospace;
+    font-size: 12px;
+    background: {t.neutral_200 if t.name == "organic" else t.neutral_800};
+    padding: 3px 8px;
+    border-radius: 4px;
+}}
+
+/* ═══ Count Badge ═══ */
+#countBadge {{
+    color: {t.neutral_400};
+    font-size: 13px;
+    background: transparent;
+}}
+
+/* ═══ Logline Builder ═══ */
+#loglinePreview {{
+    background: {t.neutral_200 if t.name == "organic" else t.neutral_800};
+    border: 1px solid {t.neutral_300 if t.name == "organic" else t.neutral_700};
+    border-radius: {t.radius_sm}px;
+    padding: 8px;
+    font-size: 13px;
+}}
+
+/* ═══ Scratchpad ═══ */
+#scratchpadEditor {{
+    font-family: 'Courier Prime', Courier, monospace;
+    font-size: 13px;
+    background: transparent;
+    border: 1px solid {t.divider};
+    border-radius: 6px;
+    padding: 8px;
+}}
+
+/* ═══ Draft Comparison ═══ */
+#diffView {{
+    font-family: 'Courier Prime', Courier, monospace;
+    font-size: 13px;
+    background: {t.surface};
+    border: 1px solid {t.divider};
+    border-radius: 6px;
+}}
+
+/* ═══ Moodboard Tiles ═══ */
+#moodboardTile {{
+    background: {t.neutral_200 if t.name == "organic" else t.neutral_800};
+    border: 2px dashed {t.neutral_300 if t.name == "organic" else t.neutral_700};
+    border-radius: {t.radius_md}px;
+}}
+#moodboardTile QLabel {{
+    color: {t.neutral_500};
+    background: transparent;
+}}
+
+/* ═══ Reading Mode ═══ */
+#readingMode {{
+    background: {t.bg};
+}}
+#readingMode QLabel {{
+    background: transparent;
+}}
 """
 
 

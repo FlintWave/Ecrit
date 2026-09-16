@@ -13,24 +13,18 @@ class MoodboardTile(QFrame):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._image_path = ""
-        t = theme.current()
+        self.setObjectName("moodboardTile")
         self.setFixedSize(120, 120)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._default_style = (
-            f"background: {t.neutral_800 if t.name == 'nocturne' else t.neutral_200}; "
-            f"border: 2px dashed {t.neutral_700 if t.name == 'nocturne' else t.neutral_300}; "
-            f"border-radius: {t.radius_md}px;"
-        )
-        self.setStyleSheet(self._default_style)
         layout = QVBoxLayout(self)
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._icon = QLabel("+")
         self._icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._icon.setStyleSheet(f"color: {t.neutral_500}; font-size: 24px; background: transparent;")
+        self._icon.setStyleSheet("font-size: 24px;")
         layout.addWidget(self._icon)
         self._label = QLabel("Click to add")
         self._label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._label.setStyleSheet(f"color: {t.neutral_500}; font-size: 11px; background: transparent;")
+        self._label.setStyleSheet("font-size: 11px;")
         layout.addWidget(self._label)
 
     def mousePressEvent(self, event):
@@ -62,7 +56,6 @@ class CharacterSheet(QDialog):
         self.setModal(True)
         self._data = {}
 
-        t = theme.current()
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
 
@@ -128,7 +121,7 @@ class CharacterSheet(QDialog):
             setattr(self, attr_name, txt)
 
         self.scenes_label = QLabel()
-        self.scenes_label.setStyleSheet(f"color: {t.neutral_500}; font-size: 12px;")
+        self.scenes_label.setObjectName("dashMutedSmall")
         left.addWidget(self.scenes_label)
 
         left.addStretch()

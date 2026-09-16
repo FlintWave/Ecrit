@@ -6,7 +6,6 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt
 
-from ecrit.ui.styles import theme
 from ecrit.screenplay.production_reports import (
     generate_scene_report,
     generate_cast_report,
@@ -40,7 +39,6 @@ class ReportsDialog(QDialog):
         self.setMinimumSize(700, 500)
         self.setModal(True)
 
-        t = theme.current()
         layout = QVBoxLayout(self)
         layout.setContentsMargins(24, 20, 24, 20)
         layout.setSpacing(16)

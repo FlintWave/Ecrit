@@ -7,7 +7,6 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, Signal
 
-from ecrit.ui.styles import theme
 
 
 PROVIDERS = [
@@ -31,7 +30,6 @@ class SyncSettingsDialog(QDialog):
 
         self._config: dict = {}
 
-        t = theme.current()
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
 
@@ -109,7 +107,6 @@ class SyncSettingsDialog(QDialog):
 
         divider = QFrame()
         divider.setFrameShape(QFrame.Shape.HLine)
-        divider.setStyleSheet(f"color: {t.neutral_700 if t.name == 'nocturne' else t.divider};")
         form.addWidget(divider)
 
         status_label = QLabel("STATUS")
@@ -118,11 +115,11 @@ class SyncSettingsDialog(QDialog):
 
         self.status_display = QLabel("Not configured")
         self.status_display.setWordWrap(True)
-        self.status_display.setStyleSheet(f"color: {t.neutral_500}; font-size: 13px; padding: 4px 0;")
+        self.status_display.setObjectName("dashMuted")
         form.addWidget(self.status_display)
 
         self.last_sync_label = QLabel("")
-        self.last_sync_label.setStyleSheet(f"color: {t.neutral_500}; font-size: 12px;")
+        self.last_sync_label.setObjectName("dashMutedSmall")
         form.addWidget(self.last_sync_label)
 
         form.addStretch()

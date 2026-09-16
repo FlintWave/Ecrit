@@ -5,7 +5,6 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, Signal, QTimer
 
-from ecrit.ui.styles import theme
 
 
 class SprintTimerWidget(QFrame):
@@ -28,7 +27,6 @@ class SprintTimerWidget(QFrame):
         self._timer.setInterval(1000)
         self._timer.timeout.connect(self._tick)
 
-        t = theme.current()
         layout = QVBoxLayout(self)
         layout.setContentsMargins(16, 14, 16, 14)
         layout.setSpacing(12)

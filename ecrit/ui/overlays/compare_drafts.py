@@ -17,7 +17,6 @@ class CompareDrafts(QDialog):
         self.setMinimumSize(820, 560)
         self.setModal(True)
 
-        t = theme.current()
         layout = QVBoxLayout(self)
         layout.setContentsMargins(20, 16, 20, 16)
         layout.setSpacing(12)
@@ -63,26 +62,17 @@ class CompareDrafts(QDialog):
 
         self.left_view = QTextEdit()
         self.left_view.setReadOnly(True)
-        self.left_view.setStyleSheet(
-            f"font-family: 'Courier Prime', Courier, monospace; font-size: 13px; "
-            f"background: {t.surface}; border: 1px solid {t.divider}; border-radius: 6px;"
-        )
+        self.left_view.setObjectName("diffView")
         self.splitter.addWidget(self.left_view)
 
         self.right_view = QTextEdit()
         self.right_view.setReadOnly(True)
-        self.right_view.setStyleSheet(
-            f"font-family: 'Courier Prime', Courier, monospace; font-size: 13px; "
-            f"background: {t.surface}; border: 1px solid {t.divider}; border-radius: 6px;"
-        )
+        self.right_view.setObjectName("diffView")
         self.splitter.addWidget(self.right_view)
 
         self.inline_view = QTextEdit()
         self.inline_view.setReadOnly(True)
-        self.inline_view.setStyleSheet(
-            f"font-family: 'Courier Prime', Courier, monospace; font-size: 13px; "
-            f"background: {t.surface}; border: 1px solid {t.divider}; border-radius: 6px;"
-        )
+        self.inline_view.setObjectName("diffView")
         self.inline_view.hide()
 
         layout.addWidget(self.splitter, 1)
@@ -90,7 +80,7 @@ class CompareDrafts(QDialog):
 
         stats = QHBoxLayout()
         self.stats_label = QLabel()
-        self.stats_label.setStyleSheet(f"color: {t.neutral_500}; font-size: 12px;")
+        self.stats_label.setObjectName("dashMutedSmall")
         stats.addWidget(self.stats_label)
         stats.addStretch()
         layout.addLayout(stats)

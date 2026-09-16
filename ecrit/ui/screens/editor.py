@@ -1340,7 +1340,6 @@ class BookmarkRail(QFrame):
 
     def refresh(self):
         self.bookmark_list.clear()
-        t = theme.current()
         for bm in self._manager.get_all():
             item = QListWidgetItem(f"●  {bm.name}  L{bm.line}")
             item.setData(Qt.ItemDataRole.UserRole, bm.line)

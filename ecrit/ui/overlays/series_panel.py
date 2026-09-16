@@ -8,7 +8,6 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, Signal
 
-from ecrit.ui.styles import theme
 from ecrit.screenplay.series_projects import (
     SeriesProject, SeriesSeason, Episode, BibleEntry, SeriesBible,
 )
@@ -28,7 +27,6 @@ class SeriesPanel(QDialog):
 
         self._project: SeriesProject | None = None
 
-        t = theme.current()
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
 

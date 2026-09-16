@@ -8,7 +8,6 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor, QPixmap
 
-from ecrit.ui.styles import theme
 from ecrit.screenplay.character_cards import (
     CharacterCardManager, CharacterCard, CharacterBio, RELATIONSHIP_TYPES,
 )
@@ -24,19 +23,18 @@ class CharacterCardsPanel(QDialog):
         self.setMinimumSize(800, 560)
         self.setModal(True)
 
-        t = theme.current()
         layout = QVBoxLayout(self)
         layout.setContentsMargins(24, 20, 24, 20)
         layout.setSpacing(12)
 
         header = QHBoxLayout()
         title = QLabel("Character Cards")
-        title.setStyleSheet(f"font-size: 18px; font-weight: bold; color: {t.text};")
+        title.setStyleSheet("font-size: 18px; font-weight: bold;")
         header.addWidget(title)
         header.addStretch()
 
         self._count_label = QLabel()
-        self._count_label.setStyleSheet(f"color: {t.neutral_400}; font-size: 13px;")
+        self._count_label.setObjectName("countBadge")
         header.addWidget(self._count_label)
         layout.addLayout(header)
 

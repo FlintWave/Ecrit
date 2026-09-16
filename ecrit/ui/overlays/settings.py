@@ -15,11 +15,7 @@ from ecrit.i18n import tr, set_language, get_language, available_languages
 class _FormGroup(QFrame):
     def __init__(self, label: str, parent=None):
         super().__init__(parent)
-        t = theme.current()
-        self.setStyleSheet(
-            f"QFrame {{ background: {t.neutral_100 if t.name == 'organic' else t.neutral_900}; "
-            f"border-radius: 8px; padding: 0; }}"
-        )
+        self.setObjectName("formGroup")
         self._layout = QVBoxLayout(self)
         self._layout.setContentsMargins(16, 12, 16, 12)
         self._layout.setSpacing(10)
@@ -56,8 +52,6 @@ class SettingsDialog(QDialog):
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-
-        t = theme.current()
 
         header = QHBoxLayout()
         header.setContentsMargins(24, 20, 24, 12)
@@ -113,10 +107,7 @@ class SettingsDialog(QDialog):
         folder_layout.setContentsMargins(0, 0, 0, 0)
         folder_layout.setSpacing(8)
         self.folder_label = QLabel()
-        self.folder_label.setStyleSheet(
-            f"font-family: ui-monospace, Menlo, monospace; font-size: 12px; "
-            f"color: {t.neutral_500}; background: transparent;"
-        )
+        self.folder_label.setObjectName("dashMonoMuted")
         folder_layout.addWidget(self.folder_label, 1)
         browse_btn = QPushButton("Browse")
         browse_btn.setObjectName("secondary")
@@ -193,14 +184,15 @@ class SettingsDialog(QDialog):
         appearance_group = _FormGroup("Appearance")
         theme_row = QHBoxLayout()
         theme_row.setSpacing(12)
+        current_theme = theme.current().name
         self.dark_btn = QPushButton("Nocturne (Dark)")
-        self.dark_btn.setObjectName("primary" if t.name == "nocturne" else "secondary")
+        self.dark_btn.setObjectName("primary" if current_theme == "nocturne" else "secondary")
         self.dark_btn.setFixedHeight(44)
         self.dark_btn.clicked.connect(lambda: self._set_theme("nocturne"))
         theme_row.addWidget(self.dark_btn)
 
         self.light_btn = QPushButton("Organic (Light)")
-        self.light_btn.setObjectName("primary" if t.name == "organic" else "secondary")
+        self.light_btn.setObjectName("primary" if current_theme == "organic" else "secondary")
         self.light_btn.setFixedHeight(44)
         self.light_btn.clicked.connect(lambda: self._set_theme("organic"))
         theme_row.addWidget(self.light_btn)
@@ -222,7 +214,7 @@ class SettingsDialog(QDialog):
         about_group.add_widget(app_name)
 
         ver = QLabel("v26.9.1 — Cross-platform Screenplay Editor")
-        ver.setStyleSheet(f"color: {t.neutral_500}; font-size: 13px; background: transparent;")
+        ver.setObjectName("dashMuted")
         about_group.add_widget(ver)
 
         desc = QLabel(
@@ -273,11 +265,11 @@ class SettingsDialog(QDialog):
         details_group.add_widget(self.mod_detail_name)
 
         self.mod_detail_version = QLabel("")
-        self.mod_detail_version.setStyleSheet(f"color: {t.neutral_500}; font-size: 12px; background: transparent;")
+        self.mod_detail_version.setObjectName("dashMutedSmall")
         details_group.add_widget(self.mod_detail_version)
 
         self.mod_detail_author = QLabel("")
-        self.mod_detail_author.setStyleSheet(f"color: {t.neutral_500}; font-size: 12px; background: transparent;")
+        self.mod_detail_author.setObjectName("dashMutedSmall")
         details_group.add_widget(self.mod_detail_author)
 
         self.mod_detail_desc = QLabel("")
@@ -286,15 +278,12 @@ class SettingsDialog(QDialog):
         details_group.add_widget(self.mod_detail_desc)
 
         self.mod_detail_type = QLabel("")
-        self.mod_detail_type.setStyleSheet(f"color: {t.neutral_500}; font-size: 12px; background: transparent;")
+        self.mod_detail_type.setObjectName("dashMutedSmall")
         details_group.add_widget(self.mod_detail_type)
 
         self.mod_detail_path = QLabel("")
         self.mod_detail_path.setWordWrap(True)
-        self.mod_detail_path.setStyleSheet(
-            f"font-family: ui-monospace, Menlo, monospace; font-size: 11px; "
-            f"color: {t.neutral_500}; background: transparent;"
-        )
+        self.mod_detail_path.setObjectName("dashMonoMuted")
         details_group.add_widget(self.mod_detail_path)
 
         self.mod_detail_error = QLabel("")

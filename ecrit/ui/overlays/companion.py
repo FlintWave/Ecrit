@@ -7,7 +7,6 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, Signal
 
-from ecrit.ui.styles import theme
 from ecrit.i18n import tr
 from ecrit.companion.device_sync import DeviceSync, PairedDevice, SyncStatus
 
@@ -25,8 +24,6 @@ class CompanionDialog(QDialog):
 
         self._device_sync = DeviceSync()
         self._device_sync.set_status_callback(self._on_sync_status_change)
-        t = theme.current()
-
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
 
@@ -85,7 +82,7 @@ class CompanionDialog(QDialog):
         s_layout.setSpacing(12)
 
         self.sync_status_label = QLabel(tr("companion.never_synced"))
-        self.sync_status_label.setStyleSheet(f"color: {t.neutral_500}; font-size: 13px;")
+        self.sync_status_label.setObjectName("dashMuted")
         s_layout.addWidget(self.sync_status_label)
 
         sync_btn = QPushButton(tr("companion.full_sync"))
@@ -106,10 +103,7 @@ class CompanionDialog(QDialog):
         s_layout.addWidget(transfer_label)
 
         self.transfer_url_label = QLabel("")
-        self.transfer_url_label.setStyleSheet(
-            f"font-family: ui-monospace, Menlo, monospace; font-size: 12px; "
-            f"color: {t.accent_300};"
-        )
+        self.transfer_url_label.setObjectName("dashMonoMuted")
         self.transfer_url_label.setWordWrap(True)
         self.transfer_url_label.setTextInteractionFlags(
             Qt.TextInteractionFlag.TextSelectableByMouse
