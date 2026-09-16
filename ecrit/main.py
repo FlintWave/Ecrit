@@ -1256,6 +1256,8 @@ class MainWindow(QMainWindow):
         self.dashboard.week_stats.set_stats(
             words=stats.get("word_count", 0),
             pages=stats.get("page_count", 0),
+            scenes=stats.get("scene_count", 0),
+            characters=stats.get("character_count", 0),
         )
 
 

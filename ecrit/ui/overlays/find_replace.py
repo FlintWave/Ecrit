@@ -6,9 +6,6 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, Signal
 
-from ecrit.ui.styles import theme
-
-
 class FindReplaceBar(QFrame):
     find_next = Signal(str, bool, bool)
     find_prev = Signal(str, bool, bool)
@@ -37,7 +34,7 @@ class FindReplaceBar(QFrame):
         find_row.addWidget(self.find_input, 1)
 
         self.match_label = QLabel("0 / 0")
-        self.match_label.setStyleSheet(f"color: {theme.current().neutral_500}; font-size: 12px;")
+        self.match_label.setObjectName("dashMuted")
         self.match_label.setFixedWidth(60)
         find_row.addWidget(self.match_label)
 

@@ -8,7 +8,6 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, Signal, QTimer
 from PySide6.QtGui import QGuiApplication
 
-from ecrit.ui.styles import theme
 from ecrit.i18n import tr
 from ecrit.collab.session import CollabSession, SessionState, CollabRole
 from ecrit.collab.p2p import ConnectionToken
@@ -26,7 +25,6 @@ class CollaborationDialog(QDialog):
         self.setModal(True)
 
         self._session: CollabSession | None = None
-        t = theme.current()
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -39,7 +37,7 @@ class CollaborationDialog(QDialog):
         header.addStretch()
 
         self.status_label = QLabel(tr("collab.disconnected"))
-        self.status_label.setStyleSheet(f"color: {t.neutral_500}; font-size: 13px;")
+        self.status_label.setObjectName("dashMuted")
         header.addWidget(self.status_label)
 
         close_btn = QPushButton("×")
@@ -79,7 +77,7 @@ class CollaborationDialog(QDialog):
         l_layout.addLayout(scan_row)
 
         self.peer_count_label = QLabel(tr("collab.no_peers"))
-        self.peer_count_label.setStyleSheet(f"color: {t.neutral_500}; font-size: 12px;")
+        self.peer_count_label.setObjectName("dashMutedSmall")
         l_layout.addWidget(self.peer_count_label)
 
         l_layout.addStretch()
@@ -94,9 +92,7 @@ class CollaborationDialog(QDialog):
         p_layout.addWidget(QLabel(tr("collab.remote_p2p")))
 
         host_frame = QFrame()
-        host_frame.setStyleSheet(
-            f"QFrame {{ background: {t.neutral_100}; border-radius: 8px; padding: 12px; }}"
-        )
+        host_frame.setObjectName("collabFrame")
         h_layout = QVBoxLayout(host_frame)
         h_layout.setSpacing(8)
         h_layout.addWidget(QLabel(tr("collab.host")))
@@ -104,10 +100,7 @@ class CollaborationDialog(QDialog):
         self.token_display = QTextEdit()
         self.token_display.setReadOnly(True)
         self.token_display.setFixedHeight(60)
-        self.token_display.setStyleSheet(
-            f"font-family: ui-monospace, Menlo, monospace; font-size: 11px; "
-            f"background: {t.bg}; border: 1px solid {t.neutral_700}; border-radius: 4px;"
-        )
+        self.token_display.setObjectName("collabTokenDisplay")
         self.token_display.setPlaceholderText(tr("collab.connection_token"))
         h_layout.addWidget(self.token_display)
 
@@ -128,9 +121,7 @@ class CollaborationDialog(QDialog):
         p_layout.addWidget(host_frame)
 
         join_frame = QFrame()
-        join_frame.setStyleSheet(
-            f"QFrame {{ background: {t.neutral_100}; border-radius: 8px; padding: 12px; }}"
-        )
+        join_frame.setObjectName("collabFrame")
         j_layout = QVBoxLayout(join_frame)
         j_layout.setSpacing(8)
         j_layout.addWidget(QLabel(tr("collab.guest")))
@@ -163,7 +154,7 @@ class CollaborationDialog(QDialog):
         leave_row.addStretch()
 
         self.participants_label = QLabel("")
-        self.participants_label.setStyleSheet(f"color: {t.neutral_500}; font-size: 12px;")
+        self.participants_label.setObjectName("dashMutedSmall")
         leave_row.addWidget(self.participants_label)
         layout.addLayout(leave_row)
 

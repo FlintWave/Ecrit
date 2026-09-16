@@ -932,7 +932,7 @@ class OutlinePhase(QWidget):
         zoom_bar.addWidget(fit_btn)
         zoom_bar.addStretch()
         info = QLabel("Right-click to add nodes")
-        info.setStyleSheet(f"color: {theme.current().neutral_500}; font-size: 12px;")
+        info.setObjectName("dashMutedSmall")
         zoom_bar.addWidget(info)
         layout.addLayout(zoom_bar)
 
@@ -1397,7 +1397,7 @@ class ManuscriptPhase(QWidget):
         center_layout.addWidget(self.presence_bar)
 
         self.page_frame = QFrame()
-        self.page_frame.setStyleSheet(f"background: {theme.current().surface}; border-radius: 4px;")
+        self.page_frame.setObjectName("pageFrame")
         self.page_frame.setMaximumWidth(816)
         self.page_frame.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         page_layout = QVBoxLayout(self.page_frame)
@@ -1464,7 +1464,7 @@ class ProofreadPhase(QWidget):
         header.addWidget(title)
         header.addStretch()
         self.count_label = QLabel("0 flags")
-        self.count_label.setStyleSheet(f"color: {theme.current().neutral_500}; font-size: 12px;")
+        self.count_label.setObjectName("dashMutedSmall")
         header.addWidget(self.count_label)
         rail_layout.addLayout(header)
 
@@ -1575,16 +1575,13 @@ class DeliverPhase(QWidget):
         center_layout.addLayout(top)
 
         self.format_label = QLabel("Paginated against fountain/core · US Letter · Courier Prime 12pt")
-        self.format_label.setStyleSheet(f"color: {theme.current().neutral_500}; font-size: 13px;")
+        self.format_label.setObjectName("dashMuted")
         center_layout.addWidget(self.format_label)
 
         self.preview_area = QPlainTextEdit()
         self.preview_area.setReadOnly(True)
         self.preview_area.setFont(QFont("Courier Prime", 12))
-        self.preview_area.setStyleSheet(
-            f"background: {theme.current().surface}; border-radius: 8px; "
-            f"min-height: 400px; color: {theme.current().text}; padding: 24px;"
-        )
+        self.preview_area.setObjectName("deliverPreview")
         self.preview_area.setPlaceholderText("Script preview will appear when a project is loaded")
         center_layout.addWidget(self.preview_area, 1)
         center_layout.addStretch()
@@ -1657,9 +1654,7 @@ class DeliverPhase(QWidget):
         rail_layout.addLayout(rev_btn_row)
 
         self.revision_history_label = QLabel("No revisions yet")
-        self.revision_history_label.setStyleSheet(
-            f"color: {theme.current().neutral_500}; font-size: 12px;"
-        )
+        self.revision_history_label.setObjectName("dashMutedSmall")
         self.revision_history_label.setWordWrap(True)
         rail_layout.addWidget(self.revision_history_label)
 
@@ -1677,9 +1672,7 @@ class DeliverPhase(QWidget):
 
         self.contest_result_label = QLabel()
         self.contest_result_label.setWordWrap(True)
-        self.contest_result_label.setStyleSheet(
-            f"color: {theme.current().neutral_500}; font-size: 12px;"
-        )
+        self.contest_result_label.setObjectName("dashMutedSmall")
         rail_layout.addWidget(self.contest_result_label)
 
         rail_layout.addStretch()
@@ -2011,6 +2004,7 @@ class EditorScreen(QWidget):
 
     def _find_in_direction(self, text, case_sensitive, regex, backward=False):
         if not text:
+            self.find_bar.set_match_count(0, 0)
             return
         editor = self.manuscript.editor
         if regex:
@@ -2021,6 +2015,7 @@ class EditorScreen(QWidget):
             qre = QRegularExpression(text)
             qre.setPatternOptions(opts)
             if not qre.isValid():
+                self.find_bar.set_match_count(0, 0)
                 return
             flags = QTextDocument.FindFlag.FindBackward if backward else QTextDocument.FindFlag(0)
             found = editor.find(qre, flags)
@@ -2041,6 +2036,50 @@ class EditorScreen(QWidget):
                 cursor.movePosition(wrap_to)
                 editor.setTextCursor(cursor)
                 editor.find(text, flags)
+        self._update_match_count(text, case_sensitive, regex)
+
+    def _update_match_count(self, text, case_sensitive, regex):
+        if not text:
+            self.find_bar.set_match_count(0, 0)
+            return
+        content = self.manuscript.editor.toPlainText()
+        if regex:
+            import re
+            flags = 0 if case_sensitive else re.IGNORECASE
+            try:
+                matches = list(re.finditer(text, content, flags))
+            except re.error:
+                self.find_bar.set_match_count(0, 0)
+                return
+        else:
+            if case_sensitive:
+                search_content = content
+                search_text = text
+            else:
+                search_content = content.lower()
+                search_text = text.lower()
+            matches = []
+            start = 0
+            while True:
+                idx = search_content.find(search_text, start)
+                if idx == -1:
+                    break
+                matches.append(idx)
+                start = idx + 1
+        total = len(matches)
+        if total == 0:
+            self.find_bar.set_match_count(0, 0)
+            return
+        cursor_pos = self.manuscript.editor.textCursor().position()
+        current = 1
+        for i, m in enumerate(matches):
+            pos = m if isinstance(m, int) else m.start()
+            if pos >= cursor_pos - len(text):
+                current = i + 1
+                break
+        else:
+            current = total
+        self.find_bar.set_match_count(current, total)
 
     def _do_find(self, text, case_sensitive, regex):
         self._find_in_direction(text, case_sensitive, regex, backward=False)
@@ -2049,19 +2088,47 @@ class EditorScreen(QWidget):
         self._find_in_direction(text, case_sensitive, regex, backward=True)
 
     def _do_replace(self, find_text, replace_text):
+        case_sensitive = self.find_bar.case_check.isChecked()
+        use_regex = self.find_bar.regex_check.isChecked()
         editor = self.manuscript.editor
         cursor = editor.textCursor()
-        if cursor.hasSelection() and cursor.selectedText() == find_text:
-            cursor.insertText(replace_text)
-        self._do_find(find_text, False, False)
+        if cursor.hasSelection():
+            selected = cursor.selectedText()
+            if use_regex:
+                import re
+                flags = 0 if case_sensitive else re.IGNORECASE
+                try:
+                    if re.fullmatch(find_text, selected, flags):
+                        new_text = re.sub(find_text, replace_text, selected, flags=flags)
+                        cursor.insertText(new_text)
+                except re.error:
+                    pass
+            else:
+                match = selected == find_text if case_sensitive else selected.lower() == find_text.lower()
+                if match:
+                    cursor.insertText(replace_text)
+        self._do_find(find_text, case_sensitive, use_regex)
 
     def _do_replace_all(self, find_text, replace_text):
         if not find_text:
             return
+        case_sensitive = self.find_bar.case_check.isChecked()
+        use_regex = self.find_bar.regex_check.isChecked()
         editor = self.manuscript.editor
         content = editor.toPlainText()
-        count = content.count(find_text)
-        if count > 0:
-            new_content = content.replace(find_text, replace_text)
+        if use_regex:
+            import re
+            flags = 0 if case_sensitive else re.IGNORECASE
+            try:
+                new_content = re.sub(find_text, replace_text, content, flags=flags)
+            except re.error:
+                return
+        else:
+            if case_sensitive:
+                new_content = content.replace(find_text, replace_text)
+            else:
+                import re
+                new_content = re.sub(re.escape(find_text), replace_text, content, flags=re.IGNORECASE)
+        if new_content != content:
             editor.setPlainText(new_content)
-            self.find_bar.set_match_count(0, 0)
+        self.find_bar.set_match_count(0, 0)

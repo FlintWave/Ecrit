@@ -7,7 +7,6 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, Signal
 
-from ecrit.ui.styles import theme
 from ecrit.i18n import tr
 from ecrit.plugins.marketplace import Marketplace, PluginListing, PluginCategory
 
@@ -24,7 +23,6 @@ class MarketplaceDialog(QDialog):
 
         self._marketplace = Marketplace()
 
-        t = theme.current()
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
 
@@ -100,17 +98,15 @@ class MarketplaceDialog(QDialog):
         layout.addWidget(tabs, 1)
 
         details = QFrame()
+        details.setObjectName("detailsPane")
         details.setFixedHeight(100)
-        details.setStyleSheet(
-            f"QFrame {{ background: {t.neutral_100}; border-top: 1px solid {t.neutral_700}; }}"
-        )
         d_layout = QVBoxLayout(details)
         d_layout.setContentsMargins(24, 8, 24, 8)
         self.detail_name = QLabel("—")
         self.detail_name.setStyleSheet("font-weight: 500; font-size: 14px;")
         d_layout.addWidget(self.detail_name)
         self.detail_info = QLabel("")
-        self.detail_info.setStyleSheet(f"color: {t.neutral_500}; font-size: 12px;")
+        self.detail_info.setObjectName("dashMuted")
         d_layout.addWidget(self.detail_info)
         self.detail_desc = QLabel("")
         self.detail_desc.setWordWrap(True)

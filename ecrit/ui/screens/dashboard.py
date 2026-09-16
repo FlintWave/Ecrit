@@ -76,9 +76,9 @@ class WeekStatsCard(QFrame):
         grid.setSpacing(8)
         for i, (key, label) in enumerate([
             ("words", "Words written"),
-            ("sessions", "Sessions"),
+            ("scenes", "Scenes"),
             ("pages", "Pages"),
-            ("streak", "Streak"),
+            ("characters", "Characters"),
         ]):
             val = QLabel("0")
             val.setAlignment(Qt.AlignmentFlag.AlignRight)
@@ -91,11 +91,11 @@ class WeekStatsCard(QFrame):
             self._stat_labels.append(lbl)
         layout.addLayout(grid)
 
-    def set_stats(self, words=0, sessions=0, pages=0, streak="0 days"):
+    def set_stats(self, words=0, scenes=0, pages=0, characters=0):
         self.stats["words"].setText(f"{words:,}")
-        self.stats["sessions"].setText(str(sessions))
+        self.stats["scenes"].setText(str(scenes))
         self.stats["pages"].setText(str(pages))
-        self.stats["streak"].setText(str(streak))
+        self.stats["characters"].setText(str(characters))
 
 
 class ProjectCard(QFrame):

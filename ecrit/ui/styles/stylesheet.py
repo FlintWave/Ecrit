@@ -413,6 +413,52 @@ QMenu::separator {{
     font-size: 12.5px;
     background: transparent;
 }}
+
+/* ═══ Command Palette ═══ */
+#cmdPalette {{
+    background: {t.surface};
+    border: 1px solid {t.neutral_700};
+    border-radius: {t.radius_lg}px;
+}}
+#cmdPaletteHint {{
+    color: {t.neutral_500};
+    font-size: 11px;
+    background: transparent;
+}}
+
+/* ═══ Marketplace Details ═══ */
+#detailsPane {{
+    background: {t.surface};
+    border-top: 1px solid {t.neutral_700};
+}}
+
+/* ═══ Editor Frames ═══ */
+#pageFrame {{
+    background: {t.surface};
+    border-radius: 4px;
+}}
+#deliverPreview {{
+    background: {t.surface};
+    border-radius: 8px;
+    min-height: 400px;
+    color: {t.text};
+    padding: 24px;
+    border: none;
+}}
+
+/* ═══ Collaboration ═══ */
+#collabFrame {{
+    background: {t.surface};
+    border-radius: 8px;
+    padding: 12px;
+}}
+#collabTokenDisplay {{
+    font-family: ui-monospace, Menlo, monospace;
+    font-size: 11px;
+    background: {t.bg};
+    border: 1px solid {t.neutral_700};
+    border-radius: 4px;
+}}
 """
 
 

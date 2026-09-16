@@ -7,7 +7,6 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QShortcut, QKeySequence
 
-from ecrit.ui.styles import theme
 
 
 COMMANDS = [
@@ -75,11 +74,7 @@ class CommandPalette(QDialog):
         self.setModal(True)
         self.setWindowFlags(Qt.WindowType.Popup | Qt.WindowType.FramelessWindowHint)
 
-        t = theme.current()
-        self.setStyleSheet(
-            f"background: {t.surface}; border: 1px solid {t.neutral_700}; "
-            f"border-radius: {t.radius_lg}px;"
-        )
+        self.setObjectName("cmdPalette")
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(12, 12, 12, 8)
@@ -96,7 +91,7 @@ class CommandPalette(QDialog):
         layout.addWidget(self.results, 1)
 
         hint = QLabel("↑↓ navigate  ⏎ select  Esc close")
-        hint.setStyleSheet(f"color: {t.neutral_500}; font-size: 11px;")
+        hint.setObjectName("cmdPaletteHint")
         hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(hint)
 
@@ -104,7 +99,6 @@ class CommandPalette(QDialog):
 
     def _populate(self, commands):
         self.results.clear()
-        t = theme.current()
         for name, category, desc in commands:
             item = QListWidgetItem()
             item.setData(Qt.ItemDataRole.UserRole, name)
