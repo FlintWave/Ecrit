@@ -1,7 +1,7 @@
 """Écrit — main application entry point."""
 
 import sys
-from PySide6.QtWidgets import QApplication, QMainWindow, QPushButton, QStackedWidget, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QApplication, QMainWindow, QStackedWidget, QVBoxLayout, QWidget
 from PySide6.QtCore import Qt, QTimer, Signal as QtSignal
 from PySide6.QtGui import QShortcut, QKeySequence
 

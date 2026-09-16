@@ -3,8 +3,7 @@
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QLineEdit, QCheckBox, QComboBox, QTabWidget, QWidget,
-    QFrame, QFileDialog, QListWidget, QListWidgetItem, QGridLayout,
-    QSpinBox
+    QFrame, QFileDialog, QListWidget, QListWidgetItem, QSpinBox
 )
 from PySide6.QtCore import Qt, Signal
 
@@ -356,7 +355,7 @@ class SettingsDialog(QDialog):
             status = "Enabled" if mod.enabled else "Disabled"
             text = f"{mod.manifest.name}  v{mod.manifest.version}  [{mod.manifest.module_type}]  ({status})"
             item = QListWidgetItem(text)
-            item.setData(Qt.UserRole, mod.manifest.name)
+            item.setData(Qt.ItemDataRole.UserRole, mod.manifest.name)
             self.modules_list.addItem(item)
 
     def _on_module_selected(self, row):
@@ -367,7 +366,7 @@ class SettingsDialog(QDialog):
         item = self.modules_list.item(row)
         if not item:
             return
-        name = item.data(Qt.UserRole)
+        name = item.data(Qt.ItemDataRole.UserRole)
         mod = self._module_registry.get_module(name)
         if not mod:
             return
@@ -400,7 +399,7 @@ class SettingsDialog(QDialog):
         item = self.modules_list.currentItem()
         if not item:
             return
-        name = item.data(Qt.UserRole)
+        name = item.data(Qt.ItemDataRole.UserRole)
         mod = self._module_registry.get_module(name)
         if not mod:
             return
