@@ -39,7 +39,7 @@
 
 ### Writing Tools
 
-- **Command Palette** (Ctrl+K) — Fuzzy search across 29 commands
+- **Command Palette** (Ctrl+K) — Fuzzy search across 30+ commands
 - **Sprint Timer** — Timed writing sessions with 15/25/45/60-minute presets
 - **Reading Mode** — Distraction-free full-screen reading
 - **Scratchpad** — Clipboard for cut text with paste-back
@@ -47,6 +47,15 @@
 - **Compare Drafts** — Side-by-side and inline diff between snapshots
 - **Statistics** — Word counts, page counts, character/scene breakdowns
 - **Character Sheets** — Name, occupation, wants/needs/flaw, arc, moodboard
+- **Bookmarks** — Mark and jump between important lines in your script
+- **Scene Tags** — Categorize scenes with color-coded tags for filtering and organization
+- **Autosave & Snapshots** — Automatic periodic snapshots with a visual browser to restore any version
+- **Annotations** — Attach margin notes to specific lines with a filterable panel
+- **Spell Check** — Edit-distance spell checker that understands Fountain syntax (skips scene headings, transitions, etc.)
+- **Script Analytics** — Dialogue-to-action ratio, pacing graphs, scene length distribution, and complexity scoring
+- **Orphan Finder** — Detect characters mentioned in dialogue but missing from character sheets
+- **Title Templates** — Quick-start title page generation from genre-specific templates (thriller, comedy, drama, horror, sci-fi)
+- **Character Cards** — Compact relationship-map cards with image, role, and arc summary
 
 ### Screenplay Features
 
@@ -64,6 +73,10 @@
 - **Remote Sync** — Push/pull to GitHub, GitLab, or Codeberg
 - **Cloud Export** — Export to Google Drive, iCloud, Dropbox, OneDrive, or Nextcloud
 - **Share for Review** — Generate self-contained, watermarked HTML files for confidential review
+- **Real-time Collaboration** — LAN-based peer-to-peer editing with CRDT conflict resolution and presence indicators
+- **Plugin Marketplace** — Browse, install, and manage community plugins with a built-in marketplace UI
+- **Android Companion** — Sync screenplay bundles to a companion reader app via LAN or file export
+- **Localization** — Full i18n system with translation support (English, French, Spanish, German, Japanese, Korean, Chinese)
 
 ### Export Formats
 
@@ -72,6 +85,8 @@
 | **PDF** | QPrinter-based, US Letter or A4, optional title page |
 | **ODT** | ODF-spec compliant for LibreOffice/Word |
 | **Fountain** | Plain `.fountain` text |
+| **EPUB** | EPUB 3 e-book export with metadata, table of contents, and styled chapters |
+| **FDX** | Import from Final Draft `.fdx` files |
 | **HTML** | Watermarked review copies with dark mode |
 
 ### Themes
@@ -88,12 +103,13 @@ Download the latest release for your platform from the [Releases page](https://g
 
 | Platform | Download |
 |----------|----------|
-| **Windows** | `Ecrit-x.x.x-win64.zip` |
-| **macOS (Intel)** | `Ecrit-x.x.x-macos-x86_64.dmg` |
-| **macOS (Apple Silicon)** | `Ecrit-x.x.x-macos-arm64.dmg` |
-| **Linux (AppImage)** | `Ecrit-x.x.x-linux-x86_64.AppImage` |
-| **Linux (.deb)** | `Ecrit-x.x.x-amd64.deb` |
-| **Linux (.rpm)** | `Ecrit-x.x.x-x86_64.rpm` |
+| **Windows (installer)** | `Ecrit-x.x-win64-setup.exe` |
+| **Windows (portable)** | `Ecrit-x.x-win64.zip` |
+| **macOS (Intel)** | `Ecrit-x.x-macos-x86_64.dmg` |
+| **macOS (Apple Silicon)** | `Ecrit-x.x-macos-arm64.dmg` |
+| **Linux (AppImage)** | `Ecrit-x.x-linux-x86_64.AppImage` |
+| **Linux (.deb)** | `ecrit_x.x_amd64.deb` |
+| **Linux (.rpm)** | `ecrit-x.x-1.x86_64.rpm` |
 
 ### From PyPI (coming soon)
 
@@ -134,7 +150,7 @@ Use **Import Script** from the Dashboard or Command Palette to open any `.founta
 
 ### Prerequisites
 
-- **Python 3.10+**
+- **Python 3.12+** (recommended; 3.10+ supported)
 - **Rust 1.70+** (for the native core)
 - **Qt 6** (installed via PySide6)
 
@@ -191,17 +207,23 @@ Ecrit/
 │   ├── screenplay/         # Screenplay domain logic
 │   │   ├── scene_numbers.py
 │   │   ├── revisions.py
-│   │   ├── series_projects.py
+│   │   ├── bookmarks.py
+│   │   ├── analytics.py
+│   │   ├── spellcheck.py
 │   │   └── ...
-│   ├── export/             # PDF, ODT, Fountain, HTML exporters
+│   ├── export/             # PDF, ODT, Fountain, EPUB, FDX, HTML exporters
 │   ├── sync/               # Remote sync and cloud export
+│   ├── collab/             # Real-time collaboration (CRDT, P2P, LAN)
+│   ├── plugins/            # Plugin marketplace and API
+│   ├── companion/          # Android companion sync
+│   ├── i18n/               # Localization and translations
 │   └── stores/             # Application state management
 ├── src-tauri/              # Rust core (PyO3)
 │   └── src/
 │       ├── fountain/       # Fountain parser
 │       ├── project/        # Project file management
 │       └── lib.rs          # PyO3 module
-├── tests/                  # Test suite (517 tests)
+├── tests/                  # Test suite (766 tests)
 ├── openspec/               # Feature tracking and roadmap
 └── public/                 # Static assets
 ```
@@ -226,12 +248,16 @@ Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for gui
 
 ## Roadmap
 
-The full feature roadmap is tracked in [`openspec/roadmap.yaml`](openspec/roadmap.yaml). All v1.0 milestone features are implemented. Future plans include:
+The full feature roadmap is tracked in [`openspec/roadmap.yaml`](openspec/roadmap.yaml). All milestones through v2.0 are complete, including:
 
-- Android companion app
-- Real-time collaboration
-- Plugin marketplace
-- Localization (i18n)
+- v0.1 Foundation — Rust core, Fountain parser, design system, dashboard
+- v0.2 Full Editor — All 5 phases, character sheets, scene navigator
+- v0.3 Project Management — New project wizard, import, settings, formats
+- v0.4 Polish — Find/replace, stats, compare drafts, reading mode, sprint timer, command palette
+- v0.5 Export & Sync — PDF/ODT/Fountain export, git snapshots, remote sync, cloud export
+- v1.0 Release — Series projects, modules, production reports, share-for-review, contest presets
+- v1.5 Platform — Localization, plugin marketplace, Android companion, real-time collaboration
+- v2.0 Craft Tools — Bookmarks, scene tags, autosave, EPUB export, orphan finder, annotations, analytics, spell check, title templates, character cards
 
 ---
 

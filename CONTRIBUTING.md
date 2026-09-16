@@ -4,9 +4,9 @@ Thanks for your interest in contributing to Ecrit! This guide will help you get 
 
 ## Prerequisites
 
-- **Python 3.10+**
+- **Python 3.12+** (recommended; 3.10+ supported)
 - **Rust 1.70+** (for the PyO3 native modules)
-- **PySide6**
+- **PySide6 6.5+**
 
 ## Getting Started
 
