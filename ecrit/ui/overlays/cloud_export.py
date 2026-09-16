@@ -7,7 +7,6 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, Signal
 
-from ecrit.ui.styles import theme
 from ecrit.sync.cloud_export import CloudProvider, CloudConfig
 
 
@@ -32,7 +31,6 @@ class CloudExportDialog(QDialog):
         self.setMinimumSize(480, 440)
         self.setModal(True)
 
-        t = theme.current()
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
 
@@ -69,7 +67,7 @@ class CloudExportDialog(QDialog):
         form.addWidget(self.provider_combo)
 
         self.auth_status = QLabel("Not authenticated")
-        self.auth_status.setStyleSheet(f"color: {t.neutral_500}; font-size: 12px;")
+        self.auth_status.setObjectName("dashMutedSmall")
         form.addWidget(self.auth_status)
 
         auth_btn = QPushButton("Authenticate...")
