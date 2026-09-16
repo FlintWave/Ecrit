@@ -112,13 +112,13 @@ class CloudExportDialog(QDialog):
         divider2.setFrameShape(QFrame.Shape.HLine)
         form.addWidget(divider2)
 
-        history_label = QLabel("EXPORT HISTORY")
-        history_label.setObjectName("kicker")
-        form.addWidget(history_label)
-
-        self.history_list = QListWidget()
-        self.history_list.setFixedHeight(100)
-        form.addWidget(self.history_list)
+        coming_soon = QLabel(
+            "Cloud export is not yet available. Provider integrations "
+            "are planned for a future release."
+        )
+        coming_soon.setWordWrap(True)
+        coming_soon.setObjectName("kicker")
+        form.addWidget(coming_soon)
 
         form.addStretch()
         scroll.setWidget(content)
@@ -134,56 +134,29 @@ class CloudExportDialog(QDialog):
         cancel_btn.clicked.connect(self.close)
         footer.addWidget(cancel_btn)
 
-        self.export_btn = QPushButton("Export Now")
+        self.export_btn = QPushButton("Coming Soon")
         self.export_btn.setObjectName("primary")
         self.export_btn.setFixedHeight(36)
-        self.export_btn.clicked.connect(self._do_export)
+        self.export_btn.setEnabled(False)
         footer.addWidget(self.export_btn)
 
         layout.addLayout(footer)
 
     def _on_provider_changed(self, index: int):
-        provider = self.provider_combo.currentData()
-        if hasattr(self, "_config_map") and provider in self._config_map:
-            cfg = self._config_map[provider]
-            if cfg.get("authenticated"):
-                self.auth_status.setText("Authenticated")
-            else:
-                self.auth_status.setText("Not authenticated")
-            self.auto_export_check.setChecked(cfg.get("auto_export", False))
-        else:
-            self.auth_status.setText("Not authenticated")
+        self.auth_status.setText("Not yet available")
 
     def _authenticate(self):
-        provider = self.provider_combo.currentData()
-        name = self.provider_combo.currentText().split(" —")[0]
-        self.auth_status.setText(f"Opening {name} authorization — check your browser")
+        self.auth_status.setText("Authentication is not yet available — coming in a future release.")
 
     def _on_auto_export_toggled(self, checked: bool):
         provider = self.provider_combo.currentData()
         self.auto_export_changed.emit(provider, checked)
 
     def _do_export(self):
-        provider = self.provider_combo.currentData()
-        fmt = self.format_combo.currentData()
-        self.export_requested.emit(provider, fmt)
-        self.history_list.insertItem(0, f"Exported as {fmt.upper()} to {self.provider_combo.currentText().split(' —')[0]}")
+        pass
 
     def set_configs(self, configs: list):
-        self._config_map = {}
-        for cfg in configs:
-            self._config_map[cfg.get("provider", "")] = cfg
-            provider = cfg.get("provider", "")
-            folder = cfg.get("folder", "")
-            if folder:
-                self.folder_input.setText(folder)
-            idx = self.provider_combo.findData(provider)
-            if idx >= 0:
-                self.provider_combo.setCurrentIndex(idx)
-            if cfg.get("authenticated"):
-                self.auth_status.setText("Authenticated")
-            auto = cfg.get("auto_export", False)
-            self.auto_export_check.setChecked(auto)
+        pass
 
     def add_history_entry(self, text: str):
-        self.history_list.insertItem(0, text)
+        pass

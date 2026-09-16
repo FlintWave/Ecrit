@@ -264,6 +264,8 @@ class MainWindow(QMainWindow):
         if self.stack.currentWidget() is self.editor and STATE.current_project_path:
             STATE.script_content = self.editor.manuscript.editor.toPlainText()
             STATE.save_script()
+            STATE.save_outline(self.editor.outline.canvas._nodes)
+            STATE.save_plan_documents(self.editor.plan.get_documents())
         self._autosave_timer.stop()
         self._swap_title_bar(show_phases=False)
         self.title_bar.set_context("")
@@ -324,6 +326,8 @@ class MainWindow(QMainWindow):
         saved = STATE.save_script()
         if saved:
             self._module_registry.call_hook(HOOK_AFTER_SAVE, STATE.script_content)
+            STATE.save_outline(self.editor.outline.canvas._nodes)
+            STATE.save_plan_documents(self.editor.plan.get_documents())
         self._editor_title_bar.save_dot.set_saved(saved)
         if saved and STATE.current_project_path:
             self._auto_sync_if_enabled()

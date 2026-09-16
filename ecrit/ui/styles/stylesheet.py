@@ -373,6 +373,46 @@ QMenu::separator {{
     padding: 20px;
     selection-background-color: rgba({_hex_to_rgb_str(t.accent)},0.25);
 }}
+
+/* ═══ Dashboard ═══ */
+#dashMuted {{
+    color: {t.neutral_500};
+    font-size: 13px;
+    background: transparent;
+}}
+#dashHeroTitle {{
+    font-size: 26px;
+    font-weight: 500;
+    background: transparent;
+}}
+#dashExcerpt {{
+    font-family: 'Courier Prime', Courier, monospace;
+    font-size: 13px;
+    color: {t.neutral_400};
+    background: transparent;
+    padding: 12px 0;
+}}
+#dashStatValue {{
+    font-family: ui-monospace, Menlo, monospace;
+    font-size: 20px;
+    background: transparent;
+}}
+#dashMonoMuted {{
+    font-family: ui-monospace, Menlo, monospace;
+    font-size: 11px;
+    color: {t.neutral_500};
+    background: transparent;
+}}
+#dashCardTitle {{
+    font-size: 15px;
+    font-weight: 500;
+    background: transparent;
+}}
+#dashMutedSmall {{
+    color: {t.neutral_500};
+    font-size: 12.5px;
+    background: transparent;
+}}
 """
 
 

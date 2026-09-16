@@ -854,6 +854,14 @@ class PlanPhase(QWidget):
         self._doc_content[name] = ""
         self.doc_list.setCurrentRow(self.doc_list.count() - 1)
 
+    def get_documents(self) -> list:
+        if self._current_doc in self._doc_content:
+            self._doc_content[self._current_doc] = self.editor.toPlainText()
+        return [
+            {"name": name, "content": content}
+            for name, content in self._doc_content.items()
+        ]
+
 
 class OutlinePhase(QWidget):
     """Outline phase: node graph with structure template support."""
@@ -1967,9 +1975,31 @@ class EditorScreen(QWidget):
             dialect=project_data.get("meta", {}).get("format_id", "fountain/core"),
         )
 
-        plans = project_data.get("plan_documents", [])
-        if plans:
-            self.plan.editor.setPlainText(plans[0].get("content", ""))
+        outline_nodes = project_data.get("outline_nodes", [])
+        if outline_nodes:
+            self.outline.canvas.set_nodes(outline_nodes)
+        else:
+            self.outline.canvas.set_nodes([])
+
+        plan_documents = project_data.get("plan_documents", [])
+        if plan_documents:
+            self.plan._doc_content.clear()
+            self.plan.doc_list.clear()
+            for doc in plan_documents:
+                name = doc.get("name", "Untitled")
+                content = doc.get("content", "")
+                self.plan.doc_list.addItem(name)
+                self.plan._doc_content[name] = content
+            self.plan.doc_list.setCurrentRow(0)
+        else:
+            self.plan._doc_content = {
+                "Logline": "", "Synopsis": "",
+                "One-page pitch": "", "Treatment": "",
+            }
+            self.plan.doc_list.clear()
+            for name in self.plan._doc_content:
+                self.plan.doc_list.addItem(name)
+            self.plan.doc_list.setCurrentRow(0)
 
         self.proofread.script_view.setPlainText(script)
 

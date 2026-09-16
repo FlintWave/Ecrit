@@ -96,10 +96,29 @@ class AppState:
                 script = script_file.read_text(encoding="utf-8")
             except Exception:
                 pass
+        outline_nodes = []
+        outline_file = project_dir / "outline.json"
+        if outline_file.exists():
+            try:
+                outline_nodes = json.loads(outline_file.read_text(encoding="utf-8"))
+            except Exception:
+                pass
+        plan_documents = []
+        plan_file = project_dir / "plan_documents.json"
+        if plan_file.exists():
+            try:
+                plan_documents = json.loads(plan_file.read_text(encoding="utf-8"))
+            except Exception:
+                pass
         self.current_project_path = path
         self.script_content = script
         self.notify()
-        return {"meta": meta, "script": script}
+        return {
+            "meta": meta,
+            "script": script,
+            "outline_nodes": outline_nodes,
+            "plan_documents": plan_documents,
+        }
 
     def save_script(self) -> bool:
         if ecrit_core and self.current_project_path:
@@ -161,6 +180,26 @@ class AppState:
             pass
         self.load_projects()
         return meta
+
+    def save_outline(self, nodes: list) -> bool:
+        if not self.current_project_path:
+            return False
+        try:
+            path = Path(self.current_project_path) / "outline.json"
+            path.write_text(json.dumps(nodes, indent=2), encoding="utf-8")
+            return True
+        except Exception:
+            return False
+
+    def save_plan_documents(self, documents: list) -> bool:
+        if not self.current_project_path:
+            return False
+        try:
+            path = Path(self.current_project_path) / "plan_documents.json"
+            path.write_text(json.dumps(documents, indent=2), encoding="utf-8")
+            return True
+        except Exception:
+            return False
 
     def parse_script(self) -> dict:
         if ecrit_core and self.script_content:

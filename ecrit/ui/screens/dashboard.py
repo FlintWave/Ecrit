@@ -25,29 +25,26 @@ class ContinueWritingCard(QFrame):
         top.addWidget(kicker)
         top.addStretch()
         self.sync_label = QLabel()
-        self.sync_label.setStyleSheet(f"color: {theme.current().neutral_500}; font-size: 12px; background: transparent;")
+        self.sync_label.setObjectName("dashMuted")
         top.addWidget(self.sync_label)
         layout.addLayout(top)
 
         self.title_label = QLabel()
-        self.title_label.setStyleSheet("font-size: 26px; font-weight: 500; background: transparent;")
+        self.title_label.setObjectName("dashHeroTitle")
         layout.addWidget(self.title_label)
 
         self.meta_label = QLabel()
-        self.meta_label.setStyleSheet(f"color: {theme.current().neutral_500}; font-size: 13px; background: transparent;")
+        self.meta_label.setObjectName("dashMuted")
         layout.addWidget(self.meta_label)
 
         self.excerpt = QLabel()
         self.excerpt.setWordWrap(True)
-        self.excerpt.setStyleSheet(
-            f"font-family: 'Courier Prime', monospace; font-size: 13px; "
-            f"color: {theme.current().neutral_400}; background: transparent; padding: 12px 0;"
-        )
+        self.excerpt.setObjectName("dashExcerpt")
         layout.addWidget(self.excerpt)
 
         bottom = QHBoxLayout()
         self.position_label = QLabel()
-        self.position_label.setStyleSheet(f"color: {theme.current().neutral_500}; font-size: 13px; background: transparent;")
+        self.position_label.setObjectName("dashMuted")
         bottom.addWidget(self.position_label)
         bottom.addStretch()
         open_btn = QPushButton("Open")
@@ -74,6 +71,7 @@ class WeekStatsCard(QFrame):
         layout.addWidget(kicker)
 
         self.stats = {}
+        self._stat_labels = []
         grid = QGridLayout()
         grid.setSpacing(8)
         for i, (key, label) in enumerate([
@@ -84,12 +82,13 @@ class WeekStatsCard(QFrame):
         ]):
             val = QLabel("0")
             val.setAlignment(Qt.AlignmentFlag.AlignRight)
-            val.setStyleSheet("font-family: ui-monospace, Menlo, monospace; font-size: 20px; background: transparent;")
+            val.setObjectName("dashStatValue")
             lbl = QLabel(label)
-            lbl.setStyleSheet(f"color: {theme.current().neutral_500}; font-size: 12px; background: transparent;")
+            lbl.setObjectName("dashMuted")
             grid.addWidget(lbl, i, 0)
             grid.addWidget(val, i, 1)
             self.stats[key] = val
+            self._stat_labels.append(lbl)
         layout.addLayout(grid)
 
     def set_stats(self, words=0, sessions=0, pages=0, streak="0 days"):
@@ -111,8 +110,6 @@ class ProjectCard(QFrame):
         layout = QVBoxLayout(self)
         layout.setSpacing(4)
 
-        t = theme.current()
-
         top = QHBoxLayout()
         fmt = project_data.get("format_id", "")
         category = _format_category(fmt)
@@ -121,19 +118,19 @@ class ProjectCard(QFrame):
             tag.setObjectName("tagNeutral")
             top.addWidget(tag)
         fmt_label = QLabel(fmt)
-        fmt_label.setStyleSheet(f"font-family: ui-monospace, Menlo, monospace; font-size: 11px; color: {t.neutral_500}; background: transparent;")
+        fmt_label.setObjectName("dashMonoMuted")
         top.addWidget(fmt_label)
         top.addStretch()
         layout.addLayout(top)
 
         title = QLabel(project_data.get("title", "Untitled"))
-        title.setStyleSheet("font-size: 15px; font-weight: 500; background: transparent;")
+        title.setObjectName("dashCardTitle")
         layout.addWidget(title)
 
         modified = project_data.get("modified_at", "")
         if modified:
             mod_label = QLabel(f"edited {_relative_time(modified)}")
-            mod_label.setStyleSheet(f"color: {t.neutral_500}; font-size: 12.5px; background: transparent;")
+            mod_label.setObjectName("dashMutedSmall")
             layout.addWidget(mod_label)
 
     def mousePressEvent(self, _event):
@@ -151,7 +148,6 @@ class Dashboard(QWidget):
         self._build_ui()
 
     def _build_ui(self):
-        t = theme.current()
         scroll = QScrollArea(self)
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
@@ -172,12 +168,13 @@ class Dashboard(QWidget):
         date_str = now.strftime("%A, %d %B")
 
         header = QHBoxLayout()
-        greeting_label = QLabel(f"{greeting}.")
-        greeting_label.setStyleSheet("font-size: 28px; font-weight: 500;")
-        header.addWidget(greeting_label)
-        date_label = QLabel(date_str)
-        date_label.setStyleSheet(f"color: {t.neutral_500}; font-size: 14px; padding-top: 8px;")
-        header.addWidget(date_label)
+        self.greeting_label = QLabel(f"{greeting}.")
+        self.greeting_label.setStyleSheet("font-size: 28px; font-weight: 500;")
+        header.addWidget(self.greeting_label)
+        self.date_label = QLabel(date_str)
+        self.date_label.setObjectName("dashMuted")
+        self.date_label.setStyleSheet("font-size: 14px; padding-top: 8px;")
+        header.addWidget(self.date_label)
         header.addStretch()
 
         settings_btn = QPushButton("⚙")
@@ -226,7 +223,7 @@ class Dashboard(QWidget):
         projects_title.setStyleSheet("font-size: 16px; font-weight: 500;")
         projects_header.addWidget(projects_title)
         self.count_label = QLabel("0 open")
-        self.count_label.setStyleSheet(f"color: {t.neutral_500}; font-size: 13px;")
+        self.count_label.setObjectName("dashMuted")
         projects_header.addWidget(self.count_label)
         projects_header.addStretch()
         inner_layout.addLayout(projects_header)
@@ -251,7 +248,12 @@ class Dashboard(QWidget):
 
     def refresh(self):
         from ecrit.stores.app_state import STATE
-        t = theme.current()
+
+        now = datetime.now()
+        hour = now.hour
+        greeting = "Good morning" if hour < 12 else "Good afternoon" if hour < 18 else "Good evening"
+        self.greeting_label.setText(f"{greeting}.")
+        self.date_label.setText(now.strftime("%A, %d %B"))
 
         STATE.load_projects()
         projects = STATE.projects
