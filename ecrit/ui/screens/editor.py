@@ -4,7 +4,7 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QFrame, QSplitter, QListWidget, QListWidgetItem,
     QPlainTextEdit, QSizePolicy, QTextEdit, QScrollArea,
-    QComboBox, QMenu,
+    QComboBox, QMenu, QInputDialog,
 )
 from PySide6.QtCore import Qt, Signal, QTimer
 from PySide6.QtGui import (
@@ -465,36 +465,67 @@ class ScriptEditor(QPlainTextEdit):
             self.completer.update_popup()
 
     def _cycle_element_type(self):
+        """Cycle current line through Fountain element types:
+        Scene Heading → Action → Character → Dialogue → Parenthetical → Transition → back.
+        """
         cursor = self.textCursor()
-        cursor.select(QTextCursor.SelectionType.BlockUnderCursor)
-        line = cursor.selectedText().strip()
-        if not line:
+        cursor.movePosition(QTextCursor.MoveOperation.StartOfBlock)
+        cursor.movePosition(QTextCursor.MoveOperation.EndOfBlock, QTextCursor.MoveMode.KeepAnchor)
+        line = cursor.selectedText()
+        stripped = line.strip()
+        if not stripped:
             return
 
-        prefixes = ["INT. ", "EXT. ", ""]
-        transitions = ["CUT TO:", "FADE OUT.", "SMASH CUT TO:", ""]
+        current = self._detect_element_type(stripped)
+        cycle = ["scene_heading", "action", "character", "dialogue", "parenthetical", "transition"]
+        idx = cycle.index(current) if current in cycle else 0
+        next_type = cycle[(idx + 1) % len(cycle)]
 
-        if line.startswith(("INT.", "EXT.", "INT/EXT")):
-            for i, pfx in enumerate(prefixes):
-                if line.startswith(pfx.strip()) and pfx:
-                    next_pfx = prefixes[(i + 1) % len(prefixes)]
-                    bare = line.split(".", 1)[1].strip() if "." in line else line
-                    cursor.removeSelectedText()
-                    cursor.insertText(f"{next_pfx}{bare}" if next_pfx else bare)
-                    return
-        elif line.startswith("(") and line.endswith(")"):
-            cursor.removeSelectedText()
-            cursor.insertText(line[1:-1] if len(line) > 2 else line)
-        elif line.endswith(("TO:", "OUT.")):
-            for i, tr in enumerate(transitions):
-                if line == tr:
-                    next_tr = transitions[(i + 1) % len(transitions)]
-                    cursor.removeSelectedText()
-                    cursor.insertText(next_tr if next_tr else line)
-                    return
-        else:
-            cursor.removeSelectedText()
-            cursor.insertText(f"({line})")
+        bare = self._strip_element_formatting(stripped, current)
+        formatted = self._apply_element_formatting(bare, next_type)
+
+        cursor.removeSelectedText()
+        cursor.insertText(formatted)
+
+    def _detect_element_type(self, line: str) -> str:
+        if line.startswith(("INT.", "INT ", "EXT.", "EXT ", "INT/EXT", "I/E ")):
+            return "scene_heading"
+        if line.startswith("(") and line.endswith(")"):
+            return "parenthetical"
+        if line.endswith(("TO:", "OUT.", "IN:")) and line == line.upper():
+            return "transition"
+        if line == line.upper() and len(line) < 60 and not line.startswith(("INT", "EXT")):
+            return "character"
+        return "action"
+
+    def _strip_element_formatting(self, line: str, elem_type: str) -> str:
+        if elem_type == "scene_heading":
+            for pfx in ("INT/EXT.", "INT/EXT ", "I/E ", "INT.", "INT ", "EXT.", "EXT "):
+                if line.startswith(pfx):
+                    return line[len(pfx):].strip()
+            return line
+        if elem_type == "parenthetical":
+            return line[1:-1].strip() if len(line) > 2 else line
+        if elem_type == "transition":
+            return line
+        if elem_type == "character":
+            return line
+        return line
+
+    def _apply_element_formatting(self, bare: str, elem_type: str) -> str:
+        if elem_type == "scene_heading":
+            return f"INT. {bare.upper()}" if bare else "INT. "
+        if elem_type == "action":
+            return bare[0].upper() + bare[1:] if bare else bare
+        if elem_type == "character":
+            return bare.upper()
+        if elem_type == "dialogue":
+            return bare[0].lower() + bare[1:] if bare else bare
+        if elem_type == "parenthetical":
+            return f"({bare.lower()})" if bare else "()"
+        if elem_type == "transition":
+            return f"{bare.upper()}:" if not bare.endswith(":") else bare.upper()
+        return bare
 
 
 class SceneNavigator(QFrame):
@@ -947,22 +978,47 @@ class OutlinePhase(QWidget):
 
 
 class OutlineCanvas(QWidget):
-    """Pannable, zoomable node graph canvas."""
+    """Pannable, zoomable node graph canvas with draggable, editable, linkable nodes."""
+
+    NODE_SIZES = {
+        "ActBreak": (220, 44),
+        "Scene": (190, 110),
+        "Transition": (110, 36),
+        "Note": (160, 80),
+    }
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setMinimumSize(400, 300)
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self._nodes = []
         self._zoom = 1.0
         self._pan_x = 0.0
         self._pan_y = 0.0
-        self._dragging = False
+        self._panning = False
+        self._dragging_node = None
+        self._drag_offset_x = 0.0
+        self._drag_offset_y = 0.0
         self._last_pos = None
         self._dot_spacing = 22
+        self._selected_node = None
+        self._linking_from = None
 
     def set_nodes(self, nodes: list):
         self._nodes = nodes
         self.update()
+
+    def _to_canvas(self, pos):
+        return (pos.x() - self._pan_x) / self._zoom, (pos.y() - self._pan_y) / self._zoom
+
+    def _node_at(self, cx, cy):
+        for node in reversed(self._nodes):
+            nx, ny = node.get("x", 0), node.get("y", 0)
+            kind = node.get("kind", "Scene")
+            w, h = self.NODE_SIZES.get(kind, (190, 92))
+            if nx <= cx <= nx + w and ny <= cy <= ny + h:
+                return node
+        return None
 
     def paintEvent(self, _event):
         p = QPainter(self)
@@ -986,20 +1042,35 @@ class OutlineCanvas(QWidget):
         p.scale(self._zoom, self._zoom)
 
         for node in self._nodes:
-            self._draw_node(p, node, t)
-
-        for node in self._nodes:
             for conn_id in node.get("connections", []):
                 target = next((n for n in self._nodes if n["id"] == conn_id), None)
                 if target:
                     self._draw_connector(p, node, target, t)
 
+        if self._linking_from:
+            p.setPen(QPen(QColor(t.accent), 2, Qt.PenStyle.DashLine))
+            src = self._linking_from
+            sx = src.get("x", 0) + self.NODE_SIZES.get(src.get("kind", "Scene"), (190, 92))[0] // 2
+            sy = src.get("y", 0) + self.NODE_SIZES.get(src.get("kind", "Scene"), (190, 92))[1] // 2
+            if self._last_pos:
+                mx, my = self._to_canvas(self._last_pos)
+                p.drawLine(int(sx), int(sy), int(mx), int(my))
+
+        for node in self._nodes:
+            self._draw_node(p, node, t, selected=(node is self._selected_node))
+
         p.restore()
         p.end()
 
-    def _draw_node(self, p: QPainter, node: dict, t):
+    def _draw_node(self, p: QPainter, node: dict, t, selected=False):
         x, y = node.get("x", 0), node.get("y", 0)
         kind = node.get("kind", "Scene")
+
+        if selected:
+            nw, nh = self.NODE_SIZES.get(kind, (190, 92))
+            p.setPen(QPen(QColor(t.accent), 2))
+            p.setBrush(Qt.BrushStyle.NoBrush)
+            p.drawRoundedRect(int(x) - 3, int(y) - 3, nw + 6, nh + 6, 8, 8)
 
         if kind == "ActBreak":
             w, h = 220, 44
@@ -1007,84 +1078,200 @@ class OutlineCanvas(QWidget):
             p.setPen(QPen(QColor(t.accent_700), 1))
             p.drawRoundedRect(int(x), int(y), w, h, 6, 6)
             p.setPen(QPen(QColor(t.text), 1))
+            font = p.font()
+            font.setPointSize(11)
+            font.setBold(True)
+            p.setFont(font)
             p.drawText(int(x) + 12, int(y) + 28, node.get("label", ""))
+            font.setBold(False)
+            p.setFont(font)
         elif kind == "Scene":
-            w, h = 190, 92
+            w, h = 190, 110
             p.setBrush(QColor(t.surface))
             p.setPen(QPen(QColor(t.neutral_800), 1))
             p.drawRoundedRect(int(x), int(y), w, h, 6, 6)
             p.setPen(QPen(QColor(t.text), 1))
             font = p.font()
-            font.setPointSize(10)
+            font.setPointSize(11)
             font.setBold(True)
             p.setFont(font)
-            p.drawText(int(x) + 8, int(y) + 20, node.get("label", ""))
+            p.drawText(int(x) + 10, int(y) + 22, node.get("label", ""))
             font.setBold(False)
             font.setPointSize(9)
             p.setFont(font)
             p.setPen(QPen(QColor(t.neutral_400), 1))
             synopsis = node.get("synopsis", "")
             if synopsis:
-                p.drawText(int(x) + 8, int(y) + 40, int(w) - 16, 40, Qt.TextFlag.TextWordWrap, synopsis[:80])
+                p.drawText(int(x) + 10, int(y) + 38, int(w) - 20, 60, Qt.TextFlag.TextWordWrap, synopsis[:120])
         elif kind == "Transition":
             w, h = 110, 36
             p.setBrush(QColor(t.surface))
             p.setPen(QPen(QColor(t.neutral_700), 1))
             p.drawRoundedRect(int(x), int(y), w, h, 18, 18)
             p.setPen(QPen(QColor(t.neutral_400), 1))
+            font = p.font()
+            font.setPointSize(9)
+            p.setFont(font)
             p.drawText(int(x) + 12, int(y) + 23, node.get("label", ""))
         elif kind == "Note":
-            w, h = 160, 60
+            w, h = 160, 80
             pen = QPen(QColor(t.neutral_600), 1, Qt.PenStyle.DashLine)
             p.setPen(pen)
             p.setBrush(QColor(t.bg))
             p.drawRoundedRect(int(x), int(y), w, h, 6, 6)
             p.setPen(QPen(QColor(t.neutral_400), 1))
             font = p.font()
+            font.setPointSize(9)
             font.setItalic(True)
             p.setFont(font)
-            p.drawText(int(x) + 8, int(y) + 30, node.get("label", ""))
+            text = node.get("label", "")
+            p.drawText(int(x) + 8, int(y) + 14, int(w) - 16, int(h) - 18, Qt.TextFlag.TextWordWrap, text[:160])
             font.setItalic(False)
             p.setFont(font)
 
     def _draw_connector(self, p: QPainter, src: dict, dst: dict, t):
-        x1 = src.get("x", 0) + 190
-        y1 = src.get("y", 0) + 46
+        sk = src.get("kind", "Scene")
+        dk = dst.get("kind", "Scene")
+        sw, sh = self.NODE_SIZES.get(sk, (190, 92))
+        dw, dh = self.NODE_SIZES.get(dk, (190, 92))
+        x1 = src.get("x", 0) + sw
+        y1 = src.get("y", 0) + sh // 2
         x2 = dst.get("x", 0)
-        y2 = dst.get("y", 0) + 46
+        y2 = dst.get("y", 0) + dh // 2
         p.setPen(QPen(QColor(t.neutral_600), 1.5))
         p.drawLine(int(x1), int(y1), int(x2), int(y2))
+        ax, ay = int(x2), int(y2)
+        p.setBrush(QColor(t.neutral_600))
+        p.setPen(Qt.PenStyle.NoPen)
+        p.drawEllipse(ax - 4, ay - 4, 8, 8)
 
     def wheelEvent(self, event):
         delta = event.angleDelta().y()
         factor = 1.1 if delta > 0 else 0.9
-        new_zoom = max(0.5, min(1.6, self._zoom * factor))
+        new_zoom = max(0.3, min(2.5, self._zoom * factor))
         self._zoom = new_zoom
         self.update()
 
     def mousePressEvent(self, event):
+        cx, cy = self._to_canvas(event.position())
+        hit = self._node_at(cx, cy)
+
         if event.button() == Qt.MouseButton.LeftButton:
-            self._dragging = True
-            self._last_pos = event.position()
-            self.setCursor(Qt.CursorShape.ClosedHandCursor)
+            if self._linking_from:
+                if hit and hit is not self._linking_from:
+                    conns = self._linking_from.setdefault("connections", [])
+                    if hit["id"] not in conns:
+                        conns.append(hit["id"])
+                self._linking_from = None
+                self.setCursor(Qt.CursorShape.OpenHandCursor)
+                self.update()
+                return
+
+            if hit:
+                self._dragging_node = hit
+                self._drag_offset_x = cx - hit.get("x", 0)
+                self._drag_offset_y = cy - hit.get("y", 0)
+                self._selected_node = hit
+                self.setCursor(Qt.CursorShape.ClosedHandCursor)
+            else:
+                self._selected_node = None
+                self._panning = True
+                self._last_pos = event.position()
+                self.setCursor(Qt.CursorShape.ClosedHandCursor)
+            self.update()
+
         elif event.button() == Qt.MouseButton.RightButton:
-            self._show_context_menu(event.position(), event.globalPosition().toPoint())
+            if hit:
+                self._show_node_context_menu(hit, event.globalPosition().toPoint())
+            else:
+                self._show_context_menu(event.position(), event.globalPosition().toPoint())
+
+    def mouseDoubleClickEvent(self, event):
+        if event.button() != Qt.MouseButton.LeftButton:
+            return
+        cx, cy = self._to_canvas(event.position())
+        hit = self._node_at(cx, cy)
+        if hit:
+            self._edit_node(hit)
 
     def mouseReleaseEvent(self, event):
-        self._dragging = False
+        self._dragging_node = None
+        self._panning = False
         self.setCursor(Qt.CursorShape.OpenHandCursor)
 
     def mouseMoveEvent(self, event):
-        if self._dragging and self._last_pos:
+        if self._linking_from:
+            self._last_pos = event.position()
+            self.update()
+            return
+        if self._dragging_node:
+            cx, cy = self._to_canvas(event.position())
+            self._dragging_node["x"] = cx - self._drag_offset_x
+            self._dragging_node["y"] = cy - self._drag_offset_y
+            self.update()
+        elif self._panning and self._last_pos:
             delta = event.position() - self._last_pos
             self._pan_x += delta.x()
             self._pan_y += delta.y()
             self._last_pos = event.position()
             self.update()
 
+    def keyPressEvent(self, event):
+        if event.key() in (Qt.Key.Key_Delete, Qt.Key.Key_Backspace) and self._selected_node:
+            node_id = self._selected_node["id"]
+            self._nodes.remove(self._selected_node)
+            for n in self._nodes:
+                conns = n.get("connections", [])
+                if node_id in conns:
+                    conns.remove(node_id)
+            self._selected_node = None
+            self.update()
+        else:
+            super().keyPressEvent(event)
+
+    def _edit_node(self, node):
+        kind = node.get("kind", "Scene")
+        if kind in ("Scene", "Note"):
+            label, ok = QInputDialog.getText(self, f"Edit {kind}", "Title:", text=node.get("label", ""))
+            if ok and label:
+                node["label"] = label
+            synopsis, ok2 = QInputDialog.getMultiLineText(
+                self, f"Edit {kind}", "Synopsis / Notes:", node.get("synopsis", ""),
+            )
+            if ok2:
+                node["synopsis"] = synopsis
+        else:
+            label, ok = QInputDialog.getText(self, f"Edit {kind}", "Label:", text=node.get("label", ""))
+            if ok and label:
+                node["label"] = label
+        self.update()
+
+    def _show_node_context_menu(self, node, global_pos):
+        menu = QMenu(self)
+        edit_action = menu.addAction("Edit...")
+        link_action = menu.addAction("Link to...")
+        menu.addSeparator()
+        delete_action = menu.addAction("Delete")
+
+        action = menu.exec(global_pos)
+        if action == edit_action:
+            self._edit_node(node)
+        elif action == link_action:
+            self._linking_from = node
+            self.setCursor(Qt.CursorShape.CrossCursor)
+        elif action == delete_action:
+            node_id = node["id"]
+            self._nodes.remove(node)
+            for n in self._nodes:
+                conns = n.get("connections", [])
+                if node_id in conns:
+                    conns.remove(node_id)
+            if self._selected_node is node:
+                self._selected_node = None
+            self.update()
+
     def _show_context_menu(self, local_pos, global_pos):
-        canvas_x = (local_pos.x() - self._pan_x) / self._zoom
-        canvas_y = (local_pos.y() - self._pan_y) / self._zoom
+        canvas_x, canvas_y = self._to_canvas(local_pos)
 
         menu = QMenu(self)
         add_scene = menu.addAction("Add Scene")
@@ -1103,11 +1290,14 @@ class OutlineCanvas(QWidget):
             self._add_node_at(canvas_x, canvas_y, "Transition", "Transition")
 
     def _add_node_at(self, x: float, y: float, kind: str, label: str):
-        new_id = f"node_{len(self._nodes) + 1}"
-        self._nodes.append({
+        import time
+        new_id = f"node_{int(time.time() * 1000)}_{len(self._nodes)}"
+        node = {
             "id": new_id, "kind": kind, "label": label,
             "synopsis": "", "x": x, "y": y, "connections": [],
-        })
+        }
+        self._nodes.append(node)
+        self._selected_node = node
         self.update()
 
 
@@ -1200,7 +1390,7 @@ class ManuscriptPhase(QWidget):
 
         self.page_frame = QFrame()
         self.page_frame.setStyleSheet(f"background: {theme.current().surface}; border-radius: 4px;")
-        self.page_frame.setMaximumWidth(680)
+        self.page_frame.setMaximumWidth(816)
         self.page_frame.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         page_layout = QVBoxLayout(self.page_frame)
         page_layout.setContentsMargins(0, 0, 0, 0)
@@ -1229,7 +1419,7 @@ class ManuscriptPhase(QWidget):
         splitter.setStretchFactor(2, 1)
         splitter.setStretchFactor(3, 0)
         splitter.setStretchFactor(4, 0)
-        splitter.setSizes([216, 1, 600, 1, 264])
+        splitter.setSizes([216, 1, 816, 1, 264])
 
         layout.addWidget(splitter)
 

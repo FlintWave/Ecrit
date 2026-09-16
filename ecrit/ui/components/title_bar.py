@@ -157,14 +157,6 @@ class TitleBar(QWidget):
         self.window_controls.maximize_clicked.connect(self.maximize_requested.emit)
         layout.addWidget(self.window_controls)
 
-        self.home_btn = QPushButton("⌂")
-        self.home_btn.setObjectName("homeBtn")
-        self.home_btn.setFixedSize(28, 28)
-        self.home_btn.setToolTip("Dashboard")
-        self.home_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.home_btn.clicked.connect(self.home_clicked.emit)
-        layout.addWidget(self.home_btn)
-
         self.wordmark = QLabel("Écrit")
         self.wordmark.setObjectName("wordmark")
         layout.addWidget(self.wordmark)

@@ -14,7 +14,7 @@ QWidget {{
     background-color: {t.bg};
     color: {t.text};
     font-family: 'Liberation Serif', 'Tinos', 'Times New Roman', serif;
-    font-size: 13px;
+    font-size: 14px;
 }}
 QWidget:focus {{
     outline: none;
@@ -31,12 +31,12 @@ QWidget:focus {{
     background: transparent;
 }}
 #wordmark {{
-    font-size: 16px;
+    font-size: 18px;
     font-weight: 500;
     color: {t.text};
 }}
 #titleContext {{
-    font-size: 13px;
+    font-size: 14px;
     color: {t.neutral_500};
 }}
 
@@ -45,8 +45,8 @@ QWidget:focus {{
     background: transparent;
     border: none;
     color: {t.neutral_500};
-    font-size: 13px;
-    padding: 8px 12px;
+    font-size: 14px;
+    padding: 8px 14px;
     font-weight: 500;
 }}
 #phaseTabs QPushButton:hover {{
@@ -165,21 +165,21 @@ QFrame#card:hover {{
 QLabel#tagNeutral {{
     background: {t.neutral_800 if t.name == "nocturne" else t.neutral_100};
     color: {t.neutral_100 if t.name == "nocturne" else t.neutral_800};
-    font-size: 11px;
+    font-size: 12px;
     padding: 3px 10px;
     border-radius: {int(t.radius_md * 0.75)}px;
 }}
 QLabel#tagAccent {{
     background: {t.accent_800 if t.name == "nocturne" else t.accent_100};
     color: {t.accent_100 if t.name == "nocturne" else t.accent_800};
-    font-size: 11px;
+    font-size: 12px;
     padding: 3px 10px;
     border-radius: {int(t.radius_md * 0.75)}px;
 }}
 
 /* ═══ Kicker Labels ═══ */
 QLabel#kicker {{
-    font-size: 12px;
+    font-size: 13px;
     letter-spacing: 1px;
     color: {t.neutral_500};
     text-transform: uppercase;
@@ -192,13 +192,13 @@ QLabel#kicker {{
     border-top: 1px solid {t.divider};
     min-height: 28px;
     max-height: 28px;
-    font-size: 12px;
+    font-size: 13px;
     color: {t.neutral_500};
 }}
 #statusBar QLabel {{
     background: transparent;
     color: {t.neutral_500};
-    font-size: 12px;
+    font-size: 13px;
 }}
 
 /* ═══ Rails (side panels) ═══ */
@@ -218,7 +218,7 @@ QListWidget {{
     border: none;
     outline: none;
     font-family: 'Courier Prime', Courier, monospace;
-    font-size: 12px;
+    font-size: 13px;
 }}
 QListWidget::item {{
     padding: 6px 12px;
@@ -249,7 +249,7 @@ QTabBar::tab {{
     background: transparent;
     color: {t.neutral_500};
     padding: 10px 16px;
-    font-size: 13.5px;
+    font-size: 14px;
     border: none;
     border-radius: {t.radius_sm}px;
 }}
@@ -314,7 +314,7 @@ QToolTip {{
     border: 1px solid {t.neutral_700};
     border-radius: {t.radius_sm}px;
     padding: 4px 8px;
-    font-size: 12px;
+    font-size: 13px;
 }}
 
 /* ═══ Menu ═══ */
@@ -338,17 +338,17 @@ QMenu::separator {{
     margin: 4px 8px;
 }}
 
-/* ═══ Home Button ═══ */
+/* ═══ Home Button (floating, bottom-right) ═══ */
 #homeBtn {{
     background: {t.surface};
     border: 1px solid {t.neutral_800 if t.name == "nocturne" else t.divider};
-    border-radius: {t.radius_sm}px;
-    width: 34px;
-    height: 34px;
+    border-radius: {t.radius_md}px;
+    font-size: 18px;
     padding: 0;
 }}
 #homeBtn:hover {{
     border-color: {t.accent};
+    background: {t.accent_900 if t.name == "nocturne" else t.accent_100};
 }}
 
 /* ═══ Script Editor ═══ */
@@ -357,7 +357,7 @@ QMenu::separator {{
     color: {t.text};
     border: none;
     font-family: 'Courier Prime', Courier, monospace;
-    font-size: 15px;
+    font-size: 16px;
     line-height: 1.6;
     padding: 40px;
     selection-background-color: rgba({_hex_to_rgb_str(t.accent)},0.25);
@@ -369,7 +369,7 @@ QMenu::separator {{
     color: {t.text};
     border: none;
     font-family: 'Liberation Serif', 'Tinos', 'Times New Roman', serif;
-    font-size: 16px;
+    font-size: 17px;
     padding: 20px;
     selection-background-color: rgba({_hex_to_rgb_str(t.accent)},0.25);
 }}

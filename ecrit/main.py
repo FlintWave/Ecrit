@@ -1,7 +1,7 @@
 """Écrit — main application entry point."""
 
 import sys
-from PySide6.QtWidgets import QApplication, QMainWindow, QStackedWidget, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QApplication, QMainWindow, QPushButton, QStackedWidget, QVBoxLayout, QWidget
 from PySide6.QtCore import Qt, QTimer, Signal as QtSignal
 from PySide6.QtGui import QShortcut, QKeySequence
 
@@ -61,7 +61,6 @@ class MainWindow(QMainWindow):
 
         self.title_bar = TitleBar(show_phases=False)
         self.title_bar.settings_clicked.connect(self._open_settings)
-        self.title_bar.home_clicked.connect(self._go_dashboard)
         self.title_bar.cmd_chip.clicked.connect(self._show_command_palette)
         self.title_bar.close_requested.connect(self.close)
         self.title_bar.minimize_requested.connect(self.showMinimized)
@@ -70,6 +69,14 @@ class MainWindow(QMainWindow):
 
         self.stack = QStackedWidget()
         root.addWidget(self.stack, 1)
+
+        self._home_btn = QPushButton("⌂", self)
+        self._home_btn.setObjectName("homeBtn")
+        self._home_btn.setFixedSize(40, 40)
+        self._home_btn.setToolTip("Dashboard")
+        self._home_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._home_btn.clicked.connect(self._go_dashboard)
+        self._home_btn.hide()
 
         self.dashboard = Dashboard()
         self.dashboard.open_project.connect(self._open_project)
@@ -101,7 +108,6 @@ class MainWindow(QMainWindow):
 
         self._editor_title_bar = TitleBar(show_phases=True)
         self._editor_title_bar.settings_clicked.connect(self._open_settings)
-        self._editor_title_bar.home_clicked.connect(self._go_dashboard)
         self._editor_title_bar.phase_changed.connect(self._on_phase_changed)
         self._editor_title_bar.cmd_chip.clicked.connect(self._show_command_palette)
         self._editor_title_bar.close_requested.connect(self.close)
@@ -262,6 +268,7 @@ class MainWindow(QMainWindow):
         self._swap_title_bar(show_phases=False)
         self.title_bar.set_context("")
         self.stack.setCurrentWidget(self.dashboard)
+        self._home_btn.hide()
         self.dashboard.refresh()
         self._update_week_stats()
 
@@ -269,6 +276,7 @@ class MainWindow(QMainWindow):
         self._swap_title_bar(show_phases=False)
         self.title_bar.set_context("New Project")
         self.stack.setCurrentWidget(self.new_project_wizard)
+        self._home_btn.hide()
         self.new_project_wizard.reset()
 
     def _open_project(self, path: str):
@@ -280,6 +288,8 @@ class MainWindow(QMainWindow):
             title = data.get("meta", {}).get("title", "Untitled")
             self._editor_title_bar.set_context(title)
             self._editor_title_bar.set_wordmark_accent()
+            self._home_btn.show()
+            self._position_home_btn()
             dialect = data.get("meta", {}).get("format_id", "fountain/core")
             paper = data.get("meta", {}).get("paper", "US Letter")
             self.editor.status_bar.update_info(dialect=dialect)
@@ -901,6 +911,18 @@ class MainWindow(QMainWindow):
             old_bar.hide()
             self.title_bar.show()
 
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._position_home_btn()
+
+    def _position_home_btn(self):
+        margin = 20
+        self._home_btn.move(
+            self.width() - self._home_btn.width() - margin,
+            self.height() - self._home_btn.height() - margin,
+        )
+        self._home_btn.raise_()
+
     def _toggle_maximize(self):
         if self.isMaximized():
             self.showNormal()
@@ -1234,8 +1256,19 @@ class MainWindow(QMainWindow):
 
 
 def main():
+    QApplication.setHighDpiScaleFactorRoundingPolicy(
+        Qt.HighDpiScaleFactorRoundingPolicy.PassThrough,
+    )
     app = QApplication(sys.argv)
     app.setApplicationName("Écrit")
+
+    from PySide6.QtGui import QFont
+    font = QFont("Liberation Serif", 14)
+    font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
+    font.setStyleStrategy(
+        QFont.StyleStrategy.PreferAntialias
+    )
+    app.setFont(font)
 
     window = MainWindow()
     window.show()
