@@ -85,7 +85,7 @@ class P2PConnection:
         self._server_socket.listen(8)
         self._server_socket.settimeout(1.0)
         self._port = self._server_socket.getsockname()[1]
-        self._session_id = base64.urlsafe_b64encode(os.urandom(6)).decode()
+        self._session_id = base64.urlsafe_b64encode(os.urandom(16)).decode().rstrip("=")
         self._running = True
 
         self._listen_thread = threading.Thread(target=self._accept_loop, daemon=True)

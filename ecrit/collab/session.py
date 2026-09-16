@@ -102,6 +102,7 @@ class CollabSession:
         )
 
         token = self._p2p.host_session(port=port, project_title=project_title)
+        self._lan.port = self._p2p._port
         self._lan.set_project_title(project_title)
         self._lan.start()
         self._set_state(SessionState.CONNECTED)
@@ -231,7 +232,7 @@ class CollabSession:
             if self._on_text_change:
                 self._on_text_change(self._crdt.get_text())
             if self.role == CollabRole.HOST:
-                relay = CollabMessage.operation(msg.user_id, op.to_dict())
+                relay = CollabMessage.operation(msg.user_id, op)
                 relay_data = relay.to_json()
                 for pid in self._p2p._clients:
                     if pid != peer_id:

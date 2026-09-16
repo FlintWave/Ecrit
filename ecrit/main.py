@@ -824,8 +824,6 @@ class MainWindow(QMainWindow):
         url = device_sync.start_transfer_server(path)
         self._companion_dialog.set_transfer_url(url)
         self._companion_dialog.set_sync_status(f"Bundle ready: {path}")
-        for device in device_sync._devices:
-            device_sync.mark_synced(device.device_id)
 
     def _on_wifi_transfer(self, path: str):
         if not STATE.current_project_path:
