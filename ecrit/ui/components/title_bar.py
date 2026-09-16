@@ -69,14 +69,17 @@ class WindowControls(QWidget):
         layout.addStretch()
 
         self._minimize = WindowButton("minimize")
+        self._minimize.setAccessibleName("Minimize window")
         self._minimize.clicked.connect(self.minimize_clicked.emit)
         layout.addWidget(self._minimize)
 
         self._maximize = WindowButton("maximize")
+        self._maximize.setAccessibleName("Maximize window")
         self._maximize.clicked.connect(self.maximize_clicked.emit)
         layout.addWidget(self._maximize)
 
         self._close = WindowButton("close")
+        self._close.setAccessibleName("Close window")
         self._close.clicked.connect(self.close_clicked.emit)
         layout.addWidget(self._close)
 
@@ -98,6 +101,7 @@ class PhaseTabBar(QWidget):
             btn = QPushButton(phase)
             btn.setProperty("active", phase == self._active)
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn.setAccessibleName(f"{phase} phase")
             btn.clicked.connect(lambda checked=False, p=phase: self._on_click(p))
             layout.addWidget(btn)
             self._buttons[phase] = btn
@@ -156,18 +160,26 @@ class TitleBar(QWidget):
         self.settings_btn.setObjectName("iconBtn")
         self.settings_btn.setFixedSize(28, 28)
         self.settings_btn.setToolTip("Settings")
+        self.settings_btn.setAccessibleName("Settings")
+        self.settings_btn.setAccessibleDescription("Open application settings")
         self.settings_btn.clicked.connect(self.settings_clicked.emit)
         layout.addWidget(self.settings_btn)
 
         self.save_dot = SaveIndicator()
+        self.save_dot.setAccessibleName("Save status")
+        self.save_dot.setAccessibleDescription("Green when saved, orange when unsaved")
+        self.save_dot.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         layout.addWidget(self.save_dot)
 
         self.wordmark = QLabel("Écrit")
         self.wordmark.setObjectName("wordmark")
+        self.wordmark.setAccessibleName("Écrit")
+        self.wordmark.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         layout.addWidget(self.wordmark)
 
         self.context_label = QLabel()
         self.context_label.setObjectName("titleContext")
+        self.context_label.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         layout.addWidget(self.context_label)
 
         layout.addStretch()
@@ -183,6 +195,8 @@ class TitleBar(QWidget):
         self.cmd_chip = QPushButton("  open anything")
         self.cmd_chip.setObjectName("secondary")
         self.cmd_chip.setFixedHeight(28)
+        self.cmd_chip.setAccessibleName("Command palette")
+        self.cmd_chip.setAccessibleDescription("Search commands and navigate the app")
         layout.addWidget(self.cmd_chip)
 
         self.window_controls = WindowControls()

@@ -83,10 +83,12 @@ class CommandPalette(QDialog):
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("Type a command...")
         self.search_input.setFixedHeight(38)
+        self.search_input.setAccessibleName("Command Search")
         self.search_input.textChanged.connect(self._filter)
         layout.addWidget(self.search_input)
 
         self.results = QListWidget()
+        self.results.setAccessibleName("Command Results")
         self.results.itemActivated.connect(self._on_select)
         layout.addWidget(self.results, 1)
 

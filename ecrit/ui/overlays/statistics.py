@@ -50,6 +50,7 @@ class StatsDialog(QDialog):
         close_btn = IconButton("x-mark")
         close_btn.setObjectName("iconBtn")
         close_btn.setFixedSize(28, 28)
+        close_btn.setAccessibleName("Close")
         close_btn.clicked.connect(self.close)
         header.addWidget(close_btn)
         layout.addLayout(header)

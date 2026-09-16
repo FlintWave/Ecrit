@@ -76,6 +76,7 @@ class MainWindow(QMainWindow):
         self._home_btn.setObjectName("homeBtn")
         self._home_btn.setFixedSize(40, 40)
         self._home_btn.setToolTip("Dashboard")
+        self._home_btn.setAccessibleName("Return to dashboard")
         self._home_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._home_btn.clicked.connect(self._go_dashboard)
         self._home_btn.hide()
@@ -119,7 +120,7 @@ class MainWindow(QMainWindow):
         self._stats_dialog = StatsDialog(self)
         self._shortcuts_dialog = ShortcutsDialog(self)
         self._settings_dialog = SettingsDialog(self)
-        self._settings_dialog.theme_changed.connect(self._apply_theme)
+        self._settings_dialog.theme_changed.connect(self._on_theme_changed_from_settings)
         self._settings_dialog.language_changed.connect(self._on_language_changed)
         self._settings_dialog.project_folder_changed.connect(self._on_project_folder_changed)
         self._settings_dialog.settings_applied.connect(self._on_settings_applied)
@@ -204,6 +205,13 @@ class MainWindow(QMainWindow):
         self._fullscreen_shortcut = QShortcut(QKeySequence("F11"), self)
         self._fullscreen_shortcut.activated.connect(self._toggle_fullscreen)
 
+        self._zoom_in_shortcut = QShortcut(QKeySequence("Ctrl+="), self)
+        self._zoom_in_shortcut.activated.connect(lambda: self._zoom_manuscript(1))
+        self._zoom_out_shortcut = QShortcut(QKeySequence("Ctrl+-"), self)
+        self._zoom_out_shortcut.activated.connect(lambda: self._zoom_manuscript(-1))
+        self._zoom_reset_shortcut = QShortcut(QKeySequence("Ctrl+0"), self)
+        self._zoom_reset_shortcut.activated.connect(lambda: self._zoom_manuscript(0))
+
         self._next_bookmark_shortcut = QShortcut(QKeySequence("Ctrl+]"), self)
         self._next_bookmark_shortcut.activated.connect(self._next_bookmark)
 
@@ -224,9 +232,23 @@ class MainWindow(QMainWindow):
         self._sprint_status_timer.timeout.connect(self._update_sprint_label)
         self._sprint_status_timer.start()
 
+        self._setup_tab_order()
         self._load_saved_preferences()
         self._apply_theme()
         self._go_dashboard()
+
+    def _setup_tab_order(self):
+        """Set logical tab order for keyboard navigation within title bar and status bar."""
+        from PySide6.QtWidgets import QWidget
+        tb = self._editor_title_bar
+        sb = self.editor.status_bar
+        QWidget.setTabOrder(tb.settings_btn, tb.cmd_chip)
+        if tb.phase_tabs:
+            phases = list(tb.phase_tabs._buttons.values())
+            QWidget.setTabOrder(tb.cmd_chip, phases[0])
+            for i in range(len(phases) - 1):
+                QWidget.setTabOrder(phases[i], phases[i + 1])
+        QWidget.setTabOrder(sb.mode_label, sb.focus_label)
 
     def _load_saved_preferences(self):
         prefs = STATE.load_preferences()
@@ -234,6 +256,8 @@ class MainWindow(QMainWindow):
             return
         STATE.author_name = prefs.get("author_name", STATE.author_name)
         STATE.author_email = prefs.get("author_email", STATE.author_email)
+        if "theme" in prefs:
+            theme.set_theme(prefs["theme"])
         if "language" in prefs:
             STATE.language = prefs["language"]
             set_language(prefs["language"])
@@ -242,6 +266,10 @@ class MainWindow(QMainWindow):
             font = QFont("Courier Prime", prefs["font_size"])
             font.setStyleHint(QFont.StyleHint.Monospace)
             self.editor.manuscript.editor.setFont(font)
+        if "ui_font_size" in prefs:
+            app_font = QApplication.font()
+            app_font.setPointSize(prefs["ui_font_size"])
+            QApplication.setFont(app_font)
         if "auto_save" in prefs:
             if prefs["auto_save"]:
                 self.editor.manuscript.editor._save_timer.setInterval(1000)
@@ -1155,6 +1183,28 @@ class MainWindow(QMainWindow):
     def _toggle_theme(self):
         theme.toggle()
         self._apply_theme()
+        self._save_theme_preference()
+
+    def _on_theme_changed_from_settings(self):
+        self._apply_theme()
+        self._save_theme_preference()
+
+    def _save_theme_preference(self):
+        prefs = STATE.load_preferences()
+        prefs["theme"] = theme.current().name
+        STATE.save_preferences(prefs)
+
+    def _zoom_manuscript(self, direction: int):
+        if self.stack.currentWidget() is not self.editor:
+            return
+        editor = self.editor.manuscript.editor
+        font = editor.font()
+        if direction == 0:
+            font.setPointSize(15)
+        else:
+            new_size = font.pointSize() + (2 * direction)
+            font.setPointSize(max(8, min(36, new_size)))
+        editor.setFont(font)
 
     def mousePressEvent(self, event):
         if event.position().y() < 44:
@@ -1190,6 +1240,11 @@ class MainWindow(QMainWindow):
         font = QFont("Courier Prime", font_size)
         font.setStyleHint(QFont.StyleHint.Monospace)
         self.editor.manuscript.editor.setFont(font)
+        ui_font_size = settings.get("ui_font_size", 14)
+        app_font = QApplication.font()
+        app_font.setPointSize(ui_font_size)
+        QApplication.setFont(app_font)
+        self._apply_theme()
         word_target = settings.get("word_target", 2500)
         self.editor.status_bar.words_label.setText(
             f"0 / {word_target:,} today"
@@ -1217,6 +1272,7 @@ class MainWindow(QMainWindow):
             "author_name": STATE.author_name,
             "author_email": STATE.author_email,
             "font_size": font_size,
+            "ui_font_size": ui_font_size,
             "word_target": word_target,
             "auto_save": auto_save,
             "typewriter": settings.get("typewriter", True),

@@ -32,6 +32,7 @@ class ReadingMode(QWidget):
         exit_btn = QPushButton("Exit Reading Mode")
         exit_btn.setObjectName("secondary")
         exit_btn.setFixedHeight(28)
+        exit_btn.setAccessibleName("Exit Reading Mode")
         exit_btn.clicked.connect(self.exit_requested.emit)
         top_bar.addWidget(exit_btn)
         layout.addLayout(top_bar)

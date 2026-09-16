@@ -40,6 +40,7 @@ class SeriesPanel(QDialog):
         close_btn = IconButton("x-mark")
         close_btn.setObjectName("iconBtn")
         close_btn.setFixedSize(28, 28)
+        close_btn.setAccessibleName("Close")
         close_btn.clicked.connect(self.close)
         header.addWidget(close_btn)
         layout.addLayout(header)
@@ -57,6 +58,7 @@ class SeriesPanel(QDialog):
         close_btn2 = QPushButton("Close")
         close_btn2.setObjectName("secondary")
         close_btn2.setFixedHeight(36)
+        close_btn2.setAccessibleName("Close")
         close_btn2.clicked.connect(self.close)
         footer.addWidget(close_btn2)
         layout.addLayout(footer)
@@ -77,12 +79,14 @@ class SeriesPanel(QDialog):
         self.season_combo = QComboBox()
         self.season_combo.setFixedHeight(32)
         self.season_combo.setMinimumWidth(160)
+        self.season_combo.setAccessibleName("Season")
         self.season_combo.currentIndexChanged.connect(self._on_season_changed)
         top_row.addWidget(self.season_combo)
 
         add_season_btn = QPushButton("+ Season")
         add_season_btn.setObjectName("secondary")
         add_season_btn.setFixedHeight(32)
+        add_season_btn.setAccessibleName("Add Season")
         add_season_btn.clicked.connect(self._add_season)
         top_row.addWidget(add_season_btn)
 
@@ -91,6 +95,7 @@ class SeriesPanel(QDialog):
         add_ep_btn = QPushButton("+ Episode")
         add_ep_btn.setObjectName("primary")
         add_ep_btn.setFixedHeight(32)
+        add_ep_btn.setAccessibleName("Add Episode")
         add_ep_btn.clicked.connect(self._add_episode)
         top_row.addWidget(add_ep_btn)
 
@@ -122,6 +127,7 @@ class SeriesPanel(QDialog):
 
         self.bible_category_combo = QComboBox()
         self.bible_category_combo.setFixedHeight(32)
+        self.bible_category_combo.setAccessibleName("Category")
         for cat in ["all", "character", "location", "prop", "theme", "backstory"]:
             self.bible_category_combo.addItem(cat.title(), cat)
         self.bible_category_combo.currentIndexChanged.connect(self._refresh_bible)
@@ -133,12 +139,14 @@ class SeriesPanel(QDialog):
         self.bible_search.setPlaceholderText("Search bible...")
         self.bible_search.setFixedHeight(32)
         self.bible_search.setFixedWidth(200)
+        self.bible_search.setAccessibleName("Search Bible")
         self.bible_search.textChanged.connect(self._refresh_bible)
         top_row.addWidget(self.bible_search)
 
         add_entry_btn = QPushButton("+ Entry")
         add_entry_btn.setObjectName("primary")
         add_entry_btn.setFixedHeight(32)
+        add_entry_btn.setAccessibleName("Add Bible Entry")
         add_entry_btn.clicked.connect(self._add_bible_entry)
         top_row.addWidget(add_entry_btn)
 
@@ -172,6 +180,7 @@ class SeriesPanel(QDialog):
             layout.addWidget(lbl)
             inp = QLineEdit()
             inp.setFixedHeight(32)
+            inp.setAccessibleName(label_text)
             setattr(self, attr, inp)
             layout.addWidget(inp)
 
@@ -180,6 +189,7 @@ class SeriesPanel(QDialog):
         layout.addWidget(lbl)
         self.logline_input = QTextEdit()
         self.logline_input.setFixedHeight(72)
+        self.logline_input.setAccessibleName("Logline")
         layout.addWidget(self.logline_input)
 
         layout.addStretch()
@@ -187,6 +197,7 @@ class SeriesPanel(QDialog):
         save_btn = QPushButton("Save Info")
         save_btn.setObjectName("primary")
         save_btn.setFixedHeight(36)
+        save_btn.setAccessibleName("Save Info")
         save_btn.clicked.connect(self._save_info)
         layout.addWidget(save_btn)
 

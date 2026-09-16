@@ -29,24 +29,34 @@ class StatusBar(QWidget):
         layout.setSpacing(12)
 
         self.page_label = QLabel("Page 1 of 1")
+        self.page_label.setAccessibleName("Page indicator")
+        self.page_label.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         layout.addWidget(self.page_label)
 
         self.scene_label = QLabel()
         self.scene_label.setStyleSheet("font-family: 'Courier Prime', monospace;")
+        self.scene_label.setAccessibleName("Current scene heading")
+        self.scene_label.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         layout.addWidget(self.scene_label)
 
         layout.addStretch()
 
         self.words_label = QLabel("0 / 2,500 today")
+        self.words_label.setAccessibleName("Daily word count")
+        self.words_label.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         layout.addWidget(self.words_label)
 
         self.sprint_label = QLabel()
+        self.sprint_label.setAccessibleName("Sprint timer")
+        self.sprint_label.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         layout.addWidget(self.sprint_label)
 
         self.mode_label = QPushButton("typewriter")
         self.mode_label.setObjectName("iconBtn")
         self.mode_label.setFixedHeight(22)
         self.mode_label.setToolTip("Toggle typewriter scrolling")
+        self.mode_label.setAccessibleName("Typewriter scrolling mode")
+        self.mode_label.setAccessibleDescription("Keep cursor centered while typing")
         self.mode_label.setCursor(Qt.CursorShape.PointingHandCursor)
         self.mode_label.clicked.connect(self._toggle_typewriter)
         layout.addWidget(self.mode_label)
@@ -55,6 +65,8 @@ class StatusBar(QWidget):
         self.focus_label.setObjectName("iconBtn")
         self.focus_label.setFixedHeight(22)
         self.focus_label.setToolTip("Toggle focus mode (dim inactive paragraphs)")
+        self.focus_label.setAccessibleName("Focus mode")
+        self.focus_label.setAccessibleDescription("Dim inactive paragraphs to reduce distractions")
         self.focus_label.setCursor(Qt.CursorShape.PointingHandCursor)
         self.focus_label.clicked.connect(self._toggle_focus)
         layout.addWidget(self.focus_label)
@@ -63,6 +75,14 @@ class StatusBar(QWidget):
         sep.setFixedWidth(8)
         layout.addWidget(sep)
 
+        _a11y_names = {
+            "Find": "Find and replace",
+            "Stats": "Statistics",
+            "KB": "Keyboard shortcuts",
+            "Theme": "Toggle theme",
+            "Read": "Reading mode",
+            "Sprint": "Sprint timer",
+        }
         buttons = [
             ("Find", self.find_clicked),
             ("Stats", self.stats_clicked),
@@ -75,7 +95,8 @@ class StatusBar(QWidget):
             btn = QPushButton(label)
             btn.setObjectName("iconBtn")
             btn.setFixedSize(QLabel(label).sizeHint().width() + 12, 22)
-            btn.setToolTip(label)
+            btn.setToolTip(_a11y_names.get(label, label))
+            btn.setAccessibleName(_a11y_names.get(label, label))
             btn.clicked.connect(signal.emit)
             layout.addWidget(btn)
 

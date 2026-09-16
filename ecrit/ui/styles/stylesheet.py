@@ -19,6 +19,11 @@ QWidget {{
 QWidget:focus {{
     outline: none;
 }}
+QPushButton:focus, QComboBox:focus, QCheckBox:focus, QSpinBox:focus,
+QListWidget:focus, QTabBar:focus {{
+    border: 2px solid {t.accent};
+    border-radius: {t.radius_sm}px;
+}}
 
 /* ═══ Title Bar ═══ */
 #titleBar {{

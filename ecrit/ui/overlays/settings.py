@@ -63,6 +63,7 @@ class SettingsDialog(QDialog):
         close_btn = IconButton("x-mark")
         close_btn.setObjectName("iconBtn")
         close_btn.setFixedSize(28, 28)
+        close_btn.setAccessibleName("Close")
         close_btn.clicked.connect(self.close)
         header.addWidget(close_btn)
         layout.addLayout(header)
@@ -79,11 +80,13 @@ class SettingsDialog(QDialog):
         self.author_input = QLineEdit()
         self.author_input.setPlaceholderText("Your name")
         self.author_input.setFixedHeight(34)
+        self.author_input.setAccessibleName("Author Name")
         identity_group.add_row("Author Name", self.author_input)
 
         self.email_input = QLineEdit()
         self.email_input.setPlaceholderText("you@example.com")
         self.email_input.setFixedHeight(34)
+        self.email_input.setAccessibleName("Author Email")
         identity_group.add_row("Author Email", self.email_input)
         g_layout.addWidget(identity_group)
 
@@ -91,6 +94,7 @@ class SettingsDialog(QDialog):
         self.language_combo = QComboBox()
         self.language_combo.setFixedHeight(34)
         self.language_combo.setMinimumWidth(180)
+        self.language_combo.setAccessibleName("Language")
         for code, display_name in available_languages():
             self.language_combo.addItem(display_name, code)
         current = get_language()
@@ -113,6 +117,7 @@ class SettingsDialog(QDialog):
         browse_btn = QPushButton("Browse")
         browse_btn.setObjectName("secondary")
         browse_btn.setFixedSize(80, 30)
+        browse_btn.setAccessibleName("Browse Project Folder")
         browse_btn.clicked.connect(self._browse_folder)
         folder_layout.addWidget(browse_btn)
         storage_group.add_row("Project Folder", folder_widget)
@@ -130,15 +135,18 @@ class SettingsDialog(QDialog):
         behavior_group = _FormGroup("Behavior")
         self.typewriter_check = QCheckBox("Typewriter scrolling")
         self.typewriter_check.setStyleSheet("background: transparent;")
+        self.typewriter_check.setAccessibleName("Typewriter scrolling")
         self.typewriter_check.setChecked(True)
         behavior_group.add_widget(self.typewriter_check)
 
         self.line_numbers_check = QCheckBox("Show line numbers")
         self.line_numbers_check.setStyleSheet("background: transparent;")
+        self.line_numbers_check.setAccessibleName("Show line numbers")
         behavior_group.add_widget(self.line_numbers_check)
 
         self.auto_save_check = QCheckBox("Auto-save on pause (1s debounce)")
         self.auto_save_check.setStyleSheet("background: transparent;")
+        self.auto_save_check.setAccessibleName("Auto-save on pause")
         self.auto_save_check.setChecked(True)
         behavior_group.add_widget(self.auto_save_check)
         e_layout.addWidget(behavior_group)
@@ -146,6 +154,7 @@ class SettingsDialog(QDialog):
         autosave_group = _FormGroup("Autosave Snapshots")
         self.autosave_enabled_check = QCheckBox("Enable periodic autosave snapshots")
         self.autosave_enabled_check.setStyleSheet("background: transparent;")
+        self.autosave_enabled_check.setAccessibleName("Enable periodic autosave snapshots")
         self.autosave_enabled_check.setChecked(True)
         autosave_group.add_widget(self.autosave_enabled_check)
 
@@ -155,6 +164,7 @@ class SettingsDialog(QDialog):
         self.autosave_interval_spin.setSuffix(" min")
         self.autosave_interval_spin.setFixedHeight(34)
         self.autosave_interval_spin.setFixedWidth(100)
+        self.autosave_interval_spin.setAccessibleName("Snapshot interval")
         autosave_group.add_row("Snapshot interval", self.autosave_interval_spin)
         e_layout.addWidget(autosave_group)
 
@@ -162,14 +172,25 @@ class SettingsDialog(QDialog):
         self.font_size = QComboBox()
         self.font_size.setFixedHeight(34)
         self.font_size.setMinimumWidth(100)
+        self.font_size.setAccessibleName("Script Font Size")
         for s in ["12", "13", "14", "15", "16", "18"]:
             self.font_size.addItem(f"{s}pt", int(s))
         self.font_size.setCurrentText("15pt")
         typography_group.add_row("Script Font Size", self.font_size)
 
+        self.ui_font_size = QComboBox()
+        self.ui_font_size.setFixedHeight(34)
+        self.ui_font_size.setMinimumWidth(100)
+        self.ui_font_size.setAccessibleName("Interface font size")
+        for s in ["12", "13", "14", "15", "16", "18"]:
+            self.ui_font_size.addItem(f"{s}px", int(s))
+        self.ui_font_size.setCurrentText("14px")
+        typography_group.add_row("Interface Font Size", self.ui_font_size)
+
         self.word_target = QLineEdit("2500")
         self.word_target.setFixedHeight(34)
         self.word_target.setFixedWidth(100)
+        self.word_target.setAccessibleName("Daily Word Target")
         typography_group.add_row("Daily Word Target", self.word_target)
         e_layout.addWidget(typography_group)
 
@@ -189,12 +210,14 @@ class SettingsDialog(QDialog):
         self.dark_btn = QPushButton("Nocturne (Dark)")
         self.dark_btn.setObjectName("primary" if current_theme == "nocturne" else "secondary")
         self.dark_btn.setFixedHeight(44)
+        self.dark_btn.setAccessibleName("Nocturne Dark Theme")
         self.dark_btn.clicked.connect(lambda: self._set_theme("nocturne"))
         theme_row.addWidget(self.dark_btn)
 
         self.light_btn = QPushButton("Organic (Light)")
         self.light_btn.setObjectName("primary" if current_theme == "organic" else "secondary")
         self.light_btn.setFixedHeight(44)
+        self.light_btn.setAccessibleName("Organic Light Theme")
         self.light_btn.clicked.connect(lambda: self._set_theme("organic"))
         theme_row.addWidget(self.light_btn)
         appearance_group._layout.addLayout(theme_row)
@@ -239,6 +262,7 @@ class SettingsDialog(QDialog):
         modules_group = _FormGroup("Loaded Modules")
         self.modules_list = QListWidget()
         self.modules_list.setFixedHeight(140)
+        self.modules_list.setAccessibleName("Loaded Modules")
         self.modules_list.currentRowChanged.connect(self._on_module_selected)
         modules_group.add_widget(self.modules_list)
 
@@ -246,6 +270,7 @@ class SettingsDialog(QDialog):
         self.toggle_module_btn = QPushButton("Enable/Disable")
         self.toggle_module_btn.setObjectName("secondary")
         self.toggle_module_btn.setFixedHeight(34)
+        self.toggle_module_btn.setAccessibleName("Enable or Disable Module")
         self.toggle_module_btn.setEnabled(False)
         self.toggle_module_btn.clicked.connect(self._toggle_module)
         mod_btn_row.addWidget(self.toggle_module_btn)
@@ -253,6 +278,7 @@ class SettingsDialog(QDialog):
         self.scan_dir_btn = QPushButton("Scan Directory")
         self.scan_dir_btn.setObjectName("secondary")
         self.scan_dir_btn.setFixedHeight(34)
+        self.scan_dir_btn.setAccessibleName("Scan Directory")
         self.scan_dir_btn.clicked.connect(self._scan_modules_directory)
         mod_btn_row.addWidget(self.scan_dir_btn)
         mod_btn_row.addStretch()
@@ -418,6 +444,14 @@ class SettingsDialog(QDialog):
             self.autosave_interval_spin.setValue(prefs["autosave_interval"])
         if "autosave_enabled" in prefs:
             self.autosave_enabled_check.setChecked(prefs["autosave_enabled"])
+        if "ui_font_size" in prefs:
+            idx = self.ui_font_size.findData(prefs["ui_font_size"])
+            if idx >= 0:
+                self.ui_font_size.setCurrentIndex(idx)
+        if "font_size" in prefs:
+            idx = self.font_size.findData(prefs["font_size"])
+            if idx >= 0:
+                self.font_size.setCurrentIndex(idx)
 
     def closeEvent(self, event):
         try:
@@ -428,6 +462,7 @@ class SettingsDialog(QDialog):
             "author_name": self.author_input.text(),
             "author_email": self.email_input.text(),
             "font_size": self.font_size.currentData() or 15,
+            "ui_font_size": self.ui_font_size.currentData() or 14,
             "word_target": word_target,
             "typewriter": self.typewriter_check.isChecked(),
             "line_numbers": self.line_numbers_check.isChecked(),

@@ -47,6 +47,7 @@ class LoglineBuilderDialog(QDialog):
         close_btn = IconButton("x-mark")
         close_btn.setObjectName("iconBtn")
         close_btn.setFixedSize(28, 28)
+        close_btn.setAccessibleName("Close")
         close_btn.clicked.connect(self.close)
         header.addWidget(close_btn)
         layout.addLayout(header)
@@ -62,6 +63,7 @@ class LoglineBuilderDialog(QDialog):
 
         self._template_combo = QComboBox()
         self._template_combo.setFixedHeight(34)
+        self._template_combo.setAccessibleName("Template")
         for key, tmpl in LOGLINE_TEMPLATES.items():
             self._template_combo.addItem(tmpl.name, key)
         self._template_combo.currentIndexChanged.connect(self._on_template_changed)
@@ -123,12 +125,14 @@ class LoglineBuilderDialog(QDialog):
         cancel_btn = QPushButton("Close")
         cancel_btn.setObjectName("secondary")
         cancel_btn.setFixedHeight(36)
+        cancel_btn.setAccessibleName("Close")
         cancel_btn.clicked.connect(self.close)
         footer.addWidget(cancel_btn)
 
         self._apply_btn = QPushButton("Apply")
         self._apply_btn.setObjectName("primary")
         self._apply_btn.setFixedHeight(36)
+        self._apply_btn.setAccessibleName("Apply Logline")
         self._apply_btn.clicked.connect(self._on_apply)
         footer.addWidget(self._apply_btn)
 
@@ -173,6 +177,7 @@ class LoglineBuilderDialog(QDialog):
             inp = QLineEdit()
             inp.setFixedHeight(32)
             inp.setPlaceholderText(f"Enter {_field_display_name(field_name).lower()}...")
+            inp.setAccessibleName(_field_display_name(field_name))
             inp.textChanged.connect(self._update_preview)
             self._fields_layout.addWidget(inp)
             self._field_inputs[field_name] = inp

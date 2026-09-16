@@ -76,6 +76,7 @@ class CharacterSheet(QDialog):
         close_btn = IconButton("x-mark")
         close_btn.setObjectName("iconBtn")
         close_btn.setFixedSize(28, 28)
+        close_btn.setAccessibleName("Close")
         close_btn.clicked.connect(self.close)
         header.addWidget(close_btn)
         layout.addLayout(header)
@@ -104,6 +105,7 @@ class CharacterSheet(QDialog):
             left.addWidget(lbl)
             inp = QLineEdit()
             inp.setFixedHeight(32)
+            inp.setAccessibleName(label_text)
             left.addWidget(inp)
             setattr(self, attr_name, inp)
 
@@ -118,6 +120,7 @@ class CharacterSheet(QDialog):
             left.addWidget(lbl)
             txt = QTextEdit()
             txt.setFixedHeight(60)
+            txt.setAccessibleName(label_text)
             left.addWidget(txt)
             setattr(self, attr_name, txt)
 
@@ -148,6 +151,7 @@ class CharacterSheet(QDialog):
 
         self.notes_input = QTextEdit()
         self.notes_input.setPlaceholderText("Character notes...")
+        self.notes_input.setAccessibleName("Notes")
         right.addWidget(self.notes_input, 1)
 
         right_widget = QWidget()
@@ -164,6 +168,7 @@ class CharacterSheet(QDialog):
         done_btn = QPushButton("Done")
         done_btn.setObjectName("primary")
         done_btn.setFixedHeight(36)
+        done_btn.setAccessibleName("Done")
         done_btn.clicked.connect(self._on_done)
         footer.addWidget(done_btn)
         layout.addLayout(footer)

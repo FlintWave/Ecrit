@@ -44,6 +44,7 @@ class CloudExportDialog(QDialog):
         close_btn = IconButton("x-mark")
         close_btn.setObjectName("iconBtn")
         close_btn.setFixedSize(28, 28)
+        close_btn.setAccessibleName("Close")
         close_btn.clicked.connect(self.close)
         header.addWidget(close_btn)
         layout.addLayout(header)
@@ -62,6 +63,7 @@ class CloudExportDialog(QDialog):
 
         self.provider_combo = QComboBox()
         self.provider_combo.setFixedHeight(34)
+        self.provider_combo.setAccessibleName("Provider")
         for provider, name, desc in CLOUD_PROVIDERS:
             self.provider_combo.addItem(f"{name} — {desc}", provider.value)
         self.provider_combo.currentIndexChanged.connect(self._on_provider_changed)
@@ -74,6 +76,7 @@ class CloudExportDialog(QDialog):
         auth_btn = QPushButton("Authenticate...")
         auth_btn.setObjectName("secondary")
         auth_btn.setFixedHeight(34)
+        auth_btn.setAccessibleName("Authenticate")
         auth_btn.clicked.connect(self._authenticate)
         form.addWidget(auth_btn)
 
@@ -89,6 +92,7 @@ class CloudExportDialog(QDialog):
         self.folder_input.setFixedHeight(34)
         self.folder_input.setPlaceholderText("/Écrit/Exports")
         self.folder_input.setText("/Écrit/Exports")
+        self.folder_input.setAccessibleName("Remote Folder")
         form.addWidget(self.folder_input)
 
         format_label = QLabel("Export Format")
@@ -97,6 +101,7 @@ class CloudExportDialog(QDialog):
 
         self.format_combo = QComboBox()
         self.format_combo.setFixedHeight(34)
+        self.format_combo.setAccessibleName("Export Format")
         self.format_combo.addItem("PDF", "pdf")
         self.format_combo.addItem("ODT (LibreOffice)", "odt")
         self.format_combo.addItem("Fountain (.fountain)", "fountain")
@@ -104,6 +109,7 @@ class CloudExportDialog(QDialog):
         form.addWidget(self.format_combo)
 
         self.auto_export_check = QCheckBox("Auto-export on save")
+        self.auto_export_check.setAccessibleName("Auto-export on save")
         self.auto_export_check.toggled.connect(self._on_auto_export_toggled)
         form.addWidget(self.auto_export_check)
 
@@ -130,12 +136,14 @@ class CloudExportDialog(QDialog):
         cancel_btn = QPushButton("Close")
         cancel_btn.setObjectName("secondary")
         cancel_btn.setFixedHeight(36)
+        cancel_btn.setAccessibleName("Close")
         cancel_btn.clicked.connect(self.close)
         footer.addWidget(cancel_btn)
 
         self.export_btn = QPushButton("Coming Soon")
         self.export_btn.setObjectName("primary")
         self.export_btn.setFixedHeight(36)
+        self.export_btn.setAccessibleName("Export")
         self.export_btn.setEnabled(False)
         footer.addWidget(self.export_btn)
 

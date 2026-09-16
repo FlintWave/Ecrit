@@ -181,6 +181,7 @@ class Dashboard(QWidget):
         settings_btn.setObjectName("iconBtn")
         settings_btn.setFixedSize(36, 36)
         settings_btn.setToolTip("Settings")
+        settings_btn.setAccessibleName("Settings")
         settings_btn.clicked.connect(self.open_settings.emit)
         header.addWidget(settings_btn)
 
@@ -200,6 +201,7 @@ class Dashboard(QWidget):
         new_btn = QPushButton("+ New project")
         new_btn.setObjectName("primary")
         new_btn.setFixedHeight(44)
+        new_btn.setAccessibleName("Create new project")
         new_btn.clicked.connect(self.new_project.emit)
         right_stack.addWidget(new_btn)
 
@@ -207,6 +209,7 @@ class Dashboard(QWidget):
         import_btn.setText(" Import script")
         import_btn.setObjectName("secondary")
         import_btn.setFixedHeight(44)
+        import_btn.setAccessibleName("Import existing screenplay file")
         import_btn.clicked.connect(self.import_script.emit)
         right_stack.addWidget(import_btn)
 

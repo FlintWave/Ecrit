@@ -264,6 +264,8 @@ class ScriptEditor(QPlainTextEdit):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setObjectName("scriptEditor")
+        self.setAccessibleName("Screenplay editor")
+        self.setAccessibleDescription("Main screenplay text editor using Fountain format")
 
         font = QFont("Courier Prime", 15)
         font.setStyleHint(QFont.StyleHint.Monospace)
@@ -883,6 +885,7 @@ class OutlinePhase(QWidget):
         layout_h.setObjectName("secondary")
         layout_h.setFixedSize(28, 28)
         layout_h.setToolTip("Horizontal layout")
+        layout_h.setAccessibleName("Horizontal layout")
         layout_h.clicked.connect(lambda: self._relayout("horizontal"))
         toolbar.addWidget(layout_h)
 
@@ -890,12 +893,14 @@ class OutlinePhase(QWidget):
         layout_v.setObjectName("secondary")
         layout_v.setFixedSize(28, 28)
         layout_v.setToolTip("Vertical layout")
+        layout_v.setAccessibleName("Vertical layout")
         layout_v.clicked.connect(lambda: self._relayout("vertical"))
         toolbar.addWidget(layout_v)
 
         toolbar.addStretch()
 
         self.template_combo = QComboBox()
+        self.template_combo.setAccessibleName("Structure template")
         self.template_combo.addItem("— Structure Template —", "")
         for key, display_name in list_templates():
             self.template_combo.addItem(display_name, key)
@@ -905,6 +910,7 @@ class OutlinePhase(QWidget):
 
         add_btn = QPushButton("+ Add node")
         add_btn.setObjectName("primary")
+        add_btn.setAccessibleName("Add outline node")
         add_btn.clicked.connect(self._add_node)
         toolbar.addWidget(add_btn)
         layout.addLayout(toolbar)
@@ -918,17 +924,21 @@ class OutlinePhase(QWidget):
         self.zoom_out = IconButton("minus", icon_size=16)
         self.zoom_out.setObjectName("secondary")
         self.zoom_out.setFixedSize(28, 28)
+        self.zoom_out.setAccessibleName("Zoom out")
         self.zoom_out.clicked.connect(lambda: self._zoom(-0.1))
         zoom_bar.addWidget(self.zoom_out)
         self.zoom_label = QLabel("100%")
+        self.zoom_label.setAccessibleName("Zoom level")
         zoom_bar.addWidget(self.zoom_label)
         self.zoom_in = IconButton("plus", icon_size=16)
         self.zoom_in.setObjectName("secondary")
         self.zoom_in.setFixedSize(28, 28)
+        self.zoom_in.setAccessibleName("Zoom in")
         self.zoom_in.clicked.connect(lambda: self._zoom(0.1))
         zoom_bar.addWidget(self.zoom_in)
         fit_btn = QPushButton("Fit")
         fit_btn.setObjectName("secondary")
+        fit_btn.setAccessibleName("Reset zoom to fit")
         fit_btn.clicked.connect(self._fit_view)
         zoom_bar.addWidget(fit_btn)
         zoom_bar.addStretch()

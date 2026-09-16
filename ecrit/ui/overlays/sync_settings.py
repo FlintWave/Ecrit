@@ -43,6 +43,7 @@ class SyncSettingsDialog(QDialog):
         close_btn = IconButton("x-mark")
         close_btn.setObjectName("iconBtn")
         close_btn.setFixedSize(28, 28)
+        close_btn.setAccessibleName("Close")
         close_btn.clicked.connect(self.close)
         header.addWidget(close_btn)
         layout.addLayout(header)
@@ -62,6 +63,7 @@ class SyncSettingsDialog(QDialog):
 
         self.provider_combo = QComboBox()
         self.provider_combo.setFixedHeight(34)
+        self.provider_combo.setAccessibleName("Provider")
         for key, name, url in PROVIDERS:
             self.provider_combo.addItem(f"{name} ({url})", key)
         form.addWidget(self.provider_combo)
@@ -73,6 +75,7 @@ class SyncSettingsDialog(QDialog):
         self.repo_url_input = QLineEdit()
         self.repo_url_input.setFixedHeight(34)
         self.repo_url_input.setPlaceholderText("https://github.com/user/project.git")
+        self.repo_url_input.setAccessibleName("Repository URL")
         form.addWidget(self.repo_url_input)
 
         user_label = QLabel("Username")
@@ -82,6 +85,7 @@ class SyncSettingsDialog(QDialog):
         self.username_input = QLineEdit()
         self.username_input.setFixedHeight(34)
         self.username_input.setPlaceholderText("Your username")
+        self.username_input.setAccessibleName("Username")
         form.addWidget(self.username_input)
 
         token_label = QLabel("Personal Access Token")
@@ -92,6 +96,7 @@ class SyncSettingsDialog(QDialog):
         self.token_input.setFixedHeight(34)
         self.token_input.setEchoMode(QLineEdit.EchoMode.Password)
         self.token_input.setPlaceholderText("ghp_... or glpat-...")
+        self.token_input.setAccessibleName("Personal Access Token")
         form.addWidget(self.token_input)
 
         branch_label = QLabel("Branch")
@@ -101,9 +106,11 @@ class SyncSettingsDialog(QDialog):
         self.branch_input = QLineEdit()
         self.branch_input.setFixedHeight(34)
         self.branch_input.setText("main")
+        self.branch_input.setAccessibleName("Branch")
         form.addWidget(self.branch_input)
 
         self.auto_sync_check = QCheckBox("Auto-sync on save")
+        self.auto_sync_check.setAccessibleName("Auto-sync on save")
         form.addWidget(self.auto_sync_check)
 
         divider = QFrame()
@@ -133,6 +140,7 @@ class SyncSettingsDialog(QDialog):
         save_btn = QPushButton("Save Config")
         save_btn.setObjectName("secondary")
         save_btn.setFixedHeight(36)
+        save_btn.setAccessibleName("Save Config")
         save_btn.clicked.connect(self._save_config)
         footer.addWidget(save_btn)
 
@@ -141,12 +149,14 @@ class SyncSettingsDialog(QDialog):
         pull_btn = QPushButton("Pull")
         pull_btn.setObjectName("secondary")
         pull_btn.setFixedHeight(36)
+        pull_btn.setAccessibleName("Pull")
         pull_btn.clicked.connect(lambda: self.sync_requested.emit("pull"))
         footer.addWidget(pull_btn)
 
         push_btn = QPushButton("Push")
         push_btn.setObjectName("primary")
         push_btn.setFixedHeight(36)
+        push_btn.setAccessibleName("Push")
         push_btn.clicked.connect(lambda: self.sync_requested.emit("push"))
         footer.addWidget(push_btn)
 
