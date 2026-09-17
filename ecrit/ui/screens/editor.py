@@ -1533,7 +1533,8 @@ class ProofreadPhase(QWidget):
                 issues.append({"line": i, "message": "Unclosed parenthetical"})
             if stripped.endswith(")") and not stripped.startswith("(") and stripped.count("(") == 0:
                 issues.append({"line": i, "message": "Orphan closing parenthesis"})
-            if stripped.isupper() and len(stripped) > 1 and stripped[0].isalpha():
+            if (stripped.isupper() and len(stripped) > 1 and stripped[0].isalpha()
+                    and not re.search(r'[.!?]$', re.sub(r'\([^)]*\)\s*$', '', stripped))):
                 if i < len(lines):
                     next_line = lines[i].strip() if i < len(lines) else ""
                     if not next_line:
@@ -1773,15 +1774,13 @@ class DeliverPhase(QWidget):
         if not script:
             return
         if self._view_mode == "cover":
-            lines = script.split("\n")
-            title_page = []
-            for line in lines:
-                stripped = line.strip()
-                if stripped.startswith(("Title:", "Credit:", "Author:", "Source:", "Draft date:", "Contact:", "Copyright:")):
-                    title_page.append(stripped)
-                elif stripped.startswith(("INT.", "EXT.", "EST.")) or (title_page and not stripped and len(title_page) > 1):
-                    break
-            self.preview_area.setPlainText("\n".join(title_page) if title_page else "No title page metadata found")
+            from ecrit.export.epub_export import _parse_title_page
+            fields = _parse_title_page(script)
+            if fields:
+                title_page = [f"{k.title()}: {v}" for k, v in fields.items()]
+                self.preview_area.setPlainText("\n".join(title_page))
+            else:
+                self.preview_area.setPlainText("No title page metadata found")
         else:
             self.preview_area.setPlainText(script)
 

@@ -110,8 +110,11 @@ class TextCRDT:
                 )
             if op1.position > op2.position or (
                 op1.position == op2.position
-                and op1.op_type == OperationType.INSERT
-                and (op1.user_id or "") >= (op2.user_id or "")
+                and (
+                    op1.op_type == OperationType.DELETE
+                    or (op1.op_type == OperationType.INSERT
+                        and (op1.user_id or "") >= (op2.user_id or ""))
+                )
             ):
                 return Operation(
                     op_type=op1.op_type,

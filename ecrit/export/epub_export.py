@@ -1,5 +1,6 @@
 """EPUB 3 export — generate a valid EPUB ebook from Fountain screenplay content."""
 
+import logging
 import os
 import re
 import uuid

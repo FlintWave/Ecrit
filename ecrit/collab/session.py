@@ -170,7 +170,9 @@ class CollabSession:
             op = self._crdt.insert(position, text)
             self._pending_ops.append(op)
             if len(self._pending_ops) > 100:
-                self._pending_ops = self._pending_ops[-50:]
+                logger.warning("Pending ops exceeded 100; requesting full sync")
+                self._pending_ops.clear()
+                self._request_sync()
         msg = CollabMessage.operation(self.user_id, op)
         self._p2p.broadcast(msg.to_json())
 
@@ -179,7 +181,9 @@ class CollabSession:
             op = self._crdt.delete(position, length)
             self._pending_ops.append(op)
             if len(self._pending_ops) > 100:
-                self._pending_ops = self._pending_ops[-50:]
+                logger.warning("Pending ops exceeded 100; requesting full sync")
+                self._pending_ops.clear()
+                self._request_sync()
         msg = CollabMessage.operation(self.user_id, op)
         self._p2p.broadcast(msg.to_json())
 
@@ -189,6 +193,13 @@ class CollabSession:
             self._participants[self.user_id].selection_end = selection_end
         msg = CollabMessage.cursor_update(self.user_id, position, selection_end)
         self._p2p.broadcast(msg.to_json())
+
+    def _request_sync(self) -> None:
+        """Ask the host for a full document sync to reset OT state."""
+        if self.role == CollabRole.HOST:
+            return  # host is authoritative; nothing to request
+        sync_msg = CollabMessage.sync_request(self.user_id)
+        self._p2p.broadcast(sync_msg.to_json())
 
     def get_text(self) -> str:
         return self._crdt.get_text()
