@@ -2083,8 +2083,13 @@ class EditorScreen(QWidget):
         cursor_pos = self.manuscript.editor.textCursor().position()
         current = 1
         for i, m in enumerate(matches):
-            pos = m if isinstance(m, int) else m.start()
-            if pos >= cursor_pos - len(text):
+            if isinstance(m, int):
+                pos = m
+                match_len = len(text)
+            else:
+                pos = m.start()
+                match_len = m.end() - m.start()
+            if pos >= cursor_pos - match_len:
                 current = i + 1
                 break
         else:
@@ -2138,7 +2143,7 @@ class EditorScreen(QWidget):
                 new_content = content.replace(find_text, replace_text)
             else:
                 import re
-                new_content = re.sub(re.escape(find_text), replace_text, content, flags=re.IGNORECASE)
+                new_content = re.sub(re.escape(find_text), replace_text.replace('\\', '\\\\'), content, flags=re.IGNORECASE)
         if new_content != content:
             editor.setPlainText(new_content)
         self.find_bar.set_match_count(0, 0)

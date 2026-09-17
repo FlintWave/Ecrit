@@ -172,6 +172,18 @@ class TestTextCRDT:
         transformed = crdt.transform(op1, op2)
         assert transformed.position == 3
 
+    def test_transform_delete_does_not_swallow_concurrent_insert(self):
+        """A delete must not expand to consume text inserted inside its range."""
+        crdt = TextCRDT(user_id="u1")
+        # op1: delete 5 chars starting at pos 2 (chars 2-6)
+        op1 = Operation(op_type=OperationType.DELETE, position=2, length=5)
+        # op2: insert "XY" at pos 4 (inside op1's range)
+        op2 = Operation(op_type=OperationType.INSERT, position=4, text="XY")
+        transformed = crdt.transform(op1, op2)
+        # The delete length must NOT grow to swallow the inserted text
+        assert transformed.length == 5
+        assert transformed.position == 2
+
     def test_transform_preserves_other_fields(self):
         crdt = TextCRDT(user_id="u1")
         op1 = Operation(

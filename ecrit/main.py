@@ -360,8 +360,11 @@ class MainWindow(QMainWindow):
         saved = STATE.save_script()
         if saved:
             self._module_registry.call_hook(HOOK_AFTER_SAVE, STATE.script_content)
-            STATE.save_outline(self.editor.outline.canvas._nodes)
-            STATE.save_plan_documents(self.editor.plan.get_documents())
+            if self.editor.outline.canvas._nodes:
+                STATE.save_outline(self.editor.outline.canvas._nodes)
+            plan_docs = self.editor.plan.get_documents()
+            if plan_docs:
+                STATE.save_plan_documents(plan_docs)
         self._editor_title_bar.save_dot.set_saved(saved)
         if saved and STATE.current_project_path:
             self._auto_sync_if_enabled()

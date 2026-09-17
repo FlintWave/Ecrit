@@ -97,12 +97,13 @@ class TextCRDT:
         if op2.op_type == OperationType.INSERT:
             insert_len = len(op2.text)
             if op1.op_type == OperationType.DELETE and op1.position < op2.position < op1.position + op1.length:
-                # op2 insert splits op1's delete range — expand length to skip inserted text
+                # op2 insert lands inside op1's delete range — preserve the inserted text
+                # by splitting the delete: only delete up to the insert point
                 return Operation(
                     op_type=op1.op_type,
                     position=op1.position,
                     text=op1.text,
-                    length=op1.length + insert_len,
+                    length=op1.length,
                     user_id=op1.user_id,
                     timestamp=op1.timestamp,
                     revision=op1.revision,
@@ -138,11 +139,10 @@ class TextCRDT:
                 overlap = max(0, overlap_end - overlap_start)
                 new_length = op1.length - overlap
                 if new_length <= 0:
-                    # op1's delete is entirely subsumed by op2
+                    # op1's delete is entirely subsumed by op2 — becomes a no-op
                     return Operation(
                         op_type=op1.op_type,
-                        position=max(op1.position, op2.position) - min(op1.position, op2.position)
-                        if op1.position >= op2.position else op1.position,
+                        position=op2.position if op1.position >= op2.position else op1.position,
                         text=op1.text,
                         length=0,
                         user_id=op1.user_id,
