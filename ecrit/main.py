@@ -30,7 +30,6 @@ from ecrit.ui.overlays.series_panel import SeriesPanel
 from ecrit.ui.overlays.sync_settings import SyncSettingsDialog
 from ecrit.ui.overlays.cloud_export import CloudExportDialog
 from ecrit.ui.overlays.share_review import ShareReviewDialog
-from ecrit.ui.overlays.marketplace import MarketplaceDialog
 from ecrit.ui.overlays.collaboration import CollaborationDialog
 from ecrit.ui.overlays.companion import CompanionDialog
 from ecrit.screenplay.series_projects import SeriesProject
@@ -162,9 +161,6 @@ class MainWindow(QMainWindow):
         self._share_dialog = ShareReviewDialog(self)
         self._share_dialog.share_created.connect(self._on_share_created)
 
-        self._marketplace_dialog = MarketplaceDialog(self)
-        self._marketplace_dialog.plugin_installed.connect(self._on_plugin_installed)
-        self._marketplace_dialog.plugin_uninstalled.connect(self._on_plugin_uninstalled)
 
         self._collab_session = CollabSession(user_name=STATE.author_name or "Writer")
         self._active_collab_session = None
@@ -472,7 +468,6 @@ class MainWindow(QMainWindow):
             "Remote Sync": self._show_sync_settings,
             "Cloud Export": self._show_cloud_export,
             "Share for Review": self._show_share_review,
-            "Plugin Marketplace": self._show_marketplace,
             "Collaboration": self._show_collaboration,
             "Companion Sync": self._show_companion,
             "Change Language": self._show_language_settings,
@@ -780,8 +775,6 @@ class MainWindow(QMainWindow):
             "path": path,
         })
 
-    def _show_marketplace(self):
-        self._marketplace_dialog.exec()
 
     def _show_collaboration(self):
         if STATE.current_project_path:
@@ -1330,13 +1323,6 @@ class MainWindow(QMainWindow):
             "autosave_enabled": autosave_enabled,
         })
 
-    def _on_plugin_installed(self, plugin_id: str):
-        if hasattr(self._settings_dialog, '_module_registry') and self._settings_dialog._module_registry:
-            self._settings_dialog._refresh_modules_list()
-
-    def _on_plugin_uninstalled(self, plugin_id: str):
-        if hasattr(self._settings_dialog, '_module_registry') and self._settings_dialog._module_registry:
-            self._settings_dialog._refresh_modules_list()
 
     def _on_sync_config_saved(self, config: dict):
         if not STATE.current_project_path:
