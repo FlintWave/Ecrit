@@ -378,14 +378,20 @@ class MainWindow(QMainWindow):
         )
 
     def _auto_sync_if_enabled(self):
+        if hasattr(self, "_sync_pending") and self._sync_pending:
+            return
         import threading
         from ecrit.sync.remote_sync import load_remote_config, push_to_remote
         config, _result = load_remote_config(STATE.current_project_path)
         if config and config.auto_sync and config.remote_url:
+            self._sync_pending = True
             path = STATE.current_project_path
-            threading.Thread(
-                target=push_to_remote, args=(path, config), daemon=True
-            ).start()
+            def _do_sync():
+                try:
+                    push_to_remote(path, config)
+                finally:
+                    self._sync_pending = False
+            threading.Thread(target=_do_sync, daemon=True).start()
 
     def _auto_export_if_enabled(self):
         import tempfile
@@ -405,8 +411,9 @@ class MainWindow(QMainWindow):
                         tmp.write(content)
                         tmp_path = tmp.name
                     exporter.upload_file(tmp_path, cfg.folder_path)
-                except Exception:
-                    pass
+                except Exception as e:
+                    import logging
+                    logging.getLogger("ecrit.export").warning("Auto-export failed for %s: %s", cfg.provider, e)
                 finally:
                     if tmp_path:
                         try:
@@ -786,6 +793,7 @@ class MainWindow(QMainWindow):
         self._collab_dialog.exec()
 
     def _on_collab_started(self, session):
+        self._on_collab_left()
         self.editor.manuscript.presence_bar.setVisible(True)
         self._active_collab_session = session
         self._collab_suppress_local = False

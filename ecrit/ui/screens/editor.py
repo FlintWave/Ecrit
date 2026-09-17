@@ -1505,7 +1505,7 @@ class ProofreadPhase(QWidget):
         if row < 0 or row >= len(self._issues):
             return
         line_num = self._issues[row]["line"]
-        block = self.script_view.document().findBlockByLineNumber(line_num - 1)
+        block = self.script_view.document().findBlockByNumber(line_num - 1)
         if block.isValid():
             cursor = self.script_view.textCursor()
             cursor.setPosition(block.position())
