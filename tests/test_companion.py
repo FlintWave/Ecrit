@@ -141,8 +141,22 @@ class TestReaderExport:
 
 
 class TestDeviceSync:
-    def test_transfer_handler_isolation(self):
+    def test_paired_device_roundtrip(self):
+        from ecrit.companion.device_sync import PairedDevice
+        dev = PairedDevice(name="Pixel 7", device_id="abc123", platform="android")
+        d = dev.to_dict()
+        restored = PairedDevice.from_dict(d)
+        assert restored.name == "Pixel 7"
+        assert restored.device_id == "abc123"
+        assert restored.platform == "android"
+
+    def test_paired_device_defaults(self):
+        from ecrit.companion.device_sync import PairedDevice
+        dev = PairedDevice.from_dict({})
+        assert dev.name == ""
+        assert dev.platform == "android"
+
+    def test_device_sync_init(self, tmp_path):
         from ecrit.companion.device_sync import DeviceSync
-        server1 = DeviceSync.__new__(DeviceSync)
-        server2 = DeviceSync.__new__(DeviceSync)
-        assert server1 is not server2
+        ds = DeviceSync(config_dir=str(tmp_path))
+        assert ds.get_devices() == []

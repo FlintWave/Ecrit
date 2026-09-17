@@ -311,7 +311,7 @@ def _list_conflict_files(project_path: Path) -> List[str]:
         proc = _run_git(["diff", "--name-only", "--diff-filter=U"], cwd=project_path)
         if proc.returncode == 0 and proc.stdout.strip():
             return proc.stdout.strip().splitlines()
-    except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
+    except (subprocess.TimeoutExpired, OSError):
         pass
     return []
 

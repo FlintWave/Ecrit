@@ -13,7 +13,7 @@ try:
     import json
     _DIALECTS = json.loads(ecrit_core.get_dialects())
     _CATEGORIES = json.loads(ecrit_core.get_format_categories())
-except (ImportError, ValueError, OSError):
+except (ImportError, ValueError, TypeError, OSError):
     _DIALECTS = []
     _CATEGORIES = {}
 

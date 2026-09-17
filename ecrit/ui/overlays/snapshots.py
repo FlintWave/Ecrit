@@ -23,7 +23,7 @@ def _run_git(project_path: str, *args) -> str:
             timeout=10,
         )
         return result.stdout.strip()
-    except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
+    except (subprocess.TimeoutExpired, OSError):
         return ""
 
 

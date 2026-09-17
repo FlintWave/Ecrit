@@ -164,6 +164,12 @@ class TestConfigPersistence:
     def test_load_nonexistent(self, tmp_path):
         assert load_cloud_configs(str(tmp_path / "nope")) == []
 
+    def test_load_corrupt_json(self, tmp_path):
+        ecrit_dir = tmp_path / ".ecrit"
+        ecrit_dir.mkdir()
+        (ecrit_dir / "cloud.json").write_text("not valid json{{{")
+        assert load_cloud_configs(str(tmp_path)) == []
+
     def test_save_creates_directory(self, tmp_path):
         project = tmp_path / "deep" / "project"
         save_cloud_configs(str(project), [])

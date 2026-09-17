@@ -270,6 +270,9 @@ def load_cloud_configs(project_path: str) -> list[CloudConfig]:
     path = _cloud_config_path(project_path)
     if not os.path.isfile(path):
         return []
-    with open(path, "r", encoding="utf-8") as f:
-        data = json.load(f)
-    return [CloudConfig.from_dict(entry) for entry in data]
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return [CloudConfig.from_dict(entry) for entry in data]
+    except (json.JSONDecodeError, OSError, KeyError, TypeError):
+        return []

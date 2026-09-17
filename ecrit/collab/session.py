@@ -215,7 +215,7 @@ class CollabSession:
     def _handle_message(self, peer_id: str, raw: str) -> None:
         try:
             msg = CollabMessage.from_json(raw)
-        except (ValueError, KeyError):
+        except (ValueError, KeyError, AttributeError, TypeError):
             logger.debug("Ignoring malformed collab message from %s", peer_id)
             return
 
