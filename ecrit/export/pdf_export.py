@@ -22,10 +22,14 @@ ELEMENT_STYLES = {
     "Synopsis": {"italic": True},
     "Note": {"italic": True},
     "PageBreak": {"page_break": True},
+    "PageHeader": {"bold": True, "upper": True, "align": Qt.AlignmentFlag.AlignLeft, "margin_top": 24},
+    "PanelHeader": {"bold": True, "align": Qt.AlignmentFlag.AlignLeft, "margin_top": 18, "left_indent": 36},
+    "Sfx": {"bold": True, "upper": True, "align": Qt.AlignmentFlag.AlignLeft, "margin_top": 6, "left_indent": 36},
+    "Caption": {"align": Qt.AlignmentFlag.AlignLeft, "margin_top": 6, "left_indent": 36},
 }
 
 
-def _build_document(script_content: str, font_size: int = 12, include_title_page: bool = True, scene_numbers: bool = False) -> QTextDocument:
+def _build_document(script_content: str, font_size: int = 12, include_title_page: bool = True, scene_numbers: bool = False, format_id: str = "fountain/core") -> QTextDocument:
     doc = QTextDocument()
     font = QFont("Courier Prime", font_size)
     doc.setDefaultFont(font)
@@ -34,7 +38,7 @@ def _build_document(script_content: str, font_size: int = 12, include_title_page
 
     try:
         import ecrit_core
-        parsed = json.loads(ecrit_core.parse_fountain(script_content))
+        parsed = json.loads(ecrit_core.parse_fountain(script_content, format_id))
     except Exception:
         logging.getLogger("ecrit.export.pdf").debug("Fountain parse unavailable, inserting raw text", exc_info=True)
         cursor.insertText(script_content)
@@ -54,16 +58,18 @@ def _build_document(script_content: str, font_size: int = 12, include_title_page
             cursor.setBlockFormat(block_fmt)
             cursor.insertText(title_page.get("title", ""), title_fmt)
 
+            normal_fmt = QTextCharFormat()
+            normal_fmt.setFont(QFont("Courier Prime", 12))
+
             if title_page.get("credit"):
                 cursor.insertBlock()
-                normal_fmt = QTextCharFormat()
-                normal_fmt.setFont(QFont("Courier Prime", 12))
                 block_fmt.setTopMargin(24)
                 cursor.setBlockFormat(block_fmt)
                 cursor.insertText(title_page["credit"], normal_fmt)
 
             if title_page.get("author"):
                 cursor.insertBlock()
+                block_fmt.setTopMargin(24)
                 cursor.setBlockFormat(block_fmt)
                 cursor.insertText(title_page["author"], normal_fmt)
 
@@ -109,6 +115,18 @@ def _build_document(script_content: str, font_size: int = 12, include_title_page
         if scene_numbers and kind == "SceneHeading":
             scene_num += 1
             display_text = f"{scene_num}. {display_text}"
+        if kind == "Sfx":
+            num = elem.get("number", "")
+            display_text = f"{num}. SFX: {display_text}" if num else f"SFX: {display_text}"
+        elif kind == "Caption":
+            num = elem.get("number", "")
+            subtype = elem.get("subtype", "CAPTION")
+            prefix = f"{num}. {subtype}:" if num else f"{subtype}:"
+            display_text = f"{prefix} {display_text}"
+        elif kind == "PageHeader":
+            display_text = elem.get("text", text)
+        elif kind == "PanelHeader":
+            display_text = elem.get("text", text)
         cursor.insertText(display_text, char_fmt)
 
     return doc
@@ -121,6 +139,7 @@ def export_pdf(
     include_title_page: bool = True,
     scene_numbers: bool = False,
     parent=None,
+    format_id: str = "fountain/core",
 ) -> str:
     default_name = f"{title}.pdf"
     path, _ = QFileDialog.getSaveFileName(
@@ -147,7 +166,7 @@ def export_pdf(
     layout = QPageLayout(page_size, QPageLayout.Orientation.Portrait, margins)
     printer.setPageLayout(layout)
 
-    doc = _build_document(script_content, include_title_page=include_title_page, scene_numbers=scene_numbers)
+    doc = _build_document(script_content, include_title_page=include_title_page, scene_numbers=scene_numbers, format_id=format_id)
     doc.setPageSize(QSizeF(printer.pageRect(QPrinter.Unit.Point).size()))
     doc.print_(printer)
 

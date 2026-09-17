@@ -17,6 +17,10 @@ pub enum Element {
     Boneyard { text: String },
     PageBreak,
     BlankLine,
+    PageHeader { text: String, page_number: Option<u32> },
+    PanelHeader { text: String, panel_number: Option<u32> },
+    Sfx { text: String, number: Option<u32> },
+    Caption { text: String, subtype: String, number: Option<u32> },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -70,4 +74,8 @@ pub struct ScriptStats {
     pub action_percentage: f32,
     pub characters: Vec<CharacterInfo>,
     pub scenes: Vec<SceneInfo>,
+    pub comic_page_count: u32,
+    pub panel_count: u32,
+    pub sfx_count: u32,
+    pub caption_count: u32,
 }

@@ -7,16 +7,18 @@ use fountain::dialect;
 use project::manager::ProjectManager;
 
 #[pyfunction]
-fn parse_fountain(text: &str) -> PyResult<String> {
+#[pyo3(signature = (text, format_id=None))]
+fn parse_fountain(text: &str, format_id: Option<&str>) -> PyResult<String> {
     let parser = FountainParser::new();
-    let doc = parser.parse(text);
+    let doc = parser.parse_with_format(text, format_id.unwrap_or("fountain/core"));
     Ok(serde_json::to_string(&doc).unwrap())
 }
 
 #[pyfunction]
-fn get_script_stats(text: &str) -> PyResult<String> {
+#[pyo3(signature = (text, format_id=None))]
+fn get_script_stats(text: &str, format_id: Option<&str>) -> PyResult<String> {
     let parser = FountainParser::new();
-    let doc = parser.parse(text);
+    let doc = parser.parse_with_format(text, format_id.unwrap_or("fountain/core"));
     let stats = parser.compute_stats(&doc);
     Ok(serde_json::to_string(&stats).unwrap())
 }

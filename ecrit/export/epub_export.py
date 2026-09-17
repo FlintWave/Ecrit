@@ -246,6 +246,34 @@ hr.page-break {
     border: none;
     page-break-after: always;
 }
+h2.page-header {
+    font-family: "Courier New", Courier, monospace;
+    font-size: 12pt;
+    font-weight: bold;
+    text-transform: uppercase;
+    margin-top: 1.5em;
+    margin-bottom: 0.5em;
+    page-break-before: always;
+}
+h2.page-header:first-of-type {
+    page-break-before: avoid;
+}
+p.panel-header {
+    font-weight: bold;
+    margin-top: 1em;
+    margin-bottom: 0.3em;
+    margin-left: 1em;
+}
+p.sfx {
+    font-weight: bold;
+    text-transform: uppercase;
+    margin: 0.3em 0;
+    margin-left: 1em;
+}
+p.caption {
+    margin: 0.3em 0;
+    margin-left: 1em;
+}
 """
 
 
@@ -351,6 +379,10 @@ _ELEMENT_CLASS = {
     "Section": "section",
     "Synopsis": "synopsis",
     "Note": "note",
+    "PageHeader": "page-header",
+    "PanelHeader": "panel-header",
+    "Sfx": "sfx",
+    "Caption": "caption",
 }
 
 
@@ -379,6 +411,30 @@ def _parse_fountain_to_xhtml(content: str) -> tuple[str, list[dict]]:
             scene_id = f"scene-{scene_count}"
             scenes.append({"id": scene_id, "text": elem["text"]})
             parts.append(f'  <h2 class="scene-heading" id="{scene_id}">{text}</h2>')
+            continue
+
+        if kind == "PageHeader":
+            scene_count += 1
+            scene_id = f"scene-{scene_count}"
+            scenes.append({"id": scene_id, "text": elem["text"]})
+            parts.append(f'  <h2 class="page-header" id="{scene_id}">{text}</h2>')
+            continue
+
+        if kind == "PanelHeader":
+            parts.append(f'  <p class="panel-header">{text}</p>')
+            continue
+
+        if kind == "Sfx":
+            num = elem.get("number", "")
+            display = f"{num}. SFX: {text}" if num else f"SFX: {text}"
+            parts.append(f'  <p class="sfx">{escape(display)}</p>')
+            continue
+
+        if kind == "Caption":
+            num = elem.get("number", "")
+            subtype = elem.get("subtype", "CAPTION")
+            display = f"{num}. {subtype}: {text}" if num else f"{subtype}: {text}"
+            parts.append(f'  <p class="caption">{escape(display)}</p>')
             continue
 
         css_class = _ELEMENT_CLASS.get(kind, "action")

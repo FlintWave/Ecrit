@@ -217,10 +217,24 @@ class AppState:
             logger.warning("Failed to save plan documents: %s", exc)
             return False
 
+    def get_format_id(self) -> str:
+        if not self.current_project_path:
+            return "fountain/core"
+        meta_path = Path(self.current_project_path) / "project.json"
+        if not meta_path.exists():
+            meta_path = Path(self.current_project_path) / "meta.json"
+        if meta_path.exists():
+            try:
+                meta = json.loads(meta_path.read_text(encoding="utf-8"))
+                return meta.get("format_id", "fountain/core")
+            except (json.JSONDecodeError, OSError):
+                pass
+        return "fountain/core"
+
     def parse_script(self) -> dict:
         if ecrit_core and self.script_content:
             try:
-                return json.loads(ecrit_core.parse_fountain(self.script_content))
+                return json.loads(ecrit_core.parse_fountain(self.script_content, self.get_format_id()))
             except Exception:
                 logger.debug("ecrit_core.parse_fountain failed, using Python fallback", exc_info=True)
         return self._parse_script_py()
@@ -244,7 +258,7 @@ class AppState:
     def get_stats(self) -> dict:
         if ecrit_core and self.script_content:
             try:
-                return json.loads(ecrit_core.get_script_stats(self.script_content))
+                return json.loads(ecrit_core.get_script_stats(self.script_content, self.get_format_id()))
             except Exception:
                 logger.debug("ecrit_core.get_script_stats failed, using Python fallback", exc_info=True)
         return self._get_stats_py()

@@ -35,9 +35,16 @@ from ecrit.screenplay.bookmarks import BookmarkManager
 
 
 class FountainHighlighter(QSyntaxHighlighter):
-    def __init__(self, document: QTextDocument):
+    def __init__(self, document: QTextDocument, format_id: str = "fountain/core"):
         super().__init__(document)
+        self._format_id = format_id
+        self._comic_mode = format_id.startswith("fountain+comic")
         self._update_formats()
+
+    def set_format_id(self, format_id: str):
+        self._format_id = format_id
+        self._comic_mode = format_id.startswith("fountain+comic")
+        self.rehighlight()
 
     def _update_formats(self):
         t = theme.current()
@@ -64,10 +71,43 @@ class FountainHighlighter(QSyntaxHighlighter):
         self.section_fmt.setFontWeight(QFont.Weight.Bold)
         self.section_fmt.setForeground(QColor(t.accent_300))
 
+        self.page_header_fmt = QTextCharFormat()
+        self.page_header_fmt.setFontWeight(QFont.Weight.Bold)
+        self.page_header_fmt.setFontCapitalization(QFont.Capitalization.AllUppercase)
+        self.page_header_fmt.setForeground(QColor(t.accent_300))
+
+        self.panel_header_fmt = QTextCharFormat()
+        self.panel_header_fmt.setFontWeight(QFont.Weight.Bold)
+        self.panel_header_fmt.setForeground(QColor(t.accent_500))
+
+        self.sfx_fmt = QTextCharFormat()
+        self.sfx_fmt.setFontWeight(QFont.Weight.Bold)
+        self.sfx_fmt.setFontCapitalization(QFont.Capitalization.AllUppercase)
+
+        self.caption_fmt = QTextCharFormat()
+        self.caption_fmt.setForeground(QColor(t.neutral_300))
+
     def highlightBlock(self, text: str):
         stripped = text.strip()
         if not stripped:
             return
+
+        upper_stripped = stripped.upper()
+
+        if self._comic_mode:
+            if stripped.startswith("#") and "PAGE" in upper_stripped:
+                self.setFormat(0, len(text), self.page_header_fmt)
+                return
+            if upper_stripped.startswith("PANEL ") or upper_stripped.startswith(".PANEL "):
+                self.setFormat(0, len(text), self.panel_header_fmt)
+                return
+            if upper_stripped.startswith("SFX:"):
+                self.setFormat(0, len(text), self.sfx_fmt)
+                return
+            import re
+            if re.match(r"(?i)^(CAP|CAPTION|BANNER|VOICE\s*OVER|VO|NARRATION|INTERNAL|EDITORIAL|TIME[- ]PLACE):", stripped):
+                self.setFormat(0, len(text), self.caption_fmt)
+                return
 
         if stripped.startswith(("INT.", "EXT.", "EST.", "INT./EXT.", "I/E.")) or stripped.startswith("."):
             self.setFormat(0, len(text), self.scene_fmt)
@@ -273,7 +313,8 @@ class ScriptEditor(QPlainTextEdit):
         self.setLineWrapMode(QPlainTextEdit.LineWrapMode.WidgetWidth)
         self.setTabStopDistance(40)
 
-        self.highlighter = FountainHighlighter(self.document())
+        self._format_id = "fountain/core"
+        self.highlighter = FountainHighlighter(self.document(), self._format_id)
         self.completer = ScriptCompleter(self)
 
         self._typewriter = True
@@ -293,6 +334,10 @@ class ScriptEditor(QPlainTextEdit):
         self.updateRequest.connect(self._update_line_number_area)
 
         self._update_line_number_area_width()
+
+    def set_format_id(self, format_id: str):
+        self._format_id = format_id
+        self.highlighter.set_format_id(format_id)
 
     def set_line_numbers_visible(self, visible: bool):
         self._show_line_numbers = visible
@@ -468,8 +513,8 @@ class ScriptEditor(QPlainTextEdit):
             self.completer.update_popup()
 
     def _cycle_element_type(self):
-        """Cycle current line through Fountain element types:
-        Scene Heading → Action → Character → Dialogue → Parenthetical → Transition → back.
+        """Cycle current line through Fountain element types.
+        In comic mode the cycle includes Page, Panel, Caption, and SFX.
         """
         cursor = self.textCursor()
         cursor.movePosition(QTextCursor.MoveOperation.StartOfBlock)
@@ -480,7 +525,13 @@ class ScriptEditor(QPlainTextEdit):
             return
 
         current = self._detect_element_type(stripped)
-        cycle = ["scene_heading", "action", "character", "dialogue", "parenthetical", "transition"]
+        if self._format_id.startswith("fountain+comic"):
+            cycle = [
+                "page_header", "panel_header", "action", "character",
+                "dialogue", "parenthetical", "caption", "sfx",
+            ]
+        else:
+            cycle = ["scene_heading", "action", "character", "dialogue", "parenthetical", "transition"]
         idx = cycle.index(current) if current in cycle else 0
         next_type = cycle[(idx + 1) % len(cycle)]
 
@@ -491,6 +542,17 @@ class ScriptEditor(QPlainTextEdit):
         cursor.insertText(formatted)
 
     def _detect_element_type(self, line: str) -> str:
+        import re
+        upper = line.upper()
+        if self._format_id.startswith("fountain+comic"):
+            if line.startswith("#") and "PAGE" in upper:
+                return "page_header"
+            if upper.startswith("PANEL ") or upper.startswith(".PANEL "):
+                return "panel_header"
+            if upper.startswith("SFX:"):
+                return "sfx"
+            if re.match(r"(?i)^(CAP|CAPTION|BANNER|VOICE\s*OVER|VO|NARRATION|INTERNAL|EDITORIAL|TIME[- ]PLACE):", line):
+                return "caption"
         if line.startswith(("INT.", "INT ", "EXT.", "EXT ", "INT/EXT", "I/E ")):
             return "scene_heading"
         if line.startswith("(") and line.endswith(")"):
@@ -511,10 +573,18 @@ class ScriptEditor(QPlainTextEdit):
             return line
         if elem_type == "parenthetical":
             return line[1:-1].strip() if len(line) > 2 else line
-        if elem_type == "transition":
-            return line
-        if elem_type == "character":
-            return line
+        if elem_type == "page_header":
+            import re
+            m = re.match(r"(?i)^#\s*PAGE\s+(.*)", line)
+            return m.group(1).strip() if m else line
+        if elem_type == "panel_header":
+            import re
+            m = re.match(r"(?i)^\.?PANEL\s+(.*)", line)
+            return m.group(1).strip() if m else line
+        if elem_type == "sfx":
+            return line.split(":", 1)[1].strip() if ":" in line else line
+        if elem_type == "caption":
+            return line.split(":", 1)[1].strip() if ":" in line else line
         return line
 
     def _apply_element_formatting(self, bare: str, elem_type: str) -> str:
@@ -530,6 +600,14 @@ class ScriptEditor(QPlainTextEdit):
             return f"({bare.lower()})" if bare else "()"
         if elem_type == "transition":
             return f"{bare.upper()}:" if not bare.endswith(":") else bare.upper()
+        if elem_type == "page_header":
+            return f"# PAGE {bare.upper()}" if bare else "# PAGE "
+        if elem_type == "panel_header":
+            return f"PANEL {bare}" if bare else "PANEL "
+        if elem_type == "sfx":
+            return f"SFX: {bare.upper()}" if bare else "SFX: "
+        if elem_type == "caption":
+            return f"CAP: {bare}" if bare else "CAP: "
         return bare
 
 
@@ -871,8 +949,12 @@ class PlanPhase(QWidget):
 class OutlinePhase(QWidget):
     """Outline phase: node graph with structure template support."""
 
+    generate_script_requested = Signal(str)
+    import_script_requested = Signal()
+
     def __init__(self, parent=None):
         super().__init__(parent)
+        self._format_id = "fountain/core"
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
 
@@ -903,12 +985,24 @@ class OutlinePhase(QWidget):
 
         self.template_combo = QComboBox()
         self.template_combo.setAccessibleName("Structure template")
-        self.template_combo.addItem("— Structure Template —", "")
-        for key, display_name in list_templates():
-            self.template_combo.addItem(display_name, key)
+        self._populate_templates()
         self.template_combo.setFixedHeight(30)
         self.template_combo.currentIndexChanged.connect(self._on_template_selected)
         toolbar.addWidget(self.template_combo)
+
+        self.generate_btn = QPushButton("Generate Script")
+        self.generate_btn.setObjectName("secondary")
+        self.generate_btn.setAccessibleName("Generate script from outline")
+        self.generate_btn.setToolTip("Generate a Fountain script skeleton from this outline")
+        self.generate_btn.clicked.connect(self._on_generate_script)
+        toolbar.addWidget(self.generate_btn)
+
+        self.import_btn = QPushButton("Import Script")
+        self.import_btn.setObjectName("secondary")
+        self.import_btn.setAccessibleName("Import outline from manuscript")
+        self.import_btn.setToolTip("Build outline nodes from the current manuscript")
+        self.import_btn.clicked.connect(self.import_script_requested.emit)
+        toolbar.addWidget(self.import_btn)
 
         add_btn = QPushButton("+ Add node")
         add_btn.setObjectName("primary")
@@ -949,14 +1043,40 @@ class OutlinePhase(QWidget):
         zoom_bar.addWidget(info)
         layout.addLayout(zoom_bar)
 
+    def _populate_templates(self):
+        self.template_combo.clear()
+        is_comic = self._format_id.startswith("fountain+comic")
+        if is_comic:
+            from ecrit.screenplay.structure_templates import COMIC_TEMPLATES
+            self.template_combo.addItem("— Comic Template —", "")
+            for key, tpl in COMIC_TEMPLATES.items():
+                self.template_combo.addItem(tpl.name, key)
+        else:
+            self.template_combo.addItem("— Structure Template —", "")
+            for key, display_name in list_templates():
+                self.template_combo.addItem(display_name, key)
+
+    def set_format_id(self, format_id: str):
+        self._format_id = format_id
+        self.canvas._comic_mode = format_id.startswith("fountain+comic")
+        self._populate_templates()
+
     def _on_template_selected(self, index: int):
         key = self.template_combo.itemData(index)
         if not key:
             return
-        tpl = TEMPLATES.get(key)
-        if tpl:
-            nodes = generate_outline_nodes(tpl)
-            self.canvas.set_nodes(nodes)
+        is_comic = self._format_id.startswith("fountain+comic")
+        if is_comic:
+            from ecrit.screenplay.structure_templates import COMIC_TEMPLATES, generate_comic_outline_nodes
+            tpl = COMIC_TEMPLATES.get(key)
+            if tpl:
+                nodes = generate_comic_outline_nodes(tpl)
+                self.canvas.set_nodes(nodes)
+        else:
+            tpl = TEMPLATES.get(key)
+            if tpl:
+                nodes = generate_outline_nodes(tpl)
+                self.canvas.set_nodes(nodes)
         self.template_combo.setCurrentIndex(0)
 
     def apply_template(self, key: str):
@@ -966,12 +1086,21 @@ class OutlinePhase(QWidget):
             nodes = generate_outline_nodes(tpl)
             self.canvas.set_nodes(nodes)
 
+    def _on_generate_script(self):
+        from ecrit.screenplay.outline_sync import outline_to_script
+        script = outline_to_script(self.canvas._nodes, self._format_id)
+        self.generate_script_requested.emit(script)
+
     def _add_node(self):
         nodes = list(self.canvas._nodes)
         new_id = f"node_{len(nodes)+1}"
         x = 40 + (len(nodes) % 4) * 210
         y = 40 + (len(nodes) // 4) * 120
-        nodes.append({"id": new_id, "kind": "Scene", "label": f"Scene {len(nodes)+1}", "synopsis": "", "x": x, "y": y, "connections": []})
+        if self._format_id.startswith("fountain+comic"):
+            panel_count = sum(1 for n in nodes if n.get("kind") == "Panel") + 1
+            nodes.append({"id": new_id, "kind": "Panel", "label": f"Panel {panel_count}", "synopsis": "", "x": x, "y": y, "connections": []})
+        else:
+            nodes.append({"id": new_id, "kind": "Scene", "label": f"Scene {len(nodes)+1}", "synopsis": "", "x": x, "y": y, "connections": []})
         self.canvas.set_nodes(nodes)
 
     def _zoom(self, delta: float):
@@ -1006,6 +1135,9 @@ class OutlineCanvas(QWidget):
         "Scene": (190, 110),
         "Transition": (110, 36),
         "Note": (160, 80),
+        "Page": (240, 48),
+        "Panel": (190, 100),
+        "Spread": (300, 48),
     }
 
     def __init__(self, parent=None):
@@ -1024,6 +1156,7 @@ class OutlineCanvas(QWidget):
         self._dot_spacing = 22
         self._selected_node = None
         self._linking_from = None
+        self._comic_mode = False
 
     def set_nodes(self, nodes: list):
         self._nodes = nodes
@@ -1149,6 +1282,53 @@ class OutlineCanvas(QWidget):
             p.drawText(int(x) + 8, int(y) + 14, int(w) - 16, int(h) - 18, Qt.TextFlag.TextWordWrap, text[:160])
             font.setItalic(False)
             p.setFont(font)
+        elif kind == "Page":
+            w, h = 240, 48
+            p.setBrush(QColor(t.accent_900))
+            p.setPen(QPen(QColor(t.accent), 2))
+            p.drawRoundedRect(int(x), int(y), w, h, 6, 6)
+            p.setPen(QPen(QColor(t.text), 1))
+            font = p.font()
+            font.setPointSize(12)
+            font.setBold(True)
+            p.setFont(font)
+            p.drawText(int(x) + 14, int(y) + 30, node.get("label", ""))
+            font.setBold(False)
+            p.setFont(font)
+        elif kind == "Panel":
+            w, h = 190, 100
+            p.setBrush(QColor(t.surface))
+            p.setPen(QPen(QColor(t.accent_700), 1))
+            p.drawRoundedRect(int(x), int(y), w, h, 6, 6)
+            p.setPen(QPen(QColor(t.accent), 1))
+            font = p.font()
+            font.setPointSize(10)
+            font.setBold(True)
+            p.setFont(font)
+            p.drawText(int(x) + 10, int(y) + 20, node.get("label", ""))
+            font.setBold(False)
+            font.setPointSize(9)
+            p.setFont(font)
+            p.setPen(QPen(QColor(t.neutral_400), 1))
+            synopsis = node.get("synopsis", "")
+            if synopsis:
+                p.drawText(int(x) + 10, int(y) + 34, int(w) - 20, 56, Qt.TextFlag.TextWordWrap, synopsis[:120])
+        elif kind == "Spread":
+            w, h = 300, 48
+            p.setBrush(QColor(t.accent_900))
+            p.setPen(QPen(QColor(t.accent), 2))
+            p.drawRoundedRect(int(x), int(y), w, h, 6, 6)
+            inner_x = int(x) + w // 2
+            p.setPen(QPen(QColor(t.accent_700), 1, Qt.PenStyle.DashLine))
+            p.drawLine(inner_x, int(y) + 6, inner_x, int(y) + h - 6)
+            p.setPen(QPen(QColor(t.text), 1))
+            font = p.font()
+            font.setPointSize(12)
+            font.setBold(True)
+            p.setFont(font)
+            p.drawText(int(x) + 14, int(y) + 30, node.get("label", ""))
+            font.setBold(False)
+            p.setFont(font)
 
     def _draw_connector(self, p: QPainter, src: dict, dst: dict, t):
         sk = src.get("kind", "Scene")
@@ -1252,7 +1432,7 @@ class OutlineCanvas(QWidget):
 
     def _edit_node(self, node):
         kind = node.get("kind", "Scene")
-        if kind in ("Scene", "Note"):
+        if kind in ("Scene", "Note", "Panel"):
             label, ok = QInputDialog.getText(self, f"Edit {kind}", "Title:", text=node.get("label", ""))
             if ok and label:
                 node["label"] = label
@@ -1295,20 +1475,36 @@ class OutlineCanvas(QWidget):
         canvas_x, canvas_y = self._to_canvas(local_pos)
 
         menu = QMenu(self)
-        add_scene = menu.addAction("Add Scene")
-        add_act = menu.addAction("Add Act Break")
-        add_note = menu.addAction("Add Note")
-        add_transition = menu.addAction("Add Transition")
-
-        action = menu.exec(global_pos)
-        if action == add_scene:
-            self._add_node_at(canvas_x, canvas_y, "Scene", f"Scene {len(self._nodes) + 1}")
-        elif action == add_act:
-            self._add_node_at(canvas_x, canvas_y, "ActBreak", f"Act {len(self._nodes) + 1}")
-        elif action == add_note:
-            self._add_node_at(canvas_x, canvas_y, "Note", "Note")
-        elif action == add_transition:
-            self._add_node_at(canvas_x, canvas_y, "Transition", "Transition")
+        if self._comic_mode:
+            add_page = menu.addAction("Add Page")
+            add_panel = menu.addAction("Add Panel")
+            add_spread = menu.addAction("Add Spread")
+            add_note = menu.addAction("Add Note")
+            action = menu.exec(global_pos)
+            page_count = sum(1 for n in self._nodes if n.get("kind") == "Page") + 1
+            panel_count = sum(1 for n in self._nodes if n.get("kind") == "Panel") + 1
+            if action == add_page:
+                self._add_node_at(canvas_x, canvas_y, "Page", f"PAGE {page_count}")
+            elif action == add_panel:
+                self._add_node_at(canvas_x, canvas_y, "Panel", f"Panel {panel_count}")
+            elif action == add_spread:
+                self._add_node_at(canvas_x, canvas_y, "Spread", f"SPREAD (Pages {page_count}-{page_count + 1})")
+            elif action == add_note:
+                self._add_node_at(canvas_x, canvas_y, "Note", "Note")
+        else:
+            add_scene = menu.addAction("Add Scene")
+            add_act = menu.addAction("Add Act Break")
+            add_note = menu.addAction("Add Note")
+            add_transition = menu.addAction("Add Transition")
+            action = menu.exec(global_pos)
+            if action == add_scene:
+                self._add_node_at(canvas_x, canvas_y, "Scene", f"Scene {len(self._nodes) + 1}")
+            elif action == add_act:
+                self._add_node_at(canvas_x, canvas_y, "ActBreak", f"Act {len(self._nodes) + 1}")
+            elif action == add_note:
+                self._add_node_at(canvas_x, canvas_y, "Note", "Note")
+            elif action == add_transition:
+                self._add_node_at(canvas_x, canvas_y, "Transition", "Transition")
 
     def _add_node_at(self, x: float, y: float, kind: str, label: str):
         import time
@@ -1901,6 +2097,8 @@ class EditorScreen(QWidget):
         self.manuscript.editor.text_cut.connect(self.scratchpad.add_text)
         self.manuscript.editor.cursor_info_changed.connect(self._on_cursor_info_changed)
         self.manuscript.scene_nav.scene_selected.connect(self._on_scene_selected)
+        self.outline.generate_script_requested.connect(self._on_generate_from_outline)
+        self.outline.import_script_requested.connect(self._on_import_to_outline)
 
     def switch_phase(self, phase: str):
         self._current_phase = phase
@@ -1960,6 +2158,10 @@ class EditorScreen(QWidget):
 
     def load_project(self, project_data: dict):
         script = project_data.get("script", "")
+        format_id = project_data.get("meta", {}).get("format_id", "fountain/core")
+        self._format_id = format_id
+        self.manuscript.editor.set_format_id(format_id)
+        self.outline.set_format_id(format_id)
         self.manuscript.editor.setPlainText(script)
 
         self.manuscript.scene_nav.set_script(script)
@@ -2006,6 +2208,17 @@ class EditorScreen(QWidget):
             self.plan.doc_list.setCurrentRow(0)
 
         self.proofread.script_view.setPlainText(script)
+
+    def _on_generate_from_outline(self, script: str):
+        self.manuscript.editor.setPlainText(script)
+        self.switch_phase("Manuscript")
+
+    def _on_import_to_outline(self):
+        from ecrit.screenplay.outline_sync import script_to_outline
+        script = self.manuscript.editor.toPlainText()
+        format_id = getattr(self, "_format_id", "fountain/core")
+        nodes = script_to_outline(script, format_id)
+        self.outline.canvas.set_nodes(nodes)
 
     def _toggle_find(self):
         self.find_bar.toggle()
