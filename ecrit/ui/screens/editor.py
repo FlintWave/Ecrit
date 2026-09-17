@@ -2130,20 +2130,38 @@ class EditorScreen(QWidget):
         case_sensitive = self.find_bar.case_check.isChecked()
         use_regex = self.find_bar.regex_check.isChecked()
         editor = self.manuscript.editor
-        content = editor.toPlainText()
+        from PySide6.QtGui import QTextDocument, QTextCursor
+        doc = editor.document()
+        flags = QTextDocument.FindFlag(0)
+        if case_sensitive:
+            flags |= QTextDocument.FindFlag.FindCaseSensitively
+        search_pattern = find_text
         if use_regex:
             import re
-            flags = 0 if case_sensitive else re.IGNORECASE
             try:
-                new_content = re.sub(find_text, replace_text, content, flags=flags)
+                re.compile(find_text)
             except re.error:
                 return
-        else:
-            if case_sensitive:
-                new_content = content.replace(find_text, replace_text)
-            else:
+            from PySide6.QtCore import QRegularExpression
+            qre = QRegularExpression(find_text)
+            if not case_sensitive:
+                qre.setPatternOptions(QRegularExpression.PatternOption.CaseInsensitiveOption)
+            search_pattern = qre
+        cursor = editor.textCursor()
+        cursor.beginEditBlock()
+        search_cursor = QTextCursor(doc)
+        while True:
+            found = doc.find(search_pattern, search_cursor, flags)
+            if found.isNull() or not found.hasSelection():
+                break
+            if use_regex:
                 import re
-                new_content = re.sub(re.escape(find_text), replace_text.replace('\\', '\\\\'), content, flags=re.IGNORECASE)
-        if new_content != content:
-            editor.setPlainText(new_content)
+                re_flags = 0 if case_sensitive else re.IGNORECASE
+                matched = found.selectedText().replace(" ", "\n")
+                replacement = re.sub(find_text, replace_text, matched, count=1, flags=re_flags)
+            else:
+                replacement = replace_text
+            found.insertText(replacement)
+            search_cursor = found
+        cursor.endEditBlock()
         self.find_bar.set_match_count(0, 0)

@@ -97,13 +97,13 @@ class TextCRDT:
         if op2.op_type == OperationType.INSERT:
             insert_len = len(op2.text)
             if op1.op_type == OperationType.DELETE and op1.position < op2.position < op1.position + op1.length:
-                # op2 insert lands inside op1's delete range — preserve the inserted text
-                # by splitting the delete: only delete up to the insert point
+                # Insert landed inside delete range — expand delete to cover the
+                # gap the insert created so all originally-targeted chars are removed
                 return Operation(
                     op_type=op1.op_type,
                     position=op1.position,
                     text=op1.text,
-                    length=op1.length,
+                    length=op1.length + insert_len,
                     user_id=op1.user_id,
                     timestamp=op1.timestamp,
                     revision=op1.revision,

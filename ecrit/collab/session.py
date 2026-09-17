@@ -104,6 +104,7 @@ class CollabSession:
         token = self._p2p.host_session(port=port, project_title=project_title)
         self._lan.port = self._p2p._port
         self._lan.set_project_title(project_title)
+        self._lan.set_session_id(self._p2p._session_id)
         self._lan.start()
         self._set_state(SessionState.CONNECTED)
         return token
@@ -113,7 +114,7 @@ class CollabSession:
         token = ConnectionToken(
             host=peer.ip_address,
             port=peer.port,
-            session_id="",
+            session_id=peer.session_id,
             user_name=peer.user_name,
             project_title=peer.project_title,
         )
@@ -162,12 +163,16 @@ class CollabSession:
     def apply_local_insert(self, position: int, text: str) -> None:
         op = self._crdt.insert(position, text)
         self._pending_ops.append(op)
+        if len(self._pending_ops) > 100:
+            self._pending_ops = self._pending_ops[-50:]
         msg = CollabMessage.operation(self.user_id, op)
         self._p2p.broadcast(msg.to_json())
 
     def apply_local_delete(self, position: int, length: int) -> None:
         op = self._crdt.delete(position, length)
         self._pending_ops.append(op)
+        if len(self._pending_ops) > 100:
+            self._pending_ops = self._pending_ops[-50:]
         msg = CollabMessage.operation(self.user_id, op)
         self._p2p.broadcast(msg.to_json())
 
@@ -234,7 +239,7 @@ class CollabSession:
             if self.role == CollabRole.HOST:
                 relay = CollabMessage.operation(msg.user_id, op)
                 relay_data = relay.to_json()
-                for pid in self._p2p._clients:
+                for pid in self._p2p.get_client_ids():
                     if pid != peer_id:
                         self._p2p.send(pid, relay_data)
 
@@ -250,7 +255,7 @@ class CollabSession:
                     msg.payload.get("selection_end", -1),
                 )
             if self.role == CollabRole.HOST:
-                for pid in self._p2p._clients:
+                for pid in self._p2p.get_client_ids():
                     if pid != peer_id:
                         self._p2p.send(pid, raw)
 

@@ -789,27 +789,53 @@ class MainWindow(QMainWindow):
             session._crdt.set_text(content)
         self.editor.manuscript.presence_bar.setVisible(True)
         self._active_collab_session = session
+        self._collab_suppress_local = False
         self._collab_text_changed.connect(self._apply_collab_text)
         self._collab_participants_changed.connect(self._apply_collab_participants)
         self._collab_cursor_changed.connect(self._apply_collab_cursor)
+        self.editor.manuscript.editor.document().contentsChange.connect(
+            self._on_collab_local_edit
+        )
         session.set_callbacks(
             on_text_change=lambda text: self._collab_text_changed.emit(text),
             on_participant_change=lambda: self._collab_participants_changed.emit(),
             on_cursor_change=lambda uid, pos, length: self._collab_cursor_changed.emit(uid, pos, length),
         )
 
+    def _on_collab_local_edit(self, position: int, chars_removed: int, chars_added: int):
+        session = self._active_collab_session
+        if not session or self._collab_suppress_local:
+            return
+        if chars_removed > 0:
+            session.apply_local_delete(position, chars_removed)
+        if chars_added > 0:
+            doc = self.editor.manuscript.editor.document()
+            cursor = self.editor.manuscript.editor.textCursor()
+            cursor.setPosition(position)
+            cursor.movePosition(cursor.MoveOperation.Right, cursor.MoveMode.KeepAnchor, chars_added)
+            added_text = cursor.selectedText().replace(" ", "\n")
+            if added_text:
+                session.apply_local_insert(position, added_text)
+
     def _apply_collab_text(self, text: str):
         editor = self.editor.manuscript.editor
         if editor.toPlainText() != text:
             cursor_pos = editor.textCursor().position()
+            self._collab_suppress_local = True
             editor.blockSignals(True)
             editor.setPlainText(text)
             cursor = editor.textCursor()
             cursor.setPosition(min(cursor_pos, len(text)))
             editor.setTextCursor(cursor)
             editor.blockSignals(False)
+            self._collab_suppress_local = False
             STATE.script_content = text
-            STATE.save_script()
+            if not hasattr(self, "_collab_save_timer"):
+                self._collab_save_timer = QTimer(self)
+                self._collab_save_timer.setSingleShot(True)
+                self._collab_save_timer.setInterval(2000)
+                self._collab_save_timer.timeout.connect(lambda: STATE.save_script())
+            self._collab_save_timer.start()
 
     def _apply_collab_participants(self):
         session = self._active_collab_session
@@ -838,6 +864,15 @@ class MainWindow(QMainWindow):
             self._collab_cursor_changed.disconnect(self._apply_collab_cursor)
         except RuntimeError:
             pass
+        try:
+            self.editor.manuscript.editor.document().contentsChange.disconnect(
+                self._on_collab_local_edit
+            )
+        except RuntimeError:
+            pass
+        if hasattr(self, "_collab_save_timer") and self._collab_save_timer.isActive():
+            self._collab_save_timer.stop()
+            STATE.save_script()
         self._active_collab_session = None
         self.editor.status_bar.sprint_label.setText("")
         self.editor.manuscript.presence_bar.clear_participants()
