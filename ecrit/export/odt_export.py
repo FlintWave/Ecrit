@@ -1,12 +1,15 @@
 """ODT export — generate Open Document Text from Fountain script."""
 
 import json
+import logging
 import os
 import zipfile
 from io import BytesIO
 from xml.sax.saxutils import escape
 
 from PySide6.QtWidgets import QFileDialog
+
+logger = logging.getLogger("ecrit.export.odt")
 
 
 CONTENT_XML_HEAD = """<?xml version="1.0" encoding="UTF-8"?>
@@ -87,6 +90,7 @@ def _build_content_xml(script_content: str) -> str:
         import ecrit_core
         parsed = json.loads(ecrit_core.parse_fountain(script_content))
     except Exception:
+        logger.debug("Fountain parse unavailable, inserting raw text", exc_info=True)
         return CONTENT_XML_HEAD + f"<text:p>{escape(script_content)}</text:p>" + CONTENT_XML_TAIL
 
     parts = [CONTENT_XML_HEAD]

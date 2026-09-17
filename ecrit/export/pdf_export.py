@@ -1,6 +1,7 @@
 """PDF export — paginate Fountain script to PDF using Qt's print engine."""
 
 import json
+import logging
 from PySide6.QtWidgets import QFileDialog
 from PySide6.QtCore import QMarginsF, QSizeF, Qt
 from PySide6.QtGui import (
@@ -35,6 +36,7 @@ def _build_document(script_content: str, font_size: int = 12, include_title_page
         import ecrit_core
         parsed = json.loads(ecrit_core.parse_fountain(script_content))
     except Exception:
+        logging.getLogger("ecrit.export.pdf").debug("Fountain parse unavailable, inserting raw text", exc_info=True)
         cursor.insertText(script_content)
         return doc
 

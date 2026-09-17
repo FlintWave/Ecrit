@@ -5,9 +5,12 @@ from __future__ import annotations
 import importlib
 import importlib.util
 import json
+import logging
 import os
 from dataclasses import dataclass, field, asdict
 from typing import Any, Callable, Optional
+
+logger = logging.getLogger("ecrit.modules")
 
 
 @dataclass
@@ -154,7 +157,7 @@ class ModuleRegistry:
             try:
                 results.append(callback(*args, **kwargs))
             except Exception:
-                pass
+                logger.warning("Hook '%s' callback %s failed", hook_name, callback, exc_info=True)
         return results
 
     def _unhook_module(self, name: str) -> None:

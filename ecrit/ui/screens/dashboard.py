@@ -327,5 +327,5 @@ def _relative_time(iso_str: str) -> str:
             return f"{hours}h ago"
         mins = diff.seconds // 60
         return f"{mins}m ago"
-    except Exception:
+    except (ValueError, TypeError):
         return ""

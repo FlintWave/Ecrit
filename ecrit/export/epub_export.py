@@ -483,4 +483,5 @@ def export_epub_to_path(content: str, path: str, title: str = "", author: str = 
             f.write(data)
         return True
     except Exception:
+        logging.getLogger("ecrit.export.epub").warning("EPUB export to %s failed", path, exc_info=True)
         return False

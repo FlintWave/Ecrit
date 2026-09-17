@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import threading
 import uuid
 from enum import Enum
@@ -12,6 +13,8 @@ from ecrit.collab.protocol import CollabMessage, MessageType, Operation
 from ecrit.collab.crdt import TextCRDT
 from ecrit.collab.lan import LANDiscovery, LANPeer
 from ecrit.collab.p2p import P2PConnection, ConnectionToken
+
+logger = logging.getLogger("ecrit.collab.session")
 
 
 class CollabRole(str, Enum):
@@ -212,7 +215,8 @@ class CollabSession:
     def _handle_message(self, peer_id: str, raw: str) -> None:
         try:
             msg = CollabMessage.from_json(raw)
-        except Exception:
+        except (ValueError, KeyError):
+            logger.debug("Ignoring malformed collab message from %s", peer_id)
             return
 
         if msg.msg_type == MessageType.JOIN:
