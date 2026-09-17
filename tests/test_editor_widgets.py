@@ -584,13 +584,12 @@ class TestCloudExportAutoExport:
         assert len(received) == 1
         assert received[0][1] is True
 
-    def test_provider_changed_restores_auth_status(self, qapp):
+    def test_provider_changed_shows_not_available(self, qapp):
         from ecrit.ui.overlays.cloud_export import CloudExportDialog
         dialog = CloudExportDialog()
-        dialog.set_configs([{"provider": "google_drive", "authenticated": True, "auto_export": True}])
         dialog.provider_combo.setCurrentIndex(1)
         dialog.provider_combo.setCurrentIndex(0)
-        assert dialog.auth_status.text() == "Authenticated"
+        assert dialog.auth_status.text() == "Not yet available"
 
 
 class TestDeliverPhaseInit:

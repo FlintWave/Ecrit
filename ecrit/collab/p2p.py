@@ -57,6 +57,7 @@ class P2PConnection:
         self.user_name = user_name
         self._server_socket: Optional[socket.socket] = None
         self._clients: dict[str, socket.socket] = {}
+        self._clients_lock = threading.Lock()
         self._running = False
         self._listen_thread: Optional[threading.Thread] = None
         self._on_message: Optional[Callable[[str, str], None]] = None
@@ -85,7 +86,7 @@ class P2PConnection:
         self._server_socket.listen(8)
         self._server_socket.settimeout(1.0)
         self._port = self._server_socket.getsockname()[1]
-        self._session_id = base64.urlsafe_b64encode(os.urandom(6)).decode()
+        self._session_id = base64.urlsafe_b64encode(os.urandom(16)).decode().rstrip("=")
         self._running = True
 
         self._listen_thread = threading.Thread(target=self._accept_loop, daemon=True)
@@ -113,7 +114,8 @@ class P2PConnection:
                 "session_id": token.session_id,
             })
             self._send_frame(sock, hello)
-            self._clients["host"] = sock
+            with self._clients_lock:
+                self._clients["host"] = sock
             self._running = True
 
             recv_thread = threading.Thread(
@@ -125,7 +127,8 @@ class P2PConnection:
             return False
 
     def send(self, peer_id: str, message: str) -> bool:
-        sock = self._clients.get(peer_id)
+        with self._clients_lock:
+            sock = self._clients.get(peer_id)
         if sock:
             try:
                 self._send_frame(sock, message)
@@ -136,8 +139,10 @@ class P2PConnection:
         return False
 
     def broadcast(self, message: str) -> None:
+        with self._clients_lock:
+            snapshot = list(self._clients.items())
         dead = []
-        for peer_id, sock in self._clients.items():
+        for peer_id, sock in snapshot:
             try:
                 self._send_frame(sock, message)
             except OSError:
@@ -147,12 +152,14 @@ class P2PConnection:
 
     def close(self) -> None:
         self._running = False
-        for sock in self._clients.values():
+        with self._clients_lock:
+            socks = list(self._clients.values())
+            self._clients.clear()
+        for sock in socks:
             try:
                 sock.close()
             except OSError:
                 pass
-        self._clients.clear()
         if self._server_socket:
             try:
                 self._server_socket.close()
@@ -161,10 +168,16 @@ class P2PConnection:
             self._server_socket = None
 
     def is_connected(self) -> bool:
-        return self._running and len(self._clients) > 0
+        with self._clients_lock:
+            return self._running and len(self._clients) > 0
 
     def get_peer_count(self) -> int:
-        return len(self._clients)
+        with self._clients_lock:
+            return len(self._clients)
+
+    def get_client_ids(self) -> list[str]:
+        with self._clients_lock:
+            return list(self._clients.keys())
 
     def _send_frame(self, sock: socket.socket, data: str) -> None:
         encoded = data.encode("utf-8")
@@ -201,7 +214,8 @@ class P2PConnection:
                     if hello.get("session_id") != self._session_id:
                         client_sock.close()
                         continue
-                    self._clients[peer_id] = client_sock
+                    with self._clients_lock:
+                        self._clients[peer_id] = client_sock
                     if self._on_connect:
                         self._on_connect(peer_id)
                     recv_thread = threading.Thread(
@@ -229,7 +243,8 @@ class P2PConnection:
         self._remove_peer(peer_id)
 
     def _remove_peer(self, peer_id: str) -> None:
-        sock = self._clients.pop(peer_id, None)
+        with self._clients_lock:
+            sock = self._clients.pop(peer_id, None)
         if sock:
             try:
                 sock.close()

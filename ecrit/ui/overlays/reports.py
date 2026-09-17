@@ -6,7 +6,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt
 
-from ecrit.ui.styles import theme
+from ecrit.ui.icons import IconButton
 from ecrit.screenplay.production_reports import (
     generate_scene_report,
     generate_cast_report,
@@ -40,7 +40,6 @@ class ReportsDialog(QDialog):
         self.setMinimumSize(700, 500)
         self.setModal(True)
 
-        t = theme.current()
         layout = QVBoxLayout(self)
         layout.setContentsMargins(24, 20, 24, 20)
         layout.setSpacing(16)
@@ -51,9 +50,10 @@ class ReportsDialog(QDialog):
         title.setStyleSheet("font-size: 20px; font-weight: 500;")
         header.addWidget(title)
         header.addStretch()
-        close_btn = QPushButton("×")
+        close_btn = IconButton("x-mark")
         close_btn.setObjectName("iconBtn")
         close_btn.setFixedSize(28, 28)
+        close_btn.setAccessibleName("Close")
         close_btn.clicked.connect(self.close)
         header.addWidget(close_btn)
         layout.addLayout(header)

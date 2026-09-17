@@ -4,8 +4,6 @@ from PySide6.QtWidgets import QWidget, QHBoxLayout, QLabel, QFrame
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
 
-from ecrit.ui.styles import theme
-
 
 class PresenceBadge(QFrame):
     def __init__(self, user_name: str, color: str, parent=None):

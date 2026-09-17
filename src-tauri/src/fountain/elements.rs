@@ -3,11 +3,10 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "type")]
 pub enum Element {
-    TitlePage { pairs: Vec<TitlePagePair> },
     SceneHeading { text: String, scene_number: Option<String>, forced: bool },
     Action { text: String, centered: bool, forced: bool },
     Character { name: String, extension: Option<String>, dual: bool, forced: bool },
-    Dialogue { text: String },
+    Dialogue { text: String, #[serde(skip_serializing_if = "Option::is_none")] number: Option<u32> },
     Parenthetical { text: String },
     Transition { text: String, forced: bool },
     Lyric { text: String },
@@ -17,12 +16,10 @@ pub enum Element {
     Boneyard { text: String },
     PageBreak,
     BlankLine,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct TitlePagePair {
-    pub key: String,
-    pub value: String,
+    PageHeader { text: String, page_number: Option<u32> },
+    PanelHeader { text: String, panel_number: Option<u32> },
+    Sfx { text: String, number: Option<u32> },
+    Caption { text: String, subtype: String, number: Option<u32> },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -70,4 +67,8 @@ pub struct ScriptStats {
     pub action_percentage: f32,
     pub characters: Vec<CharacterInfo>,
     pub scenes: Vec<SceneInfo>,
+    pub comic_page_count: u32,
+    pub panel_count: u32,
+    pub sfx_count: u32,
+    pub caption_count: u32,
 }

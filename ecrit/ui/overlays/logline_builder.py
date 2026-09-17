@@ -7,6 +7,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, Signal
 
 from ecrit.ui.styles import theme
+from ecrit.ui.icons import IconButton
 from ecrit.screenplay.logline_builder import (
     LOGLINE_TEMPLATES,
     build_logline,
@@ -33,8 +34,6 @@ class LoglineBuilderDialog(QDialog):
         self._field_inputs: dict[str, QLineEdit] = {}
         self._current_key: str = ""
 
-        t = theme.current()
-
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
 
@@ -45,9 +44,10 @@ class LoglineBuilderDialog(QDialog):
         title.setStyleSheet("font-size: 20px; font-weight: 500;")
         header.addWidget(title)
         header.addStretch()
-        close_btn = QPushButton("×")
+        close_btn = IconButton("x-mark")
         close_btn.setObjectName("iconBtn")
         close_btn.setFixedSize(28, 28)
+        close_btn.setAccessibleName("Close")
         close_btn.clicked.connect(self.close)
         header.addWidget(close_btn)
         layout.addLayout(header)
@@ -63,6 +63,7 @@ class LoglineBuilderDialog(QDialog):
 
         self._template_combo = QComboBox()
         self._template_combo.setFixedHeight(34)
+        self._template_combo.setAccessibleName("Template")
         for key, tmpl in LOGLINE_TEMPLATES.items():
             self._template_combo.addItem(tmpl.name, key)
         self._template_combo.currentIndexChanged.connect(self._on_template_changed)
@@ -70,10 +71,8 @@ class LoglineBuilderDialog(QDialog):
 
         self._example_label = QLabel()
         self._example_label.setWordWrap(True)
-        self._example_label.setStyleSheet(
-            f"color: {t.neutral_500}; font-size: 12px; font-style: italic; "
-            f"padding: 4px 0;"
-        )
+        self._example_label.setObjectName("dashMutedSmall")
+        self._example_label.setStyleSheet("font-style: italic; padding: 4px 0;")
         selector_area.addWidget(self._example_label)
 
         layout.addLayout(selector_area)
@@ -94,9 +93,6 @@ class LoglineBuilderDialog(QDialog):
         # --- Divider ---
         divider = QFrame()
         divider.setFrameShape(QFrame.Shape.HLine)
-        divider.setStyleSheet(
-            f"color: {t.neutral_700 if t.name == 'nocturne' else t.divider};"
-        )
         layout.addWidget(divider)
 
         # --- Preview area ---
@@ -111,19 +107,12 @@ class LoglineBuilderDialog(QDialog):
         self._preview = QTextEdit()
         self._preview.setReadOnly(True)
         self._preview.setFixedHeight(72)
-        self._preview.setStyleSheet(
-            f"background: {t.neutral_800 if t.name == 'nocturne' else t.neutral_200}; "
-            f"border: 1px solid {t.neutral_700 if t.name == 'nocturne' else t.neutral_300}; "
-            f"border-radius: {t.radius_sm}px; "
-            f"padding: 8px; font-size: 13px;"
-        )
+        self._preview.setObjectName("loglinePreview")
         preview_area.addWidget(self._preview)
 
         # --- Validation indicator ---
         self._validation_label = QLabel()
-        self._validation_label.setStyleSheet(
-            f"color: {t.neutral_500}; font-size: 12px; padding: 2px 0;"
-        )
+        self._validation_label.setObjectName("dashMutedSmall")
         preview_area.addWidget(self._validation_label)
 
         layout.addLayout(preview_area)
@@ -136,12 +125,14 @@ class LoglineBuilderDialog(QDialog):
         cancel_btn = QPushButton("Close")
         cancel_btn.setObjectName("secondary")
         cancel_btn.setFixedHeight(36)
+        cancel_btn.setAccessibleName("Close")
         cancel_btn.clicked.connect(self.close)
         footer.addWidget(cancel_btn)
 
         self._apply_btn = QPushButton("Apply")
         self._apply_btn.setObjectName("primary")
         self._apply_btn.setFixedHeight(36)
+        self._apply_btn.setAccessibleName("Apply Logline")
         self._apply_btn.clicked.connect(self._on_apply)
         footer.addWidget(self._apply_btn)
 
@@ -186,6 +177,7 @@ class LoglineBuilderDialog(QDialog):
             inp = QLineEdit()
             inp.setFixedHeight(32)
             inp.setPlaceholderText(f"Enter {_field_display_name(field_name).lower()}...")
+            inp.setAccessibleName(_field_display_name(field_name))
             inp.textChanged.connect(self._update_preview)
             self._fields_layout.addWidget(inp)
             self._field_inputs[field_name] = inp

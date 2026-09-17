@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, Signal
 
-from ecrit.ui.styles import theme
+from ecrit.ui.icons import IconButton
 
 
 def _run_git(project_path: str, *args) -> str:
@@ -23,7 +23,7 @@ def _run_git(project_path: str, *args) -> str:
             timeout=10,
         )
         return result.stdout.strip()
-    except Exception:
+    except (subprocess.TimeoutExpired, OSError):
         return ""
 
 
@@ -103,7 +103,6 @@ class SnapshotsDialog(QDialog):
 
         self._project_path = ""
 
-        t = theme.current()
         layout = QVBoxLayout(self)
         layout.setContentsMargins(20, 16, 20, 16)
         layout.setSpacing(12)
@@ -113,9 +112,10 @@ class SnapshotsDialog(QDialog):
         title.setStyleSheet("font-size: 20px; font-weight: 500;")
         header.addWidget(title)
         header.addStretch()
-        close_btn = QPushButton("×")
+        close_btn = IconButton("x-mark")
         close_btn.setObjectName("iconBtn")
         close_btn.setFixedSize(28, 28)
+        close_btn.setAccessibleName("Close")
         close_btn.clicked.connect(self.close)
         header.addWidget(close_btn)
         layout.addLayout(header)
@@ -124,16 +124,19 @@ class SnapshotsDialog(QDialog):
         self.message_input = QLineEdit()
         self.message_input.setPlaceholderText("Snapshot message (optional)")
         self.message_input.setFixedHeight(34)
+        self.message_input.setAccessibleName("Snapshot Message")
         create_row.addWidget(self.message_input, 1)
 
         snap_btn = QPushButton("Snapshot")
         snap_btn.setObjectName("primary")
         snap_btn.setFixedHeight(34)
+        snap_btn.setAccessibleName("Create Snapshot")
         snap_btn.clicked.connect(self._create_snapshot)
         create_row.addWidget(snap_btn)
         layout.addLayout(create_row)
 
         self.snap_list = QListWidget()
+        self.snap_list.setAccessibleName("Snapshots")
         layout.addWidget(self.snap_list, 1)
 
         restore_row = QHBoxLayout()
@@ -141,6 +144,7 @@ class SnapshotsDialog(QDialog):
         self.restore_btn = QPushButton("Restore selected")
         self.restore_btn.setObjectName("secondary")
         self.restore_btn.setFixedHeight(34)
+        self.restore_btn.setAccessibleName("Restore Selected Snapshot")
         self.restore_btn.clicked.connect(self._restore_snapshot)
         restore_row.addWidget(self.restore_btn)
         layout.addLayout(restore_row)
@@ -151,7 +155,6 @@ class SnapshotsDialog(QDialog):
 
     def _refresh(self):
         self.snap_list.clear()
-        t = theme.current()
         snapshots = list_snapshots(self._project_path)
         for s in snapshots:
             item = QListWidgetItem(f"{s['date']}  —  {s['label']}")

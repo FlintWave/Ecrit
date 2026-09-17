@@ -71,7 +71,7 @@
 - **Series Manager** — Multi-episode/season management with a shared series bible (characters, locations, props, themes, backstory)
 - **Git Snapshots** — Local version control with create, list, and restore
 - **Remote Sync** — Push/pull to GitHub, GitLab, or Codeberg
-- **Cloud Export** — Export to Google Drive, iCloud, Dropbox, OneDrive, or Nextcloud
+- **Cloud Export** — Export scaffolding for Google Drive, iCloud, Dropbox, OneDrive, and Nextcloud (provider SDKs not yet integrated)
 - **Share for Review** — Generate self-contained, watermarked HTML files for confidential review
 - **Real-time Collaboration** — LAN-based peer-to-peer editing with CRDT conflict resolution and presence indicators
 - **Plugin Marketplace** — Browse, install, and manage community plugins with a built-in marketplace UI
@@ -153,6 +153,7 @@ Use **Import Script** from the Dashboard or Command Palette to open `.fountain` 
 
 - **Python 3.12+** (recommended; 3.10+ supported)
 - **Rust 1.70+** (for the native core)
+- **maturin** (`pip install maturin`)
 - **Qt 6** (installed via PySide6)
 
 ### Setup
@@ -169,9 +170,9 @@ source .venv/bin/activate  # or .venv\Scripts\activate on Windows
 # Install Python dependencies
 pip install -e ".[dev]"
 
-# Build the Rust core
+# Build the Rust core (PyO3 extension)
 cd src-tauri
-cargo build --release
+maturin develop --release
 cd ..
 
 # Run the app
@@ -224,7 +225,7 @@ Ecrit/
 │       ├── fountain/       # Fountain parser
 │       ├── project/        # Project file management
 │       └── lib.rs          # PyO3 module
-├── tests/                  # Test suite (766 tests)
+├── tests/                  # Test suite (879 tests)
 ├── openspec/               # Feature tracking and roadmap
 └── public/                 # Static assets
 ```

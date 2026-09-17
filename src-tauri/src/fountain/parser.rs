@@ -16,6 +16,14 @@ pub struct FountainParser {
     note_re: Regex,
     boneyard_re: Regex,
     lyric_re: Regex,
+    page_header_re: Regex,
+    panel_header_re: Regex,
+    sfx_re: Regex,
+    caption_re: Regex,
+}
+
+fn is_comic_format(format_id: &str) -> bool {
+    format_id.starts_with("fountain+comic")
 }
 
 impl FountainParser {
@@ -35,10 +43,19 @@ impl FountainParser {
             note_re: Regex::new(r"\[\[([^\]]*)\]\]").unwrap(),
             boneyard_re: Regex::new(r"/\*[\s\S]*?\*/").unwrap(),
             lyric_re: Regex::new(r"^~(.+)$").unwrap(),
+            page_header_re: Regex::new(r"(?i)^#\s*PAGE\s+(.+)$").unwrap(),
+            panel_header_re: Regex::new(r"(?i)^\.?PANEL\s+(.+)$").unwrap(),
+            sfx_re: Regex::new(r"(?i)^SFX:\s*(.+)$").unwrap(),
+            caption_re: Regex::new(r"(?i)^(CAP|CAPTION|BANNER|VOICE\s*OVER|VO|NARRATION|INTERNAL|EDITORIAL|TIME[- ]PLACE):\s*(.+)$").unwrap(),
         }
     }
 
     pub fn parse(&self, input: &str) -> FountainDocument {
+        self.parse_with_format(input, "fountain/core")
+    }
+
+    pub fn parse_with_format(&self, input: &str, format_id: &str) -> FountainDocument {
+        let comic_mode = is_comic_format(format_id);
         let cleaned = self.boneyard_re.replace_all(input, "").to_string();
         let lines: Vec<&str> = cleaned.lines().collect();
         let mut elements = Vec::new();
@@ -49,6 +66,10 @@ impl FountainParser {
             title_page = Some(tp);
             i = consumed;
         }
+
+        let mut comic_page_num: u32 = 0;
+        let mut comic_panel_num: u32 = 0;
+        let mut lettering_num: u32 = 0;
 
         while i < lines.len() {
             let line = lines[i].trim_end();
@@ -65,7 +86,70 @@ impl FountainParser {
                 continue;
             }
 
+            if comic_mode {
+                if let Some(caps) = self.page_header_re.captures(line) {
+                    comic_page_num += 1;
+                    comic_panel_num = 0;
+                    lettering_num = 0;
+                    let text = caps[1].trim().to_string();
+                    elements.push(Element::PageHeader {
+                        text: format!("PAGE {}", text),
+                        page_number: Some(comic_page_num),
+                    });
+                    i += 1;
+                    continue;
+                }
+
+                if let Some(caps) = self.panel_header_re.captures(line) {
+                    comic_panel_num += 1;
+                    let text = caps[1].trim().to_string();
+                    elements.push(Element::PanelHeader {
+                        text: format!("PANEL {}", text),
+                        panel_number: Some(comic_panel_num),
+                    });
+                    i += 1;
+                    continue;
+                }
+
+                if let Some(caps) = self.sfx_re.captures(line) {
+                    lettering_num += 1;
+                    let text = caps[1].trim().to_string();
+                    elements.push(Element::Sfx {
+                        text,
+                        number: Some(lettering_num),
+                    });
+                    i += 1;
+                    continue;
+                }
+
+                if let Some(caps) = self.caption_re.captures(line) {
+                    lettering_num += 1;
+                    let subtype_raw = caps[1].to_string();
+                    let text = caps[2].trim().to_string();
+                    let subtype = normalize_caption_subtype(&subtype_raw);
+                    elements.push(Element::Caption {
+                        text,
+                        subtype,
+                        number: Some(lettering_num),
+                    });
+                    i += 1;
+                    continue;
+                }
+            }
+
             if let Some(caps) = self.section_re.captures(line) {
+                if comic_mode && caps[2].trim().to_uppercase().starts_with("PAGE") {
+                    comic_page_num += 1;
+                    comic_panel_num = 0;
+                    lettering_num = 0;
+                    let text = caps[2].trim().to_string();
+                    elements.push(Element::PageHeader {
+                        text,
+                        page_number: Some(comic_page_num),
+                    });
+                    i += 1;
+                    continue;
+                }
                 let level = caps[1].len() as u8;
                 let text = caps[2].trim().to_string();
                 elements.push(Element::Section { level, text });
@@ -135,7 +219,7 @@ impl FountainParser {
                 continue;
             }
 
-            if let Some((char_elem, dialogue_elements, consumed)) = self.try_dialogue_block(&lines, i, &elements) {
+            if let Some((char_elem, dialogue_elements, consumed)) = self.try_dialogue_block(&lines, i, &elements, comic_mode, &mut lettering_num) {
                 elements.push(char_elem);
                 for de in dialogue_elements {
                     elements.push(de);
@@ -244,6 +328,8 @@ impl FountainParser {
         lines: &[&str],
         start: usize,
         prev_elements: &[Element],
+        comic_mode: bool,
+        lettering_num: &mut u32,
     ) -> Option<(Element, Vec<Element>, usize)> {
         let line = lines[start].trim_end();
 
@@ -272,6 +358,13 @@ impl FountainParser {
             return None;
         }
 
+        let balloon_num = if comic_mode {
+            *lettering_num += 1;
+            Some(*lettering_num)
+        } else {
+            None
+        };
+
         let char_elem = Element::Character { name, extension, dual, forced };
         let mut dialogue_elems = Vec::new();
 
@@ -284,7 +377,7 @@ impl FountainParser {
             if trimmed.starts_with('(') && trimmed.ends_with(')') {
                 dialogue_elems.push(Element::Parenthetical { text: trimmed.to_string() });
             } else {
-                dialogue_elems.push(Element::Dialogue { text: dline.to_string() });
+                dialogue_elems.push(Element::Dialogue { text: dline.to_string(), number: balloon_num });
             }
             i += 1;
         }
@@ -317,6 +410,11 @@ impl FountainParser {
         let mut page = 1u32;
         let mut lines_on_page = 0u32;
         let lines_per_page = 55u32;
+
+        let mut comic_page_count = 0u32;
+        let mut panel_count = 0u32;
+        let mut sfx_count = 0u32;
+        let mut caption_count = 0u32;
 
         for elem in &doc.elements {
             match elem {
@@ -354,7 +452,7 @@ impl FountainParser {
                     }
                     lines_on_page += 1;
                 }
-                Element::Dialogue { text } => {
+                Element::Dialogue { text, .. } => {
                     let wc = text.split_whitespace().count() as u32;
                     total_words += wc;
                     dialogue_words += wc;
@@ -388,6 +486,28 @@ impl FountainParser {
                     page += 1;
                     lines_on_page = 0;
                 }
+                Element::PageHeader { .. } => {
+                    comic_page_count += 1;
+                    lines_on_page += 2;
+                }
+                Element::PanelHeader { .. } => {
+                    panel_count += 1;
+                    lines_on_page += 2;
+                }
+                Element::Sfx { text, .. } => {
+                    sfx_count += 1;
+                    let wc = text.split_whitespace().count() as u32;
+                    total_words += wc;
+                    action_words += wc;
+                    lines_on_page += 1;
+                }
+                Element::Caption { text, .. } => {
+                    caption_count += 1;
+                    let wc = text.split_whitespace().count() as u32;
+                    total_words += wc;
+                    dialogue_words += wc;
+                    lines_on_page += 1;
+                }
                 _ => {}
             }
 
@@ -410,6 +530,23 @@ impl FountainParser {
             action_percentage: (action_words as f32 / total_content) * 100.0,
             characters: char_list,
             scenes,
+            comic_page_count,
+            panel_count,
+            sfx_count,
+            caption_count,
         }
+    }
+}
+
+fn normalize_caption_subtype(raw: &str) -> String {
+    let collapsed: String = raw.split_whitespace().collect::<Vec<_>>().join(" ").to_uppercase();
+    match collapsed.as_str() {
+        "CAP" | "CAPTION" => "CAPTION".to_string(),
+        "BANNER" | "TIME-PLACE" | "TIME PLACE" => "BANNER".to_string(),
+        "VO" | "VOICE OVER" | "VOICEOVER" => "VOICE OVER".to_string(),
+        "NARRATION" => "NARRATION".to_string(),
+        "INTERNAL" => "INTERNAL".to_string(),
+        "EDITORIAL" => "EDITORIAL".to_string(),
+        _ => "CAPTION".to_string(),
     }
 }

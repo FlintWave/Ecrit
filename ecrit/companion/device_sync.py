@@ -154,9 +154,11 @@ class DeviceSync:
             self.stop_transfer_server()
 
         token = secrets.token_urlsafe(32)
-        _TransferHandler.bundle_path = bundle_path
-        _TransferHandler.transfer_token = token
-        self._server = HTTPServer(("0.0.0.0", port), _TransferHandler)
+        handler = type("_Handler", (_TransferHandler,), {
+            "bundle_path": bundle_path,
+            "transfer_token": token,
+        })
+        self._server = HTTPServer(("0.0.0.0", port), handler)
         self._server_thread = threading.Thread(target=self._server.serve_forever, daemon=True)
         self._server_thread.start()
         self._set_status(SyncStatus.TRANSFERRING)

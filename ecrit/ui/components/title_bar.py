@@ -7,6 +7,7 @@ from PySide6.QtCore import Qt, Signal, QSize
 from PySide6.QtGui import QPainter, QColor, QPen
 
 from ecrit.ui.styles import theme
+from ecrit.ui.icons import icon as heroicon, IconButton
 
 
 class WindowButton(QWidget):
@@ -62,22 +63,25 @@ class WindowControls(QWidget):
         super().__init__(parent)
         self.setFixedSize(68, 44)
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(12, 0, 0, 0)
+        layout.setContentsMargins(0, 0, 12, 0)
         layout.setSpacing(8)
 
-        self._close = WindowButton("close")
-        self._close.clicked.connect(self.close_clicked.emit)
-        layout.addWidget(self._close)
+        layout.addStretch()
 
         self._minimize = WindowButton("minimize")
+        self._minimize.setAccessibleName("Minimize window")
         self._minimize.clicked.connect(self.minimize_clicked.emit)
         layout.addWidget(self._minimize)
 
         self._maximize = WindowButton("maximize")
+        self._maximize.setAccessibleName("Maximize window")
         self._maximize.clicked.connect(self.maximize_clicked.emit)
         layout.addWidget(self._maximize)
 
-        layout.addStretch()
+        self._close = WindowButton("close")
+        self._close.setAccessibleName("Close window")
+        self._close.clicked.connect(self.close_clicked.emit)
+        layout.addWidget(self._close)
 
 
 class PhaseTabBar(QWidget):
@@ -97,6 +101,7 @@ class PhaseTabBar(QWidget):
             btn = QPushButton(phase)
             btn.setProperty("active", phase == self._active)
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn.setAccessibleName(f"{phase} phase")
             btn.clicked.connect(lambda checked=False, p=phase: self._on_click(p))
             layout.addWidget(btn)
             self._buttons[phase] = btn
@@ -136,7 +141,6 @@ class SaveIndicator(QWidget):
 
 class TitleBar(QWidget):
     settings_clicked = Signal()
-    home_clicked = Signal()
     phase_changed = Signal(str)
     close_requested = Signal()
     minimize_requested = Signal()
@@ -148,29 +152,33 @@ class TitleBar(QWidget):
         self.setFixedHeight(44)
 
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(0, 0, 12, 0)
+        layout.setContentsMargins(12, 0, 0, 0)
         layout.setSpacing(8)
 
-        self.window_controls = WindowControls()
-        self.window_controls.close_clicked.connect(self.close_requested.emit)
-        self.window_controls.minimize_clicked.connect(self.minimize_requested.emit)
-        self.window_controls.maximize_clicked.connect(self.maximize_requested.emit)
-        layout.addWidget(self.window_controls)
+        self.settings_btn = IconButton("cog-6-tooth")
+        self.settings_btn.setObjectName("iconBtn")
+        self.settings_btn.setFixedSize(28, 28)
+        self.settings_btn.setToolTip("Settings")
+        self.settings_btn.setAccessibleName("Settings")
+        self.settings_btn.setAccessibleDescription("Open application settings")
+        self.settings_btn.clicked.connect(self.settings_clicked.emit)
+        layout.addWidget(self.settings_btn)
 
-        self.home_btn = QPushButton("⌂")
-        self.home_btn.setObjectName("homeBtn")
-        self.home_btn.setFixedSize(28, 28)
-        self.home_btn.setToolTip("Dashboard")
-        self.home_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.home_btn.clicked.connect(self.home_clicked.emit)
-        layout.addWidget(self.home_btn)
+        self.save_dot = SaveIndicator()
+        self.save_dot.setAccessibleName("Save status")
+        self.save_dot.setAccessibleDescription("Green when saved, orange when unsaved")
+        self.save_dot.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        layout.addWidget(self.save_dot)
 
         self.wordmark = QLabel("Écrit")
         self.wordmark.setObjectName("wordmark")
+        self.wordmark.setAccessibleName("Écrit")
+        self.wordmark.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         layout.addWidget(self.wordmark)
 
         self.context_label = QLabel()
         self.context_label.setObjectName("titleContext")
+        self.context_label.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         layout.addWidget(self.context_label)
 
         layout.addStretch()
@@ -183,23 +191,27 @@ class TitleBar(QWidget):
         else:
             self.phase_tabs = None
 
-        self.cmd_chip = QPushButton("⌘K  open anything")
+        self.cmd_chip = QPushButton("  open anything")
         self.cmd_chip.setObjectName("secondary")
         self.cmd_chip.setFixedHeight(28)
+        self.cmd_chip.setAccessibleName("Command palette")
+        self.cmd_chip.setAccessibleDescription("Search commands and navigate the app")
         layout.addWidget(self.cmd_chip)
 
-        self.save_dot = SaveIndicator()
-        layout.addWidget(self.save_dot)
-
-        self.settings_btn = QPushButton("⚙")
-        self.settings_btn.setObjectName("iconBtn")
-        self.settings_btn.setFixedSize(28, 28)
-        self.settings_btn.setToolTip("Settings")
-        self.settings_btn.clicked.connect(self.settings_clicked.emit)
-        layout.addWidget(self.settings_btn)
+        self.window_controls = WindowControls()
+        self.window_controls.close_clicked.connect(self.close_requested.emit)
+        self.window_controls.minimize_clicked.connect(self.minimize_requested.emit)
+        self.window_controls.maximize_clicked.connect(self.maximize_requested.emit)
+        layout.addWidget(self.window_controls)
 
     def set_context(self, text: str):
         self.context_label.setText(text)
+
+    def refresh_icons(self):
+        t = theme.current()
+        color = t.neutral_300 if t.name == "nocturne" else t.neutral_700
+        self.cmd_chip.setIcon(heroicon("magnifying-glass", color, 14))
+        self.cmd_chip.setIconSize(QSize(14, 14))
 
     def set_wordmark_accent(self):
         from PySide6.QtCore import Qt
@@ -207,3 +219,4 @@ class TitleBar(QWidget):
         self.wordmark.setTextFormat(Qt.TextFormat.RichText)
         self.wordmark.setText(f"<span style='color:{t.text}'>Écrit</span>"
                               f"<span style='color:{t.accent}'>.</span>")
+        self.refresh_icons()

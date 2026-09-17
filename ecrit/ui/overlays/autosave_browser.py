@@ -8,7 +8,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, Signal
 
-from ecrit.ui.styles import theme
+from ecrit.ui.icons import IconButton
 from ecrit.screenplay.autosave import AutosaveManager
 
 
@@ -24,7 +24,6 @@ class AutosaveBrowserDialog(QDialog):
         self._manager = manager
         self._project_path = project_path
 
-        t = theme.current()
         layout = QVBoxLayout(self)
         layout.setContentsMargins(20, 16, 20, 16)
         layout.setSpacing(12)
@@ -34,30 +33,34 @@ class AutosaveBrowserDialog(QDialog):
         title.setStyleSheet("font-size: 20px; font-weight: 500;")
         header.addWidget(title)
         header.addStretch()
-        close_btn = QPushButton("×")
+        close_btn = IconButton("x-mark")
         close_btn.setObjectName("iconBtn")
         close_btn.setFixedSize(28, 28)
+        close_btn.setAccessibleName("Close")
         close_btn.clicked.connect(self.close)
         header.addWidget(close_btn)
         layout.addLayout(header)
 
         info = QLabel(f"Snapshots saved every {manager._interval_minutes} min")
-        info.setStyleSheet(f"color: {t.neutral_500}; font-size: 12px;")
+        info.setObjectName("dashMutedSmall")
         layout.addWidget(info)
 
         self.snap_list = QListWidget()
+        self.snap_list.setAccessibleName("Autosave Snapshots")
         layout.addWidget(self.snap_list, 1)
 
         btn_row = QHBoxLayout()
         self.delete_btn = QPushButton("Delete")
         self.delete_btn.setObjectName("secondary")
         self.delete_btn.setFixedHeight(34)
+        self.delete_btn.setAccessibleName("Delete Snapshot")
         self.delete_btn.clicked.connect(self._delete_selected)
         btn_row.addWidget(self.delete_btn)
         btn_row.addStretch()
         self.restore_btn = QPushButton("Restore selected")
         self.restore_btn.setObjectName("primary")
         self.restore_btn.setFixedHeight(34)
+        self.restore_btn.setAccessibleName("Restore Selected Snapshot")
         self.restore_btn.clicked.connect(self._restore_selected)
         btn_row.addWidget(self.restore_btn)
         layout.addLayout(btn_row)

@@ -1,5 +1,6 @@
 """EPUB 3 export — generate a valid EPUB ebook from Fountain screenplay content."""
 
+import logging
 import os
 import re
 import uuid
@@ -245,6 +246,34 @@ hr.page-break {
     border: none;
     page-break-after: always;
 }
+h2.page-header {
+    font-family: "Courier New", Courier, monospace;
+    font-size: 12pt;
+    font-weight: bold;
+    text-transform: uppercase;
+    margin-top: 1.5em;
+    margin-bottom: 0.5em;
+    page-break-before: always;
+}
+h2.page-header:first-of-type {
+    page-break-before: avoid;
+}
+p.panel-header {
+    font-weight: bold;
+    margin-top: 1em;
+    margin-bottom: 0.3em;
+    margin-left: 1em;
+}
+p.sfx {
+    font-weight: bold;
+    text-transform: uppercase;
+    margin: 0.3em 0;
+    margin-left: 1em;
+}
+p.caption {
+    margin: 0.3em 0;
+    margin-left: 1em;
+}
 """
 
 
@@ -350,34 +379,68 @@ _ELEMENT_CLASS = {
     "Section": "section",
     "Synopsis": "synopsis",
     "Note": "note",
+    "PageHeader": "page-header",
+    "PanelHeader": "panel-header",
+    "Sfx": "sfx",
+    "Caption": "caption",
 }
 
 
-def _parse_fountain_to_xhtml(content: str) -> tuple[str, list[dict]]:
+def _parse_fountain_to_xhtml(content: str, format_id: str = "fountain/core") -> tuple[str, list[dict]]:
     """Convert Fountain text to XHTML body content.
 
     Returns a tuple of (xhtml_body_content, scenes) where scenes is a list
     of {"id": str, "text": str} dicts for the table of contents.
     """
-    elements = _parse_fountain_to_elements(content)
+    try:
+        import json
+        import ecrit_core
+        parsed = json.loads(ecrit_core.parse_fountain(content, format_id))
+        elements = parsed.get("elements", [])
+    except Exception:
+        elements = _parse_fountain_to_elements(content)
 
     parts: list[str] = []
     scenes: list[dict] = []
     scene_count = 0
 
     for elem in elements:
-        kind = elem["type"]
-        text = escape(elem["text"])
-
-        if kind == "PageBreak":
-            parts.append('  <hr class="page-break"/>')
+        kind = elem.get("type", "Action")
+        if kind in ("PageBreak", "BlankLine"):
+            if kind == "PageBreak":
+                parts.append('  <hr class="page-break"/>')
             continue
+        text = escape(elem.get("text", ""))
 
         if kind == "SceneHeading":
             scene_count += 1
             scene_id = f"scene-{scene_count}"
             scenes.append({"id": scene_id, "text": elem["text"]})
             parts.append(f'  <h2 class="scene-heading" id="{scene_id}">{text}</h2>')
+            continue
+
+        if kind == "PageHeader":
+            scene_count += 1
+            scene_id = f"scene-{scene_count}"
+            scenes.append({"id": scene_id, "text": elem["text"]})
+            parts.append(f'  <h2 class="page-header" id="{scene_id}">{text}</h2>')
+            continue
+
+        if kind == "PanelHeader":
+            parts.append(f'  <p class="panel-header">{text}</p>')
+            continue
+
+        if kind == "Sfx":
+            num = elem.get("number", "")
+            display = f"{num}. SFX: {text}" if num else f"SFX: {text}"
+            parts.append(f'  <p class="sfx">{display}</p>')
+            continue
+
+        if kind == "Caption":
+            num = elem.get("number", "")
+            subtype = elem.get("subtype", "CAPTION")
+            display = f"{num}. {subtype}: {text}" if num else f"{subtype}: {text}"
+            parts.append(f'  <p class="caption">{display}</p>')
             continue
 
         css_class = _ELEMENT_CLASS.get(kind, "action")
@@ -402,7 +465,7 @@ def _generate_script_xhtml(title: str, body_content: str) -> str:
         f'</html>'
 
 
-def _create_epub_bytes(content: str, title: str = "", author: str = "") -> bytes:
+def _create_epub_bytes(content: str, title: str = "", author: str = "", format_id: str = "fountain/core") -> bytes:
     """Build a complete EPUB 3 file in memory and return the bytes."""
     # Extract title page fields from the Fountain content
     tp_fields = _parse_title_page(content)
@@ -415,7 +478,7 @@ def _create_epub_bytes(content: str, title: str = "", author: str = "") -> bytes
     uid = str(uuid.uuid4())
 
     # Parse screenplay body into XHTML
-    body_content, scenes = _parse_fountain_to_xhtml(content)
+    body_content, scenes = _parse_fountain_to_xhtml(content, format_id)
 
     # Build the EPUB ZIP
     buf = BytesIO()
@@ -440,7 +503,7 @@ def _create_epub_bytes(content: str, title: str = "", author: str = "") -> bytes
     return buf.getvalue()
 
 
-def export_epub(content: str, title: str = "", author: str = "", output_path: str = "", parent=None) -> str:
+def export_epub(content: str, title: str = "", author: str = "", output_path: str = "", parent=None, format_id: str = "fountain/core") -> str:
     """Export Fountain content as an EPUB file.
 
     If *output_path* is empty, opens a file-save dialog. Returns the path
@@ -464,23 +527,24 @@ def export_epub(content: str, title: str = "", author: str = "", output_path: st
     if not output_path.endswith(".epub"):
         output_path += ".epub"
 
-    data = _create_epub_bytes(content, title=title, author=author)
+    data = _create_epub_bytes(content, title=title, author=author, format_id=format_id)
     with open(output_path, "wb") as f:
         f.write(data)
 
     return output_path
 
 
-def export_epub_to_path(content: str, path: str, title: str = "", author: str = "") -> bool:
+def export_epub_to_path(content: str, path: str, title: str = "", author: str = "", format_id: str = "fountain/core") -> bool:
     """Export Fountain content as an EPUB to a specific path.
 
     Returns True on success, False on failure.
     """
     try:
         os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
-        data = _create_epub_bytes(content, title=title, author=author)
+        data = _create_epub_bytes(content, title=title, author=author, format_id=format_id)
         with open(path, "wb") as f:
             f.write(data)
         return True
     except Exception:
+        logging.getLogger("ecrit.export.epub").warning("EPUB export to %s failed", path, exc_info=True)
         return False

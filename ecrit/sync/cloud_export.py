@@ -116,138 +116,42 @@ class CloudExporter(ABC):
 # Concrete stub implementations
 # ---------------------------------------------------------------------------
 
-class GoogleDriveExporter(CloudExporter):
+class _StubExporter(CloudExporter):
+    """Base for providers whose SDK is not yet integrated."""
+
+    def authenticate(self) -> bool:
+        return False
+
+    def upload_file(self, local_path: str, remote_folder: str) -> ExportResult:
+        return ExportResult(False, f"{self.PROVIDER_NAME} integration is not yet available")
+
+    def list_files(self, remote_folder: str) -> list[dict]:
+        return []
+
+
+class GoogleDriveExporter(_StubExporter):
     PROVIDER_NAME = "Google Drive"
     AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 
-    def authenticate(self) -> bool:
-        if self.config.auth_token:
-            self._authenticated = True
-            return True
-        self._authenticated = False
-        return False
 
-    def upload_file(self, local_path: str, remote_folder: str) -> ExportResult:
-        if not self._authenticated:
-            return ExportResult(False, "Not authenticated with Google Drive")
-        filename = os.path.basename(local_path)
-        url = f"https://drive.google.com/file/d/stub-id/{filename}"
-        return ExportResult(True, f"Uploaded {filename} to Google Drive", url)
-
-    def list_files(self, remote_folder: str) -> list[dict]:
-        if not self._authenticated:
-            return []
-        return [
-            {"name": "example_script.fountain", "id": "stub-1", "size": 24000},
-            {"name": "example_script.pdf", "id": "stub-2", "size": 180000},
-        ]
-
-
-class ICloudExporter(CloudExporter):
+class ICloudExporter(_StubExporter):
     PROVIDER_NAME = "iCloud Drive"
     AUTH_URL = "https://appleid.apple.com/auth/authorize"
 
-    def authenticate(self) -> bool:
-        if self.config.auth_token:
-            self._authenticated = True
-            return True
-        self._authenticated = False
-        return False
 
-    def upload_file(self, local_path: str, remote_folder: str) -> ExportResult:
-        if not self._authenticated:
-            return ExportResult(False, "Not authenticated with iCloud Drive")
-        filename = os.path.basename(local_path)
-        return ExportResult(
-            True,
-            f"Uploaded {filename} to iCloud Drive",
-            f"icloud://stub/{remote_folder}/{filename}",
-        )
-
-    def list_files(self, remote_folder: str) -> list[dict]:
-        if not self._authenticated:
-            return []
-        return [
-            {"name": "example_script.fountain", "type": "file", "size": 24000},
-        ]
-
-
-class DropboxExporter(CloudExporter):
+class DropboxExporter(_StubExporter):
     PROVIDER_NAME = "Dropbox"
     AUTH_URL = "https://www.dropbox.com/oauth2/authorize"
 
-    def authenticate(self) -> bool:
-        if self.config.auth_token:
-            self._authenticated = True
-            return True
-        self._authenticated = False
-        return False
 
-    def upload_file(self, local_path: str, remote_folder: str) -> ExportResult:
-        if not self._authenticated:
-            return ExportResult(False, "Not authenticated with Dropbox")
-        filename = os.path.basename(local_path)
-        url = f"https://www.dropbox.com/home{remote_folder}/{filename}"
-        return ExportResult(True, f"Uploaded {filename} to Dropbox", url)
-
-    def list_files(self, remote_folder: str) -> list[dict]:
-        if not self._authenticated:
-            return []
-        return [
-            {"name": "example_script.fountain", "path": f"{remote_folder}/example_script.fountain", "size": 24000},
-        ]
-
-
-class OneDriveExporter(CloudExporter):
+class OneDriveExporter(_StubExporter):
     PROVIDER_NAME = "OneDrive"
     AUTH_URL = "https://login.microsoftonline.com/common/oauth2/v2.0/authorize"
 
-    def authenticate(self) -> bool:
-        if self.config.auth_token:
-            self._authenticated = True
-            return True
-        self._authenticated = False
-        return False
 
-    def upload_file(self, local_path: str, remote_folder: str) -> ExportResult:
-        if not self._authenticated:
-            return ExportResult(False, "Not authenticated with OneDrive")
-        filename = os.path.basename(local_path)
-        url = f"https://onedrive.live.com/stub/{remote_folder}/{filename}"
-        return ExportResult(True, f"Uploaded {filename} to OneDrive", url)
-
-    def list_files(self, remote_folder: str) -> list[dict]:
-        if not self._authenticated:
-            return []
-        return [
-            {"name": "example_script.fountain", "id": "stub-onedrive-1", "size": 24000},
-        ]
-
-
-class NextcloudExporter(CloudExporter):
+class NextcloudExporter(_StubExporter):
     PROVIDER_NAME = "Nextcloud"
-    AUTH_URL = "https://cloud.example.com/index.php/apps/oauth2/authorize"
-
-    def authenticate(self) -> bool:
-        if self.config.auth_token:
-            self._authenticated = True
-            return True
-        self._authenticated = False
-        return False
-
-    def upload_file(self, local_path: str, remote_folder: str) -> ExportResult:
-        if not self._authenticated:
-            return ExportResult(False, "Not authenticated with Nextcloud")
-        filename = os.path.basename(local_path)
-        url = f"https://cloud.example.com/remote.php/dav/files/user{remote_folder}/{filename}"
-        return ExportResult(True, f"Uploaded {filename} to Nextcloud", url)
-
-    def list_files(self, remote_folder: str) -> list[dict]:
-        if not self._authenticated:
-            return []
-        return [
-            {"name": "example_script.fountain", "href": f"{remote_folder}/example_script.fountain", "size": 24000},
-        ]
+    AUTH_URL = ""
 
 
 # ---------------------------------------------------------------------------
@@ -366,6 +270,9 @@ def load_cloud_configs(project_path: str) -> list[CloudConfig]:
     path = _cloud_config_path(project_path)
     if not os.path.isfile(path):
         return []
-    with open(path, "r", encoding="utf-8") as f:
-        data = json.load(f)
-    return [CloudConfig.from_dict(entry) for entry in data]
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return [CloudConfig.from_dict(entry) for entry in data]
+    except (json.JSONDecodeError, OSError, KeyError, TypeError):
+        return []

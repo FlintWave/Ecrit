@@ -6,7 +6,8 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt
 
-from ecrit.ui.styles import theme
+from ecrit.ui.icons import IconButton
+
 
 SHORTCUT_GROUPS = [
     ("File", [
@@ -52,7 +53,6 @@ class ShortcutsDialog(QDialog):
         self.setMinimumSize(480, 520)
         self.setModal(True)
 
-        t = theme.current()
         layout = QVBoxLayout(self)
         layout.setContentsMargins(24, 20, 24, 20)
         layout.setSpacing(16)
@@ -62,9 +62,10 @@ class ShortcutsDialog(QDialog):
         title.setStyleSheet("font-size: 20px; font-weight: 500;")
         header.addWidget(title)
         header.addStretch()
-        close_btn = QPushButton("×")
+        close_btn = IconButton("x-mark")
         close_btn.setObjectName("iconBtn")
         close_btn.setFixedSize(28, 28)
+        close_btn.setAccessibleName("Close")
         close_btn.clicked.connect(self.close)
         header.addWidget(close_btn)
         layout.addLayout(header)
@@ -86,11 +87,7 @@ class ShortcutsDialog(QDialog):
             grid.setSpacing(6)
             for i, (key, desc) in enumerate(shortcuts):
                 key_label = QLabel(key)
-                key_label.setStyleSheet(
-                    f"font-family: ui-monospace, Menlo, monospace; font-size: 12px; "
-                    f"background: {t.neutral_800 if t.name == 'nocturne' else t.neutral_200}; "
-                    f"padding: 3px 8px; border-radius: 4px;"
-                )
+                key_label.setObjectName("kbdKey")
                 key_label.setFixedWidth(140)
                 grid.addWidget(key_label, i, 0)
 

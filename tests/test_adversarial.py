@@ -1087,6 +1087,7 @@ class TestCollabOTRelay:
         session._pending_ops = [Operation(0, 0, "old")]
         session._crdt = TextCRDT()
         session._p2p = None
+        session._lock = __import__("threading").Lock()
         session._on_text_change = None
         session._on_participant_change = None
         session._on_cursor_change = None

@@ -7,7 +7,6 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, Signal
 
-from ecrit.ui.styles import theme
 from ecrit.screenplay.title_templates import TitleTemplateManager
 
 
@@ -22,13 +21,12 @@ class TitleTemplateDialog(QDialog):
         self.setMinimumSize(660, 520)
         self.setModal(True)
 
-        t = theme.current()
         layout = QVBoxLayout(self)
         layout.setContentsMargins(24, 20, 24, 20)
         layout.setSpacing(12)
 
         header = QLabel("Title Page Template")
-        header.setStyleSheet(f"font-size: 18px; font-weight: bold; color: {t.text};")
+        header.setStyleSheet("font-size: 18px; font-weight: bold;")
         layout.addWidget(header)
 
         body = QHBoxLayout()
@@ -41,7 +39,7 @@ class TitleTemplateDialog(QDialog):
         right = QVBoxLayout()
         self._desc_label = QLabel()
         self._desc_label.setWordWrap(True)
-        self._desc_label.setStyleSheet(f"color: {t.neutral_400}; font-size: 12px;")
+        self._desc_label.setObjectName("countBadge")
         right.addWidget(self._desc_label)
 
         self._form_layout = QFormLayout()
@@ -50,7 +48,7 @@ class TitleTemplateDialog(QDialog):
         self._preview = QTextEdit()
         self._preview.setReadOnly(True)
         self._preview.setMaximumHeight(120)
-        self._preview.setStyleSheet(f"font-family: 'Courier Prime', monospace; font-size: 12px; color: {t.text};")
+        self._preview.setStyleSheet("font-family: 'Courier Prime', monospace; font-size: 12px;")
         right.addWidget(self._preview)
         right.addStretch()
         body.addLayout(right, 1)

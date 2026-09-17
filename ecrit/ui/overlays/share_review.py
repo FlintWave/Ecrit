@@ -7,7 +7,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, Signal
 
-from ecrit.ui.styles import theme
+from ecrit.ui.icons import IconButton
 
 
 class ShareReviewDialog(QDialog):
@@ -23,7 +23,6 @@ class ShareReviewDialog(QDialog):
 
         self._shares: list[dict] = []
 
-        t = theme.current()
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
 
@@ -33,9 +32,10 @@ class ShareReviewDialog(QDialog):
         title.setStyleSheet("font-size: 20px; font-weight: 500;")
         header.addWidget(title)
         header.addStretch()
-        close_btn = QPushButton("×")
+        close_btn = IconButton("x-mark")
         close_btn.setObjectName("iconBtn")
         close_btn.setFixedSize(28, 28)
+        close_btn.setAccessibleName("Close")
         close_btn.clicked.connect(self.close)
         header.addWidget(close_btn)
         layout.addLayout(header)
@@ -53,7 +53,7 @@ class ShareReviewDialog(QDialog):
             "Includes a watermark overlay for confidentiality."
         )
         desc.setWordWrap(True)
-        desc.setStyleSheet(f"color: {t.neutral_500}; font-size: 13px;")
+        desc.setObjectName("dashMuted")
         form.addWidget(desc)
 
         watermark_label = QLabel("Watermark Text")
@@ -64,13 +64,16 @@ class ShareReviewDialog(QDialog):
         self.watermark_input.setFixedHeight(34)
         self.watermark_input.setText("CONFIDENTIAL — FOR REVIEW ONLY")
         self.watermark_input.setPlaceholderText("e.g. CONFIDENTIAL — FOR REVIEW ONLY")
+        self.watermark_input.setAccessibleName("Watermark Text")
         form.addWidget(self.watermark_input)
 
         self.include_title_page = QCheckBox("Include title page")
+        self.include_title_page.setAccessibleName("Include title page")
         self.include_title_page.setChecked(True)
         form.addWidget(self.include_title_page)
 
         self.include_page_numbers = QCheckBox("Include page numbers")
+        self.include_page_numbers.setAccessibleName("Include page numbers")
         self.include_page_numbers.setChecked(True)
         form.addWidget(self.include_page_numbers)
 
@@ -84,6 +87,7 @@ class ShareReviewDialog(QDialog):
 
         self.shares_list = QListWidget()
         self.shares_list.setFixedHeight(120)
+        self.shares_list.setAccessibleName("Generated Shares")
         form.addWidget(self.shares_list)
 
         btn_row = QHBoxLayout()
@@ -92,12 +96,14 @@ class ShareReviewDialog(QDialog):
         copy_btn = QPushButton("Copy Path")
         copy_btn.setObjectName("secondary")
         copy_btn.setFixedHeight(30)
+        copy_btn.setAccessibleName("Copy Path")
         copy_btn.clicked.connect(self._copy_selected_path)
         btn_row.addWidget(copy_btn)
 
         delete_btn = QPushButton("Delete")
         delete_btn.setObjectName("secondary")
         delete_btn.setFixedHeight(30)
+        delete_btn.setAccessibleName("Delete Share")
         delete_btn.clicked.connect(self._delete_selected)
         btn_row.addWidget(delete_btn)
 
@@ -115,12 +121,14 @@ class ShareReviewDialog(QDialog):
         cancel_btn = QPushButton("Close")
         cancel_btn.setObjectName("secondary")
         cancel_btn.setFixedHeight(36)
+        cancel_btn.setAccessibleName("Close")
         cancel_btn.clicked.connect(self.close)
         footer.addWidget(cancel_btn)
 
         self.generate_btn = QPushButton("Generate Review Link")
         self.generate_btn.setObjectName("primary")
         self.generate_btn.setFixedHeight(36)
+        self.generate_btn.setAccessibleName("Generate Review Link")
         self.generate_btn.clicked.connect(self._generate)
         footer.addWidget(self.generate_btn)
 

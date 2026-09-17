@@ -7,8 +7,8 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, Signal
 
-from ecrit.ui.styles import theme
 from ecrit.i18n import tr
+from ecrit.ui.icons import IconButton
 from ecrit.plugins.marketplace import Marketplace, PluginListing, PluginCategory
 
 
@@ -24,7 +24,6 @@ class MarketplaceDialog(QDialog):
 
         self._marketplace = Marketplace()
 
-        t = theme.current()
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
 
@@ -34,9 +33,10 @@ class MarketplaceDialog(QDialog):
         title.setStyleSheet("font-size: 20px; font-weight: 500;")
         header.addWidget(title)
         header.addStretch()
-        close_btn = QPushButton("×")
+        close_btn = IconButton("x-mark")
         close_btn.setObjectName("iconBtn")
         close_btn.setFixedSize(28, 28)
+        close_btn.setAccessibleName("Close")
         close_btn.clicked.connect(self.close)
         header.addWidget(close_btn)
         layout.addLayout(header)
@@ -46,10 +46,12 @@ class MarketplaceDialog(QDialog):
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText(tr("marketplace.search"))
         self.search_input.setFixedHeight(34)
+        self.search_input.setAccessibleName("Search Plugins")
         self.search_input.textChanged.connect(self._on_search)
         search_row.addWidget(self.search_input)
 
         self.category_combo = QComboBox()
+        self.category_combo.setAccessibleName("Plugin Category")
         self.category_combo.addItem(tr("marketplace.categories"), "")
         for cat in PluginCategory:
             self.category_combo.addItem(cat.value.capitalize(), cat.value)
@@ -65,6 +67,7 @@ class MarketplaceDialog(QDialog):
         i_layout = QVBoxLayout(self.installed_tab)
         i_layout.setContentsMargins(16, 12, 16, 12)
         self.installed_list = QListWidget()
+        self.installed_list.setAccessibleName("Installed Plugins")
         self.installed_list.currentRowChanged.connect(self._on_installed_selected)
         i_layout.addWidget(self.installed_list)
 
@@ -72,6 +75,7 @@ class MarketplaceDialog(QDialog):
         self.uninstall_btn = QPushButton(tr("marketplace.uninstall"))
         self.uninstall_btn.setObjectName("secondary")
         self.uninstall_btn.setFixedHeight(34)
+        self.uninstall_btn.setAccessibleName("Uninstall Plugin")
         self.uninstall_btn.setEnabled(False)
         self.uninstall_btn.clicked.connect(self._uninstall_selected)
         i_btn_row.addWidget(self.uninstall_btn)
@@ -83,6 +87,7 @@ class MarketplaceDialog(QDialog):
         a_layout = QVBoxLayout(self.available_tab)
         a_layout.setContentsMargins(16, 12, 16, 12)
         self.available_list = QListWidget()
+        self.available_list.setAccessibleName("Available Plugins")
         self.available_list.currentRowChanged.connect(self._on_available_selected)
         a_layout.addWidget(self.available_list)
 
@@ -90,6 +95,7 @@ class MarketplaceDialog(QDialog):
         self.install_btn = QPushButton(tr("marketplace.install"))
         self.install_btn.setObjectName("primary")
         self.install_btn.setFixedHeight(34)
+        self.install_btn.setAccessibleName("Install Plugin")
         self.install_btn.setEnabled(False)
         self.install_btn.clicked.connect(self._install_from_directory)
         a_btn_row.addWidget(self.install_btn)
@@ -100,17 +106,15 @@ class MarketplaceDialog(QDialog):
         layout.addWidget(tabs, 1)
 
         details = QFrame()
+        details.setObjectName("detailsPane")
         details.setFixedHeight(100)
-        details.setStyleSheet(
-            f"QFrame {{ background: {t.neutral_100}; border-top: 1px solid {t.neutral_700}; }}"
-        )
         d_layout = QVBoxLayout(details)
         d_layout.setContentsMargins(24, 8, 24, 8)
         self.detail_name = QLabel("—")
         self.detail_name.setStyleSheet("font-weight: 500; font-size: 14px;")
         d_layout.addWidget(self.detail_name)
         self.detail_info = QLabel("")
-        self.detail_info.setStyleSheet(f"color: {t.neutral_500}; font-size: 12px;")
+        self.detail_info.setObjectName("dashMuted")
         d_layout.addWidget(self.detail_info)
         self.detail_desc = QLabel("")
         self.detail_desc.setWordWrap(True)

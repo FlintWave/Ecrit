@@ -95,10 +95,30 @@ class TextCRDT:
     def transform(self, op1: Operation, op2: Operation) -> Operation:
         """Operational transform: adjust op1 against already-applied op2."""
         if op2.op_type == OperationType.INSERT:
-            if op1.position >= op2.position:
+            insert_len = len(op2.text)
+            if op1.op_type == OperationType.DELETE and op1.position < op2.position < op1.position + op1.length:
+                # Insert landed inside delete range — expand delete to cover the
+                # gap the insert created so all originally-targeted chars are removed
                 return Operation(
                     op_type=op1.op_type,
-                    position=op1.position + len(op2.text),
+                    position=op1.position,
+                    text=op1.text,
+                    length=op1.length + insert_len,
+                    user_id=op1.user_id,
+                    timestamp=op1.timestamp,
+                    revision=op1.revision,
+                )
+            if op1.position > op2.position or (
+                op1.position == op2.position
+                and (
+                    op1.op_type == OperationType.DELETE
+                    or (op1.op_type == OperationType.INSERT
+                        and (op1.user_id or "") >= (op2.user_id or ""))
+                )
+            ):
+                return Operation(
+                    op_type=op1.op_type,
+                    position=op1.position + insert_len,
                     text=op1.text,
                     length=op1.length,
                     user_id=op1.user_id,
@@ -106,7 +126,9 @@ class TextCRDT:
                     revision=op1.revision,
                 )
         elif op2.op_type == OperationType.DELETE:
-            if op1.position >= op2.position + op2.length:
+            op2_end = op2.position + op2.length
+            if op1.position >= op2_end:
+                # op1 is entirely after op2's deleted range
                 return Operation(
                     op_type=op1.op_type,
                     position=op1.position - op2.length,
@@ -116,7 +138,36 @@ class TextCRDT:
                     timestamp=op1.timestamp,
                     revision=op1.revision,
                 )
+            if op1.op_type == OperationType.DELETE:
+                op1_end = op1.position + op1.length
+                # Compute overlap between the two delete ranges
+                overlap_start = max(op1.position, op2.position)
+                overlap_end = min(op1_end, op2_end)
+                overlap = max(0, overlap_end - overlap_start)
+                new_length = op1.length - overlap
+                if new_length <= 0:
+                    # op1's delete is entirely subsumed by op2 — becomes a no-op
+                    return Operation(
+                        op_type=op1.op_type,
+                        position=op2.position if op1.position >= op2.position else op1.position,
+                        text=op1.text,
+                        length=0,
+                        user_id=op1.user_id,
+                        timestamp=op1.timestamp,
+                        revision=op1.revision,
+                    )
+                new_pos = min(op1.position, op2.position)
+                return Operation(
+                    op_type=op1.op_type,
+                    position=new_pos,
+                    text=op1.text,
+                    length=new_length,
+                    user_id=op1.user_id,
+                    timestamp=op1.timestamp,
+                    revision=op1.revision,
+                )
             elif op1.position >= op2.position:
+                # INSERT inside op2's deleted range — move to op2.position
                 return Operation(
                     op_type=op1.op_type,
                     position=op2.position,
