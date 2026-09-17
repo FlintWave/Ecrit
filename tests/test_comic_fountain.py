@@ -3,7 +3,7 @@
 import json
 import pytest
 
-import ecrit_core
+ecrit_core = pytest.importorskip("ecrit_core")
 
 
 # ---------------------------------------------------------------------------
