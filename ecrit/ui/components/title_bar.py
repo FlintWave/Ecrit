@@ -141,7 +141,6 @@ class SaveIndicator(QWidget):
 
 class TitleBar(QWidget):
     settings_clicked = Signal()
-    home_clicked = Signal()
     phase_changed = Signal(str)
     close_requested = Signal()
     minimize_requested = Signal()

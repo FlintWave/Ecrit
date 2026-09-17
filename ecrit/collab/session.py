@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import threading
 import uuid
 from enum import Enum
 from dataclasses import dataclass, field
@@ -53,6 +54,7 @@ class CollabSession:
         self._p2p = P2PConnection(self.user_id, self.user_name)
         self._participants: dict[str, Participant] = {}
         self._pending_ops: list = []
+        self._lock = threading.Lock()
         self._color_index = 0
 
         self._on_state_change: Optional[Callable[[SessionState], None]] = None
@@ -161,18 +163,20 @@ class CollabSession:
     # ── Editing methods ──
 
     def apply_local_insert(self, position: int, text: str) -> None:
-        op = self._crdt.insert(position, text)
-        self._pending_ops.append(op)
-        if len(self._pending_ops) > 100:
-            self._pending_ops = self._pending_ops[-50:]
+        with self._lock:
+            op = self._crdt.insert(position, text)
+            self._pending_ops.append(op)
+            if len(self._pending_ops) > 100:
+                self._pending_ops = self._pending_ops[-50:]
         msg = CollabMessage.operation(self.user_id, op)
         self._p2p.broadcast(msg.to_json())
 
     def apply_local_delete(self, position: int, length: int) -> None:
-        op = self._crdt.delete(position, length)
-        self._pending_ops.append(op)
-        if len(self._pending_ops) > 100:
-            self._pending_ops = self._pending_ops[-50:]
+        with self._lock:
+            op = self._crdt.delete(position, length)
+            self._pending_ops.append(op)
+            if len(self._pending_ops) > 100:
+                self._pending_ops = self._pending_ops[-50:]
         msg = CollabMessage.operation(self.user_id, op)
         self._p2p.broadcast(msg.to_json())
 
@@ -227,13 +231,14 @@ class CollabSession:
 
         elif msg.msg_type == MessageType.OPERATION:
             op = Operation.from_dict(msg.payload)
-            transformed_pending = []
-            for pending in self._pending_ops:
-                pending_prime = self._crdt.transform(pending, op)
-                op = self._crdt.transform(op, pending)
-                transformed_pending.append(pending_prime)
-            self._pending_ops = transformed_pending
-            self._crdt.apply_operation(op)
+            with self._lock:
+                transformed_pending = []
+                for pending in self._pending_ops:
+                    pending_prime = self._crdt.transform(pending, op)
+                    op = self._crdt.transform(op, pending)
+                    transformed_pending.append(pending_prime)
+                self._pending_ops = transformed_pending
+                self._crdt.apply_operation(op)
             if self._on_text_change:
                 self._on_text_change(self._crdt.get_text())
             if self.role == CollabRole.HOST:
@@ -268,8 +273,9 @@ class CollabSession:
 
         elif msg.msg_type == MessageType.SYNC_RESPONSE:
             content = msg.payload.get("content", "")
-            self._crdt.set_text(content)
-            self._pending_ops.clear()
+            with self._lock:
+                self._crdt.set_text(content)
+                self._pending_ops.clear()
             if self._on_text_change:
                 self._on_text_change(content)
 

@@ -149,7 +149,7 @@ class TextCRDT:
                         timestamp=op1.timestamp,
                         revision=op1.revision,
                     )
-                new_pos = min(op1.position, op2.position) if op1.position < op2.position else op2.position
+                new_pos = min(op1.position, op2.position)
                 return Operation(
                     op_type=op1.op_type,
                     position=new_pos,

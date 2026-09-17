@@ -821,12 +821,13 @@ class MainWindow(QMainWindow):
         if editor.toPlainText() != text:
             cursor_pos = editor.textCursor().position()
             self._collab_suppress_local = True
-            editor.blockSignals(True)
-            editor.setPlainText(text)
             cursor = editor.textCursor()
+            cursor.beginEditBlock()
+            cursor.select(cursor.SelectionType.Document)
+            cursor.insertText(text)
+            cursor.endEditBlock()
             cursor.setPosition(min(cursor_pos, len(text)))
             editor.setTextCursor(cursor)
-            editor.blockSignals(False)
             self._collab_suppress_local = False
             STATE.script_content = text
             if not hasattr(self, "_collab_save_timer"):

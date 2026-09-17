@@ -499,6 +499,8 @@ class ScriptEditor(QPlainTextEdit):
             return "transition"
         if line == line.upper() and len(line) < 60 and not line.startswith(("INT", "EXT")):
             return "character"
+        if line and line[0].islower():
+            return "dialogue"
         return "action"
 
     def _strip_element_formatting(self, line: str, elem_type: str) -> str:
