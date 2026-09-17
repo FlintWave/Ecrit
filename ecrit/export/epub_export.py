@@ -386,25 +386,31 @@ _ELEMENT_CLASS = {
 }
 
 
-def _parse_fountain_to_xhtml(content: str) -> tuple[str, list[dict]]:
+def _parse_fountain_to_xhtml(content: str, format_id: str = "fountain/core") -> tuple[str, list[dict]]:
     """Convert Fountain text to XHTML body content.
 
     Returns a tuple of (xhtml_body_content, scenes) where scenes is a list
     of {"id": str, "text": str} dicts for the table of contents.
     """
-    elements = _parse_fountain_to_elements(content)
+    try:
+        import json
+        import ecrit_core
+        parsed = json.loads(ecrit_core.parse_fountain(content, format_id))
+        elements = parsed.get("elements", [])
+    except Exception:
+        elements = _parse_fountain_to_elements(content)
 
     parts: list[str] = []
     scenes: list[dict] = []
     scene_count = 0
 
     for elem in elements:
-        kind = elem["type"]
-        text = escape(elem["text"])
-
-        if kind == "PageBreak":
-            parts.append('  <hr class="page-break"/>')
+        kind = elem.get("type", "Action")
+        if kind in ("PageBreak", "BlankLine"):
+            if kind == "PageBreak":
+                parts.append('  <hr class="page-break"/>')
             continue
+        text = escape(elem.get("text", ""))
 
         if kind == "SceneHeading":
             scene_count += 1
@@ -427,14 +433,14 @@ def _parse_fountain_to_xhtml(content: str) -> tuple[str, list[dict]]:
         if kind == "Sfx":
             num = elem.get("number", "")
             display = f"{num}. SFX: {text}" if num else f"SFX: {text}"
-            parts.append(f'  <p class="sfx">{escape(display)}</p>')
+            parts.append(f'  <p class="sfx">{display}</p>')
             continue
 
         if kind == "Caption":
             num = elem.get("number", "")
             subtype = elem.get("subtype", "CAPTION")
             display = f"{num}. {subtype}: {text}" if num else f"{subtype}: {text}"
-            parts.append(f'  <p class="caption">{escape(display)}</p>')
+            parts.append(f'  <p class="caption">{display}</p>')
             continue
 
         css_class = _ELEMENT_CLASS.get(kind, "action")
@@ -459,7 +465,7 @@ def _generate_script_xhtml(title: str, body_content: str) -> str:
         f'</html>'
 
 
-def _create_epub_bytes(content: str, title: str = "", author: str = "") -> bytes:
+def _create_epub_bytes(content: str, title: str = "", author: str = "", format_id: str = "fountain/core") -> bytes:
     """Build a complete EPUB 3 file in memory and return the bytes."""
     # Extract title page fields from the Fountain content
     tp_fields = _parse_title_page(content)
@@ -472,7 +478,7 @@ def _create_epub_bytes(content: str, title: str = "", author: str = "") -> bytes
     uid = str(uuid.uuid4())
 
     # Parse screenplay body into XHTML
-    body_content, scenes = _parse_fountain_to_xhtml(content)
+    body_content, scenes = _parse_fountain_to_xhtml(content, format_id)
 
     # Build the EPUB ZIP
     buf = BytesIO()
@@ -497,7 +503,7 @@ def _create_epub_bytes(content: str, title: str = "", author: str = "") -> bytes
     return buf.getvalue()
 
 
-def export_epub(content: str, title: str = "", author: str = "", output_path: str = "", parent=None) -> str:
+def export_epub(content: str, title: str = "", author: str = "", output_path: str = "", parent=None, format_id: str = "fountain/core") -> str:
     """Export Fountain content as an EPUB file.
 
     If *output_path* is empty, opens a file-save dialog. Returns the path
@@ -521,21 +527,21 @@ def export_epub(content: str, title: str = "", author: str = "", output_path: st
     if not output_path.endswith(".epub"):
         output_path += ".epub"
 
-    data = _create_epub_bytes(content, title=title, author=author)
+    data = _create_epub_bytes(content, title=title, author=author, format_id=format_id)
     with open(output_path, "wb") as f:
         f.write(data)
 
     return output_path
 
 
-def export_epub_to_path(content: str, path: str, title: str = "", author: str = "") -> bool:
+def export_epub_to_path(content: str, path: str, title: str = "", author: str = "", format_id: str = "fountain/core") -> bool:
     """Export Fountain content as an EPUB to a specific path.
 
     Returns True on success, False on failure.
     """
     try:
         os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
-        data = _create_epub_bytes(content, title=title, author=author)
+        data = _create_epub_bytes(content, title=title, author=author, format_id=format_id)
         with open(path, "wb") as f:
             f.write(data)
         return True

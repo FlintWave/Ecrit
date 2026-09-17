@@ -662,7 +662,7 @@ def generate_outline_nodes(template: StructureTemplate) -> list[dict]:
 
     nodes: list[dict] = []
     node_id = 0
-    prev_id: int | None = None
+    prev_id: str | None = None
 
     # Layout constants
     x_start = 40
@@ -674,22 +674,19 @@ def generate_outline_nodes(template: StructureTemplate) -> list[dict]:
         beats_in_act = acts[act_num]
 
         # Act break node
-        act_node_id = node_id
+        act_node_str = f"tpl_{node_id}"
         node_id += 1
         act_x = x_start
         act_y = y_start + act_index * row_height
 
-        connections: list[int] = []
         if prev_id is not None:
-            connections = [act_node_id]
-            # Add connection from the previous node to this act break
             for n in nodes:
                 if n["id"] == prev_id:
-                    n["connections"].append(act_node_id)
+                    n["connections"].append(act_node_str)
                     break
 
         act_node: dict = {
-            "id": act_node_id,
+            "id": act_node_str,
             "x": act_x,
             "y": act_y,
             "kind": "ActBreak",
@@ -698,17 +695,17 @@ def generate_outline_nodes(template: StructureTemplate) -> list[dict]:
             "connections": [],
         }
         nodes.append(act_node)
-        prev_id = act_node_id
+        prev_id = act_node_str
 
         # Beat nodes
         for beat_index, beat in enumerate(beats_in_act):
-            beat_node_id = node_id
+            beat_node_str = f"tpl_{node_id}"
             node_id += 1
             beat_x = x_start + (beat_index + 1) * col_width
             beat_y = act_y
 
             beat_node: dict = {
-                "id": beat_node_id,
+                "id": beat_node_str,
                 "x": beat_x,
                 "y": beat_y,
                 "kind": "Scene",
@@ -717,14 +714,13 @@ def generate_outline_nodes(template: StructureTemplate) -> list[dict]:
                 "connections": [],
             }
 
-            # Connect previous node to this beat
             for n in nodes:
                 if n["id"] == prev_id:
-                    n["connections"].append(beat_node_id)
+                    n["connections"].append(beat_node_str)
                     break
 
             nodes.append(beat_node)
-            prev_id = beat_node_id
+            prev_id = beat_node_str
 
     return nodes
 
@@ -740,7 +736,7 @@ def generate_comic_outline_nodes(template: ComicTemplate) -> list[dict]:
 
     nodes: list[dict] = []
     node_id = 0
-    prev_id: int | None = None
+    prev_id: str | None = None
 
     x_start = 40
     y_start = 40
@@ -758,9 +754,10 @@ def generate_comic_outline_nodes(template: ComicTemplate) -> list[dict]:
             if beat.page not in pages_seen:
                 current_row += 1
                 pages_seen[beat.page] = current_row
+                col_in_row = 0
             else:
                 current_row = pages_seen[beat.page]
-            col_in_row = 0
+                col_in_row += 1
         else:
             col_in_row += 1
 
@@ -768,7 +765,7 @@ def generate_comic_outline_nodes(template: ComicTemplate) -> list[dict]:
         bx = x_start + col_in_row * col_width
         by = y_start + row * row_height
 
-        bid = node_id
+        bid = f"tpl_{node_id}"
         node_id += 1
 
         bnode: dict = {

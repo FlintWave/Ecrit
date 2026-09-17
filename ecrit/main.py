@@ -939,22 +939,24 @@ class MainWindow(QMainWindow):
         from ecrit.screenplay.module_system import HOOK_BEFORE_EXPORT, HOOK_AFTER_EXPORT
         self._module_registry.call_hook(HOOK_BEFORE_EXPORT, kind, content)
         export_opts = self.editor.deliver._export_opts
+        format_id = STATE.get_format_id()
         if kind == "pdf":
             from ecrit.export.pdf_export import export_pdf
             export_pdf(
                 content, title=title, parent=self,
                 include_title_page=export_opts.get("title_page", True),
                 scene_numbers=export_opts.get("scene_numbers", True),
+                format_id=format_id,
             )
         elif kind == "odt":
             from ecrit.export.odt_export import export_odt
-            export_odt(content, title=title, parent=self)
+            export_odt(content, title=title, parent=self, format_id=format_id)
         elif kind == "fountain":
             from ecrit.export.fountain_export import export_fountain
             export_fountain(content, title=title, parent=self)
         elif kind == "epub":
             from ecrit.export.epub_export import export_epub
-            export_epub(content, title=title, parent=self)
+            export_epub(content, title=title, parent=self, format_id=format_id)
         self._module_registry.call_hook(HOOK_AFTER_EXPORT, kind, content)
 
     def _import_script(self):

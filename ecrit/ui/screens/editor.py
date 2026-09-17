@@ -1481,14 +1481,16 @@ class OutlineCanvas(QWidget):
             add_spread = menu.addAction("Add Spread")
             add_note = menu.addAction("Add Note")
             action = menu.exec(global_pos)
-            page_count = sum(1 for n in self._nodes if n.get("kind") == "Page") + 1
+            page_count = sum(1 for n in self._nodes if n.get("kind") == "Page")
+            spread_count = sum(1 for n in self._nodes if n.get("kind") == "Spread")
+            next_page = page_count + spread_count * 2 + 1
             panel_count = sum(1 for n in self._nodes if n.get("kind") == "Panel") + 1
             if action == add_page:
-                self._add_node_at(canvas_x, canvas_y, "Page", f"PAGE {page_count}")
+                self._add_node_at(canvas_x, canvas_y, "Page", f"PAGE {next_page}")
             elif action == add_panel:
                 self._add_node_at(canvas_x, canvas_y, "Panel", f"Panel {panel_count}")
             elif action == add_spread:
-                self._add_node_at(canvas_x, canvas_y, "Spread", f"SPREAD (Pages {page_count}-{page_count + 1})")
+                self._add_node_at(canvas_x, canvas_y, "Spread", f"SPREAD (Pages {next_page}-{next_page + 1})")
             elif action == add_note:
                 self._add_node_at(canvas_x, canvas_y, "Note", "Note")
         else:
@@ -2024,6 +2026,7 @@ class EditorScreen(QWidget):
         super().__init__(parent)
         self._current_phase = "Manuscript"
         self._total_pages = 1
+        self._format_id = "fountain/core"
         self._build_ui()
 
     def _build_ui(self):

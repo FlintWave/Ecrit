@@ -59,7 +59,7 @@ def _build_document(script_content: str, font_size: int = 12, include_title_page
             cursor.insertText(title_page.get("title", ""), title_fmt)
 
             normal_fmt = QTextCharFormat()
-            normal_fmt.setFont(QFont("Courier Prime", 12))
+            normal_fmt.setFont(QFont("Courier Prime", font_size))
 
             if title_page.get("credit"):
                 cursor.insertBlock()
@@ -123,10 +123,6 @@ def _build_document(script_content: str, font_size: int = 12, include_title_page
             subtype = elem.get("subtype", "CAPTION")
             prefix = f"{num}. {subtype}:" if num else f"{subtype}:"
             display_text = f"{prefix} {display_text}"
-        elif kind == "PageHeader":
-            display_text = elem.get("text", text)
-        elif kind == "PanelHeader":
-            display_text = elem.get("text", text)
         cursor.insertText(display_text, char_fmt)
 
     return doc
@@ -178,6 +174,7 @@ def export_pdf_to_path(
     path: str,
     paper: str = "USLetter",
     include_title_page: bool = True,
+    format_id: str = "fountain/core",
 ):
     import os
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
@@ -195,6 +192,6 @@ def export_pdf_to_path(
     layout = QPageLayout(page_size, QPageLayout.Orientation.Portrait, margins)
     printer.setPageLayout(layout)
 
-    doc = _build_document(script_content, include_title_page=include_title_page)
+    doc = _build_document(script_content, include_title_page=include_title_page, format_id=format_id)
     doc.setPageSize(QSizeF(printer.pageRect(QPrinter.Unit.Point).size()))
     doc.print_(printer)

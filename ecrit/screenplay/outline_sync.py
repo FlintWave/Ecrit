@@ -27,8 +27,8 @@ def outline_to_script(nodes: list[dict], format_id: str = "fountain/core") -> st
 
     for node in sorted_nodes:
         kind = node.get("kind", "Scene")
-        label = node.get("label", "")
-        synopsis = node.get("synopsis", "")
+        label = node.get("label") or ""
+        synopsis = node.get("synopsis") or ""
 
         if is_comic:
             if kind == "Page":
@@ -96,7 +96,7 @@ def script_to_outline(script: str, format_id: str = "fountain/core") -> list[dic
 
     nodes: list[dict] = []
     node_id = 0
-    prev_id: int | None = None
+    prev_id: str | None = None
 
     x_start = 40
     y_start = 40
@@ -116,7 +116,7 @@ def script_to_outline(script: str, format_id: str = "fountain/core") -> list[dic
                 text = elem.get("text", "")
                 if "SPREAD" in text.upper():
                     kind = "Spread"
-                nid = node_id
+                nid = f"sync_{node_id}"
                 node_id += 1
                 node = {
                     "id": nid,
@@ -134,7 +134,7 @@ def script_to_outline(script: str, format_id: str = "fountain/core") -> list[dic
 
             elif etype == "PanelHeader":
                 col_in_row += 1
-                nid = node_id
+                nid = f"sync_{node_id}"
                 node_id += 1
                 node = {
                     "id": nid,
@@ -154,10 +154,12 @@ def script_to_outline(script: str, format_id: str = "fountain/core") -> list[dic
                 if nodes:
                     last = nodes[-1]
                     text = elem.get("text", "")
-                    if last.get("synopsis"):
-                        last["synopsis"] += f" / {text[:60]}"
-                    else:
-                        last["synopsis"] = text[:80]
+                    cur = last.get("synopsis") or ""
+                    if len(cur) < 200:
+                        if cur:
+                            last["synopsis"] = cur + f" / {text[:60]}"
+                        else:
+                            last["synopsis"] = text[:80]
     else:
         for elem in elements:
             etype = elem.get("type", "")
@@ -165,7 +167,7 @@ def script_to_outline(script: str, format_id: str = "fountain/core") -> list[dic
             if etype == "Section":
                 current_row += 1
                 col_in_row = 0
-                nid = node_id
+                nid = f"sync_{node_id}"
                 node_id += 1
                 node = {
                     "id": nid,
@@ -183,7 +185,7 @@ def script_to_outline(script: str, format_id: str = "fountain/core") -> list[dic
 
             elif etype == "SceneHeading":
                 col_in_row += 1
-                nid = node_id
+                nid = f"sync_{node_id}"
                 node_id += 1
                 node = {
                     "id": nid,
@@ -201,7 +203,7 @@ def script_to_outline(script: str, format_id: str = "fountain/core") -> list[dic
 
             elif etype == "Transition":
                 col_in_row += 1
-                nid = node_id
+                nid = f"sync_{node_id}"
                 node_id += 1
                 node = {
                     "id": nid,
@@ -255,6 +257,8 @@ def _parse_elements_fallback(script: str) -> list[dict]:
             text = stripped.lstrip("#").strip()
             if re.match(r"(?i)^PAGE\s", text):
                 elements.append({"type": "PageHeader", "text": text})
+            elif re.match(r"(?i)^SPREAD[\s(]", text):
+                elements.append({"type": "PageHeader", "text": text})
             else:
                 elements.append({"type": "Section", "text": text})
         elif re.match(r"(?i)^\.?PANEL\s", stripped):
@@ -285,21 +289,21 @@ def _topo_sort(nodes: list[dict]) -> list[dict]:
     if not roots:
         return sorted(nodes, key=lambda n: (n.get("y", 0), n.get("x", 0)))
 
-    visited = set()
+    visited: set = set()
     result = []
 
-    def walk(node):
-        nid = node["id"]
-        if nid in visited:
-            return
-        visited.add(nid)
-        result.append(node)
-        for cid in node.get("connections", []):
-            if cid in id_map:
-                walk(id_map[cid])
-
     for root in sorted(roots, key=lambda n: (n.get("y", 0), n.get("x", 0))):
-        walk(root)
+        stack = [root]
+        while stack:
+            node = stack.pop()
+            nid = node["id"]
+            if nid in visited:
+                continue
+            visited.add(nid)
+            result.append(node)
+            for cid in reversed(node.get("connections", [])):
+                if cid in id_map and cid not in visited:
+                    stack.append(id_map[cid])
 
     for n in nodes:
         if n["id"] not in visited:

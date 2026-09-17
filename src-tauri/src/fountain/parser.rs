@@ -358,9 +358,12 @@ impl FountainParser {
             return None;
         }
 
-        if comic_mode {
+        let balloon_num = if comic_mode {
             *lettering_num += 1;
-        }
+            Some(*lettering_num)
+        } else {
+            None
+        };
 
         let char_elem = Element::Character { name, extension, dual, forced };
         let mut dialogue_elems = Vec::new();
@@ -374,7 +377,7 @@ impl FountainParser {
             if trimmed.starts_with('(') && trimmed.ends_with(')') {
                 dialogue_elems.push(Element::Parenthetical { text: trimmed.to_string() });
             } else {
-                dialogue_elems.push(Element::Dialogue { text: dline.to_string() });
+                dialogue_elems.push(Element::Dialogue { text: dline.to_string(), number: balloon_num });
             }
             i += 1;
         }
@@ -449,7 +452,7 @@ impl FountainParser {
                     }
                     lines_on_page += 1;
                 }
-                Element::Dialogue { text } => {
+                Element::Dialogue { text, .. } => {
                     let wc = text.split_whitespace().count() as u32;
                     total_words += wc;
                     dialogue_words += wc;
@@ -536,8 +539,8 @@ impl FountainParser {
 }
 
 fn normalize_caption_subtype(raw: &str) -> String {
-    let upper = raw.trim().to_uppercase();
-    match upper.as_str() {
+    let collapsed: String = raw.split_whitespace().collect::<Vec<_>>().join(" ").to_uppercase();
+    match collapsed.as_str() {
         "CAP" | "CAPTION" => "CAPTION".to_string(),
         "BANNER" | "TIME-PLACE" | "TIME PLACE" => "BANNER".to_string(),
         "VO" | "VOICE OVER" | "VOICEOVER" => "VOICE OVER".to_string(),

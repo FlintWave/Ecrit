@@ -144,16 +144,20 @@ def _build_content_xml(script_content: str, format_id: str = "fountain/core") ->
     return "\n".join(parts)
 
 
-def _create_odt_bytes(script_content: str) -> bytes:
+def _create_odt_bytes(script_content: str, format_id: str = "fountain/core") -> bytes:
     buf = BytesIO()
     with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
-        zf.writestr("mimetype", "application/vnd.oasis.opendocument.text")
+        zf.writestr(
+            zipfile.ZipInfo("mimetype", date_time=(2020, 1, 1, 0, 0, 0)),
+            "application/vnd.oasis.opendocument.text",
+            compress_type=zipfile.ZIP_STORED,
+        )
         zf.writestr("META-INF/manifest.xml", MANIFEST_XML)
-        zf.writestr("content.xml", _build_content_xml(script_content))
+        zf.writestr("content.xml", _build_content_xml(script_content, format_id))
     return buf.getvalue()
 
 
-def export_odt(script_content: str, title: str = "Untitled", parent=None) -> str:
+def export_odt(script_content: str, title: str = "Untitled", parent=None, format_id: str = "fountain/core") -> str:
     default_name = f"{title}.odt"
     path, _ = QFileDialog.getSaveFileName(
         parent, "Export ODT",
@@ -166,14 +170,14 @@ def export_odt(script_content: str, title: str = "Untitled", parent=None) -> str
     if not path.endswith(".odt"):
         path += ".odt"
 
-    data = _create_odt_bytes(script_content)
+    data = _create_odt_bytes(script_content, format_id)
     with open(path, 'wb') as f:
         f.write(data)
     return path
 
 
-def export_odt_to_path(script_content: str, path: str):
+def export_odt_to_path(script_content: str, path: str, format_id: str = "fountain/core"):
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
-    data = _create_odt_bytes(script_content)
+    data = _create_odt_bytes(script_content, format_id)
     with open(path, 'wb') as f:
         f.write(data)
