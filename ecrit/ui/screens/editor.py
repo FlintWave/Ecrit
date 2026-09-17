@@ -2108,7 +2108,7 @@ class EditorScreen(QWidget):
         editor = self.manuscript.editor
         cursor = editor.textCursor()
         if cursor.hasSelection():
-            selected = cursor.selectedText()
+            selected = cursor.selectedText().replace(" ", "\n")
             if use_regex:
                 import re
                 flags = 0 if case_sensitive else re.IGNORECASE

@@ -55,13 +55,21 @@ class AppState:
         if not folder.exists():
             return []
         projects = []
-        for item in sorted(folder.iterdir(), key=lambda p: p.stat().st_mtime if p.is_dir() else 0, reverse=True):
+        entries = []
+        for item in folder.iterdir():
+            if item.is_dir():
+                try:
+                    entries.append((item, item.stat().st_mtime))
+                except OSError:
+                    pass
+        entries.sort(key=lambda e: e[1], reverse=True)
+        for item, mtime_ts in entries:
             meta_file = item / "meta.json"
-            if item.is_dir() and meta_file.exists():
+            if meta_file.exists():
                 try:
                     meta = json.loads(meta_file.read_text(encoding="utf-8"))
                     meta["path"] = str(item)
-                    mtime = datetime.fromtimestamp(item.stat().st_mtime, tz=timezone.utc)
+                    mtime = datetime.fromtimestamp(mtime_ts, tz=timezone.utc)
                     meta["modified_at"] = mtime.isoformat()
                     projects.append(meta)
                 except Exception:

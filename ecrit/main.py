@@ -781,12 +781,11 @@ class MainWindow(QMainWindow):
             content = self.editor.manuscript.editor.toPlainText()
             title = self._editor_title_bar.context_label.text() or "Untitled"
             self._collab_session.project_title = title
+            self._collab_dialog._host_content = content
+            self._collab_dialog._host_title = title
         self._collab_dialog.exec()
 
     def _on_collab_started(self, session):
-        if STATE.current_project_path and session.role.value == "host":
-            content = self.editor.manuscript.editor.toPlainText()
-            session._crdt.set_text(content)
         self.editor.manuscript.presence_bar.setVisible(True)
         self._active_collab_session = session
         self._collab_suppress_local = False
@@ -1158,7 +1157,7 @@ class MainWindow(QMainWindow):
         content = editor.toPlainText()
         if content.startswith("Title:") or content.startswith("title:"):
             lines = content.split("\n")
-            end = 0
+            end = len(lines)
             for i, line in enumerate(lines):
                 if line.strip() == "" and i > 0:
                     end = i + 1

@@ -26,6 +26,8 @@ class CollaborationDialog(QDialog):
         self.setModal(True)
 
         self._session: CollabSession | None = None
+        self._host_content: str = ""
+        self._host_title: str = ""
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -225,7 +227,7 @@ class CollaborationDialog(QDialog):
     def _start_host(self):
         if not self._session:
             return
-        token = self._session.host(content="", project_title="")
+        token = self._session.host(content=self._host_content, project_title=self._host_title)
         self._token = token.encode()
         self.token_display.setText(self._token)
         self.copy_token_btn.setEnabled(True)
