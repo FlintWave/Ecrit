@@ -154,9 +154,12 @@ def current() -> ThemeTokens:
     return _current_theme
 
 
-def set_theme(theme: ThemeTokens):
+def set_theme(theme):
     global _current_theme
-    _current_theme = theme
+    if isinstance(theme, str):
+        _current_theme = NOCTURNE if theme == "nocturne" else ORGANIC
+    else:
+        _current_theme = theme
 
 
 def toggle():

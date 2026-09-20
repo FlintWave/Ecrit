@@ -7,7 +7,6 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor
 
-from ecrit.ui.styles import theme
 
 
 class SpellCheckDialog(QDialog):
@@ -20,19 +19,18 @@ class SpellCheckDialog(QDialog):
         self.setMinimumSize(700, 460)
         self.setModal(True)
 
-        t = theme.current()
         layout = QVBoxLayout(self)
         layout.setContentsMargins(24, 20, 24, 20)
         layout.setSpacing(12)
 
         header = QHBoxLayout()
         title = QLabel("Spell Check")
-        title.setStyleSheet(f"font-size: 18px; font-weight: bold; color: {t.text};")
+        title.setStyleSheet("font-size: 18px; font-weight: bold;")
         header.addWidget(title)
         header.addStretch()
 
         self._count_label = QLabel()
-        self._count_label.setStyleSheet(f"color: {t.neutral_400}; font-size: 13px;")
+        self._count_label.setObjectName("countBadge")
         header.addWidget(self._count_label)
         layout.addLayout(header)
 

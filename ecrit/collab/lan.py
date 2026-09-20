@@ -22,6 +22,7 @@ class LANPeer:
     ip_address: str
     port: int
     project_title: str = ""
+    session_id: str = ""
     last_seen: float = 0.0
 
     def is_stale(self, timeout: float = 10.0) -> bool:
@@ -76,6 +77,9 @@ class LANDiscovery:
                     self._on_peer_lost(uid)
             return list(self._peers.values())
 
+    def set_session_id(self, session_id: str) -> None:
+        self._session_id = session_id
+
     def _make_announce(self) -> bytes:
         payload = json.dumps({
             "service": SERVICE_ID,
@@ -83,6 +87,7 @@ class LANDiscovery:
             "user_name": self.user_name,
             "port": self.port,
             "project_title": self._project_title,
+            "session_id": getattr(self, "_session_id", ""),
         })
         return payload.encode("utf-8")
 
@@ -125,6 +130,7 @@ class LANDiscovery:
                     ip_address=addr[0],
                     port=payload.get("port", 8741),
                     project_title=payload.get("project_title", ""),
+                    session_id=payload.get("session_id", ""),
                     last_seen=time.time(),
                 )
                 with self._peers_lock:

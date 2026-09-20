@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+import threading
 import uuid
 from enum import Enum
 from dataclasses import dataclass, field
@@ -11,6 +13,8 @@ from ecrit.collab.protocol import CollabMessage, MessageType, Operation
 from ecrit.collab.crdt import TextCRDT
 from ecrit.collab.lan import LANDiscovery, LANPeer
 from ecrit.collab.p2p import P2PConnection, ConnectionToken
+
+logger = logging.getLogger("ecrit.collab.session")
 
 
 class CollabRole(str, Enum):
@@ -53,6 +57,7 @@ class CollabSession:
         self._p2p = P2PConnection(self.user_id, self.user_name)
         self._participants: dict[str, Participant] = {}
         self._pending_ops: list = []
+        self._lock = threading.Lock()
         self._color_index = 0
 
         self._on_state_change: Optional[Callable[[SessionState], None]] = None
@@ -102,7 +107,9 @@ class CollabSession:
         )
 
         token = self._p2p.host_session(port=port, project_title=project_title)
+        self._lan.port = self._p2p._port
         self._lan.set_project_title(project_title)
+        self._lan.set_session_id(self._p2p._session_id)
         self._lan.start()
         self._set_state(SessionState.CONNECTED)
         return token
@@ -112,7 +119,7 @@ class CollabSession:
         token = ConnectionToken(
             host=peer.ip_address,
             port=peer.port,
-            session_id="",
+            session_id=peer.session_id,
             user_name=peer.user_name,
             project_title=peer.project_title,
         )
@@ -159,14 +166,24 @@ class CollabSession:
     # ── Editing methods ──
 
     def apply_local_insert(self, position: int, text: str) -> None:
-        op = self._crdt.insert(position, text)
-        self._pending_ops.append(op)
+        with self._lock:
+            op = self._crdt.insert(position, text)
+            self._pending_ops.append(op)
+            if len(self._pending_ops) > 100:
+                logger.warning("Pending ops exceeded 100; requesting full sync")
+                self._pending_ops.clear()
+                self._request_sync()
         msg = CollabMessage.operation(self.user_id, op)
         self._p2p.broadcast(msg.to_json())
 
     def apply_local_delete(self, position: int, length: int) -> None:
-        op = self._crdt.delete(position, length)
-        self._pending_ops.append(op)
+        with self._lock:
+            op = self._crdt.delete(position, length)
+            self._pending_ops.append(op)
+            if len(self._pending_ops) > 100:
+                logger.warning("Pending ops exceeded 100; requesting full sync")
+                self._pending_ops.clear()
+                self._request_sync()
         msg = CollabMessage.operation(self.user_id, op)
         self._p2p.broadcast(msg.to_json())
 
@@ -176,6 +193,13 @@ class CollabSession:
             self._participants[self.user_id].selection_end = selection_end
         msg = CollabMessage.cursor_update(self.user_id, position, selection_end)
         self._p2p.broadcast(msg.to_json())
+
+    def _request_sync(self) -> None:
+        """Ask the host for a full document sync to reset OT state."""
+        if self.role == CollabRole.HOST:
+            return  # host is authoritative; nothing to request
+        sync_msg = CollabMessage.sync_request(self.user_id)
+        self._p2p.broadcast(sync_msg.to_json())
 
     def get_text(self) -> str:
         return self._crdt.get_text()
@@ -202,7 +226,8 @@ class CollabSession:
     def _handle_message(self, peer_id: str, raw: str) -> None:
         try:
             msg = CollabMessage.from_json(raw)
-        except Exception:
+        except (ValueError, KeyError, AttributeError, TypeError):
+            logger.debug("Ignoring malformed collab message from %s", peer_id)
             return
 
         if msg.msg_type == MessageType.JOIN:
@@ -221,19 +246,20 @@ class CollabSession:
 
         elif msg.msg_type == MessageType.OPERATION:
             op = Operation.from_dict(msg.payload)
-            transformed_pending = []
-            for pending in self._pending_ops:
-                pending_prime = self._crdt.transform(pending, op)
-                op = self._crdt.transform(op, pending)
-                transformed_pending.append(pending_prime)
-            self._pending_ops = transformed_pending
-            self._crdt.apply_operation(op)
+            with self._lock:
+                transformed_pending = []
+                for pending in self._pending_ops:
+                    pending_prime = self._crdt.transform(pending, op)
+                    op = self._crdt.transform(op, pending)
+                    transformed_pending.append(pending_prime)
+                self._pending_ops = transformed_pending
+                self._crdt.apply_operation(op)
             if self._on_text_change:
                 self._on_text_change(self._crdt.get_text())
             if self.role == CollabRole.HOST:
-                relay = CollabMessage.operation(msg.user_id, op.to_dict())
+                relay = CollabMessage.operation(msg.user_id, op)
                 relay_data = relay.to_json()
-                for pid in self._p2p._clients:
+                for pid in self._p2p.get_client_ids():
                     if pid != peer_id:
                         self._p2p.send(pid, relay_data)
 
@@ -249,7 +275,7 @@ class CollabSession:
                     msg.payload.get("selection_end", -1),
                 )
             if self.role == CollabRole.HOST:
-                for pid in self._p2p._clients:
+                for pid in self._p2p.get_client_ids():
                     if pid != peer_id:
                         self._p2p.send(pid, raw)
 
@@ -262,8 +288,9 @@ class CollabSession:
 
         elif msg.msg_type == MessageType.SYNC_RESPONSE:
             content = msg.payload.get("content", "")
-            self._crdt.set_text(content)
-            self._pending_ops.clear()
+            with self._lock:
+                self._crdt.set_text(content)
+                self._pending_ops.clear()
             if self._on_text_change:
                 self._on_text_change(content)
 

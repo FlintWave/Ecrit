@@ -5,7 +5,6 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, Signal, QTimer
 
-from ecrit.ui.styles import theme
 
 
 class SprintTimerWidget(QFrame):
@@ -28,7 +27,6 @@ class SprintTimerWidget(QFrame):
         self._timer.setInterval(1000)
         self._timer.timeout.connect(self._tick)
 
-        t = theme.current()
         layout = QVBoxLayout(self)
         layout.setContentsMargins(16, 14, 16, 14)
         layout.setSpacing(12)
@@ -49,6 +47,7 @@ class SprintTimerWidget(QFrame):
             btn = QPushButton(f"{mins}m")
             btn.setObjectName("secondary")
             btn.setFixedHeight(30)
+            btn.setAccessibleName(f"{mins} minutes")
             btn.clicked.connect(lambda checked=False, m=mins: self._set_duration(m))
             presets.addWidget(btn)
         layout.addLayout(presets)
@@ -57,12 +56,14 @@ class SprintTimerWidget(QFrame):
         self.start_btn = QPushButton("Start")
         self.start_btn.setObjectName("primary")
         self.start_btn.setFixedHeight(34)
+        self.start_btn.setAccessibleName("Start")
         self.start_btn.clicked.connect(self._toggle)
         controls.addWidget(self.start_btn)
 
         self.reset_btn = QPushButton("Reset")
         self.reset_btn.setObjectName("secondary")
         self.reset_btn.setFixedHeight(34)
+        self.reset_btn.setAccessibleName("Reset")
         self.reset_btn.clicked.connect(self._reset)
         controls.addWidget(self.reset_btn)
         layout.addLayout(controls)

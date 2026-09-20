@@ -376,19 +376,17 @@ class TestCloudExportUI:
         assert "pdf" in formats
         assert "fountain" in formats
 
-    def test_export_requested_signal(self, qapp):
+    def test_export_button_disabled(self, qapp):
         from ecrit.ui.overlays.cloud_export import CloudExportDialog
         dialog = CloudExportDialog()
-        received = []
-        dialog.export_requested.connect(lambda p, f: received.append((p, f)))
-        dialog._do_export()
-        assert len(received) == 1
+        assert not dialog.export_btn.isEnabled()
+        assert dialog.export_btn.text() == "Coming Soon"
 
-    def test_history_entry(self, qapp):
+    def test_authenticate_shows_not_available(self, qapp):
         from ecrit.ui.overlays.cloud_export import CloudExportDialog
         dialog = CloudExportDialog()
-        dialog.add_history_entry("Test export")
-        assert dialog.history_list.count() == 1
+        dialog._authenticate()
+        assert "not yet available" in dialog.auth_status.text().lower()
 
 
 # ---------------------------------------------------------------------------
@@ -619,15 +617,11 @@ class TestNewFeaturesAdversarial:
         assert config["remote_url"] == ""
         assert config["token"] == ""
 
-    def test_cloud_export_all_formats(self, qapp):
+    def test_cloud_export_button_disabled_coming_soon(self, qapp):
         from ecrit.ui.overlays.cloud_export import CloudExportDialog
         dialog = CloudExportDialog()
-        received = []
-        dialog.export_requested.connect(lambda p, f: received.append(f))
-        for i in range(dialog.format_combo.count()):
-            dialog.format_combo.setCurrentIndex(i)
-            dialog._do_export()
-        assert len(received) == dialog.format_combo.count()
+        assert not dialog.export_btn.isEnabled()
+        assert dialog.format_combo.count() == 4
 
     def test_share_review_html_large_script(self):
         from ecrit.export.share_review import generate_review_html

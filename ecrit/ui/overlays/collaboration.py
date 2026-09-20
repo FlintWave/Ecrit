@@ -8,10 +8,10 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, Signal, QTimer
 from PySide6.QtGui import QGuiApplication
 
-from ecrit.ui.styles import theme
 from ecrit.i18n import tr
 from ecrit.collab.session import CollabSession, SessionState, CollabRole
 from ecrit.collab.p2p import ConnectionToken
+from ecrit.ui.icons import IconButton
 
 
 class CollaborationDialog(QDialog):
@@ -26,7 +26,8 @@ class CollaborationDialog(QDialog):
         self.setModal(True)
 
         self._session: CollabSession | None = None
-        t = theme.current()
+        self._host_content: str = ""
+        self._host_title: str = ""
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -39,12 +40,13 @@ class CollaborationDialog(QDialog):
         header.addStretch()
 
         self.status_label = QLabel(tr("collab.disconnected"))
-        self.status_label.setStyleSheet(f"color: {t.neutral_500}; font-size: 13px;")
+        self.status_label.setObjectName("dashMuted")
         header.addWidget(self.status_label)
 
-        close_btn = QPushButton("×")
+        close_btn = IconButton("x-mark")
         close_btn.setObjectName("iconBtn")
         close_btn.setFixedSize(28, 28)
+        close_btn.setAccessibleName("Close")
         close_btn.clicked.connect(self.close)
         header.addWidget(close_btn)
         layout.addLayout(header)
@@ -61,25 +63,28 @@ class CollaborationDialog(QDialog):
 
         self.peers_list = QListWidget()
         self.peers_list.setFixedHeight(160)
+        self.peers_list.setAccessibleName("LAN Peers")
         l_layout.addWidget(self.peers_list)
 
         scan_row = QHBoxLayout()
         self.scan_btn = QPushButton(tr("collab.scanning"))
         self.scan_btn.setObjectName("secondary")
         self.scan_btn.setFixedHeight(34)
+        self.scan_btn.setAccessibleName("Scan for Peers")
         self.scan_btn.clicked.connect(self._toggle_scan)
         scan_row.addWidget(self.scan_btn)
 
         self.join_lan_btn = QPushButton(tr("collab.join_session"))
         self.join_lan_btn.setObjectName("primary")
         self.join_lan_btn.setFixedHeight(34)
+        self.join_lan_btn.setAccessibleName("Join LAN Session")
         self.join_lan_btn.setEnabled(False)
         self.join_lan_btn.clicked.connect(self._join_lan_peer)
         scan_row.addWidget(self.join_lan_btn)
         l_layout.addLayout(scan_row)
 
         self.peer_count_label = QLabel(tr("collab.no_peers"))
-        self.peer_count_label.setStyleSheet(f"color: {t.neutral_500}; font-size: 12px;")
+        self.peer_count_label.setObjectName("dashMutedSmall")
         l_layout.addWidget(self.peer_count_label)
 
         l_layout.addStretch()
@@ -94,9 +99,7 @@ class CollaborationDialog(QDialog):
         p_layout.addWidget(QLabel(tr("collab.remote_p2p")))
 
         host_frame = QFrame()
-        host_frame.setStyleSheet(
-            f"QFrame {{ background: {t.neutral_100}; border-radius: 8px; padding: 12px; }}"
-        )
+        host_frame.setObjectName("collabFrame")
         h_layout = QVBoxLayout(host_frame)
         h_layout.setSpacing(8)
         h_layout.addWidget(QLabel(tr("collab.host")))
@@ -104,23 +107,23 @@ class CollaborationDialog(QDialog):
         self.token_display = QTextEdit()
         self.token_display.setReadOnly(True)
         self.token_display.setFixedHeight(60)
-        self.token_display.setStyleSheet(
-            f"font-family: ui-monospace, Menlo, monospace; font-size: 11px; "
-            f"background: {t.bg}; border: 1px solid {t.neutral_700}; border-radius: 4px;"
-        )
+        self.token_display.setObjectName("collabTokenDisplay")
         self.token_display.setPlaceholderText(tr("collab.connection_token"))
+        self.token_display.setAccessibleName("Connection Token")
         h_layout.addWidget(self.token_display)
 
         host_btn_row = QHBoxLayout()
         self.start_btn = QPushButton(tr("collab.start_session"))
         self.start_btn.setObjectName("primary")
         self.start_btn.setFixedHeight(34)
+        self.start_btn.setAccessibleName("Start Session")
         self.start_btn.clicked.connect(self._start_host)
         host_btn_row.addWidget(self.start_btn)
 
         self.copy_token_btn = QPushButton(tr("collab.copy_token"))
         self.copy_token_btn.setObjectName("secondary")
         self.copy_token_btn.setFixedHeight(34)
+        self.copy_token_btn.setAccessibleName("Copy Token")
         self.copy_token_btn.setEnabled(False)
         self.copy_token_btn.clicked.connect(self._copy_token)
         host_btn_row.addWidget(self.copy_token_btn)
@@ -128,9 +131,7 @@ class CollaborationDialog(QDialog):
         p_layout.addWidget(host_frame)
 
         join_frame = QFrame()
-        join_frame.setStyleSheet(
-            f"QFrame {{ background: {t.neutral_100}; border-radius: 8px; padding: 12px; }}"
-        )
+        join_frame.setObjectName("collabFrame")
         j_layout = QVBoxLayout(join_frame)
         j_layout.setSpacing(8)
         j_layout.addWidget(QLabel(tr("collab.guest")))
@@ -138,11 +139,13 @@ class CollaborationDialog(QDialog):
         self.token_input = QLineEdit()
         self.token_input.setPlaceholderText(tr("collab.paste_token"))
         self.token_input.setFixedHeight(34)
+        self.token_input.setAccessibleName("Paste Token")
         j_layout.addWidget(self.token_input)
 
         self.join_btn = QPushButton(tr("collab.join_session"))
         self.join_btn.setObjectName("primary")
         self.join_btn.setFixedHeight(34)
+        self.join_btn.setAccessibleName("Join Session")
         self.join_btn.clicked.connect(self._join_with_token)
         j_layout.addWidget(self.join_btn)
         p_layout.addWidget(join_frame)
@@ -157,13 +160,14 @@ class CollaborationDialog(QDialog):
         self.leave_btn = QPushButton(tr("collab.leave_session"))
         self.leave_btn.setObjectName("secondary")
         self.leave_btn.setFixedHeight(36)
+        self.leave_btn.setAccessibleName("Leave Session")
         self.leave_btn.setEnabled(False)
         self.leave_btn.clicked.connect(self._leave_session)
         leave_row.addWidget(self.leave_btn)
         leave_row.addStretch()
 
         self.participants_label = QLabel("")
-        self.participants_label.setStyleSheet(f"color: {t.neutral_500}; font-size: 12px;")
+        self.participants_label.setObjectName("dashMutedSmall")
         leave_row.addWidget(self.participants_label)
         layout.addLayout(leave_row)
 
@@ -223,7 +227,7 @@ class CollaborationDialog(QDialog):
     def _start_host(self):
         if not self._session:
             return
-        token = self._session.host(content="", project_title="")
+        token = self._session.host(content=self._host_content, project_title=self._host_title)
         self._token = token.encode()
         self.token_display.setText(self._token)
         self.copy_token_btn.setEnabled(True)

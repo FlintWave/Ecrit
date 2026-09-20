@@ -1,11 +1,14 @@
 """Central app state management."""
 
 import json
+import logging
 import re
 from dataclasses import dataclass, field
 from typing import Optional, Callable
 from pathlib import Path
 from datetime import datetime, timezone
+
+logger = logging.getLogger("ecrit.state")
 
 try:
     import ecrit_core
@@ -45,6 +48,7 @@ class AppState:
                 data = ecrit_core.list_projects(self.project_folder)
                 self.projects = json.loads(data)
             except Exception:
+                logger.debug("ecrit_core.list_projects failed, using Python fallback", exc_info=True)
                 self.projects = self._load_projects_py()
         else:
             self.projects = self._load_projects_py()
@@ -55,17 +59,25 @@ class AppState:
         if not folder.exists():
             return []
         projects = []
-        for item in sorted(folder.iterdir(), key=lambda p: p.stat().st_mtime if p.is_dir() else 0, reverse=True):
+        entries = []
+        for item in folder.iterdir():
+            if item.is_dir():
+                try:
+                    entries.append((item, item.stat().st_mtime))
+                except OSError:
+                    pass
+        entries.sort(key=lambda e: e[1], reverse=True)
+        for item, mtime_ts in entries:
             meta_file = item / "meta.json"
-            if item.is_dir() and meta_file.exists():
+            if meta_file.exists():
                 try:
                     meta = json.loads(meta_file.read_text(encoding="utf-8"))
                     meta["path"] = str(item)
-                    mtime = datetime.fromtimestamp(item.stat().st_mtime, tz=timezone.utc)
+                    mtime = datetime.fromtimestamp(mtime_ts, tz=timezone.utc)
                     meta["modified_at"] = mtime.isoformat()
                     projects.append(meta)
-                except Exception:
-                    pass
+                except (json.JSONDecodeError, OSError) as exc:
+                    logger.warning("Skipping project %s: %s", item.name, exc)
         return projects
 
     def open_project(self, path: str):
@@ -77,7 +89,7 @@ class AppState:
                 self.notify()
                 return data
             except Exception:
-                pass
+                logger.debug("ecrit_core.open_project failed, using Python fallback", exc_info=True)
         return self._open_project_py(path)
 
     def _open_project_py(self, path: str):
@@ -87,19 +99,39 @@ class AppState:
             return None
         try:
             meta = json.loads(meta_file.read_text(encoding="utf-8"))
-        except Exception:
+        except (json.JSONDecodeError, OSError) as exc:
+            logger.warning("Cannot read project meta %s: %s", meta_file, exc)
             return None
         script_file = project_dir / "script.fountain"
         script = ""
         if script_file.exists():
             try:
                 script = script_file.read_text(encoding="utf-8")
-            except Exception:
-                pass
+            except OSError as exc:
+                logger.warning("Cannot read script file %s: %s", script_file, exc)
+        outline_nodes = []
+        outline_file = project_dir / "outline.json"
+        if outline_file.exists():
+            try:
+                outline_nodes = json.loads(outline_file.read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, OSError) as exc:
+                logger.warning("Cannot read outline %s: %s", outline_file, exc)
+        plan_documents = []
+        plan_file = project_dir / "plan_documents.json"
+        if plan_file.exists():
+            try:
+                plan_documents = json.loads(plan_file.read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, OSError) as exc:
+                logger.warning("Cannot read plan documents %s: %s", plan_file, exc)
         self.current_project_path = path
         self.script_content = script
         self.notify()
-        return {"meta": meta, "script": script}
+        return {
+            "meta": meta,
+            "script": script,
+            "outline_nodes": outline_nodes,
+            "plan_documents": plan_documents,
+        }
 
     def save_script(self) -> bool:
         if ecrit_core and self.current_project_path:
@@ -107,13 +139,14 @@ class AppState:
                 ecrit_core.save_script(self.current_project_path, self.script_content)
                 return True
             except Exception:
-                pass
+                logger.debug("ecrit_core.save_script failed, using Python fallback", exc_info=True)
         if self.current_project_path:
             script_file = Path(self.current_project_path) / "script.fountain"
             try:
                 script_file.write_text(self.script_content, encoding="utf-8")
                 return True
-            except Exception:
+            except OSError as exc:
+                logger.warning("Failed to save script to %s: %s", script_file, exc)
                 return False
         return False
 
@@ -128,7 +161,7 @@ class AppState:
                 self.load_projects()
                 return meta
             except Exception:
-                pass
+                logger.debug("ecrit_core.create_project failed, using Python fallback", exc_info=True)
         return self._create_project_py(title, author, format_id, paper, kind)
 
     def _create_project_py(self, title: str, author: str, format_id: str, paper: str, kind: str = "Single"):
@@ -162,12 +195,48 @@ class AppState:
         self.load_projects()
         return meta
 
+    def save_outline(self, nodes: list) -> bool:
+        if not self.current_project_path:
+            return False
+        try:
+            path = Path(self.current_project_path) / "outline.json"
+            path.write_text(json.dumps(nodes, indent=2), encoding="utf-8")
+            return True
+        except OSError as exc:
+            logger.warning("Failed to save outline: %s", exc)
+            return False
+
+    def save_plan_documents(self, documents: list) -> bool:
+        if not self.current_project_path:
+            return False
+        try:
+            path = Path(self.current_project_path) / "plan_documents.json"
+            path.write_text(json.dumps(documents, indent=2), encoding="utf-8")
+            return True
+        except OSError as exc:
+            logger.warning("Failed to save plan documents: %s", exc)
+            return False
+
+    def get_format_id(self) -> str:
+        if not self.current_project_path:
+            return "fountain/core"
+        meta_path = Path(self.current_project_path) / "project.json"
+        if not meta_path.exists():
+            meta_path = Path(self.current_project_path) / "meta.json"
+        if meta_path.exists():
+            try:
+                meta = json.loads(meta_path.read_text(encoding="utf-8"))
+                return meta.get("format_id", "fountain/core")
+            except (json.JSONDecodeError, OSError):
+                pass
+        return "fountain/core"
+
     def parse_script(self) -> dict:
         if ecrit_core and self.script_content:
             try:
-                return json.loads(ecrit_core.parse_fountain(self.script_content))
+                return json.loads(ecrit_core.parse_fountain(self.script_content, self.get_format_id()))
             except Exception:
-                pass
+                logger.debug("ecrit_core.parse_fountain failed, using Python fallback", exc_info=True)
         return self._parse_script_py()
 
     def _parse_script_py(self) -> dict:
@@ -189,9 +258,9 @@ class AppState:
     def get_stats(self) -> dict:
         if ecrit_core and self.script_content:
             try:
-                return json.loads(ecrit_core.get_script_stats(self.script_content))
+                return json.loads(ecrit_core.get_script_stats(self.script_content, self.get_format_id()))
             except Exception:
-                pass
+                logger.debug("ecrit_core.get_script_stats failed, using Python fallback", exc_info=True)
         return self._get_stats_py()
 
     def _get_stats_py(self) -> dict:
@@ -296,12 +365,13 @@ class AppState:
             if path.exists():
                 try:
                     existing = json.loads(path.read_text(encoding="utf-8"))
-                except Exception:
-                    pass
+                except (json.JSONDecodeError, OSError):
+                    logger.debug("Could not read existing preferences, starting fresh")
             existing.update(prefs)
             path.write_text(json.dumps(existing, indent=2), encoding="utf-8")
             return True
-        except Exception:
+        except OSError as exc:
+            logger.warning("Failed to save preferences: %s", exc)
             return False
 
     def load_preferences(self) -> dict:
@@ -309,8 +379,8 @@ class AppState:
             path = self._prefs_path()
             if path.exists():
                 return json.loads(path.read_text(encoding="utf-8"))
-        except Exception:
-            pass
+        except (json.JSONDecodeError, OSError) as exc:
+            logger.warning("Failed to load preferences: %s", exc)
         return {}
 
 STATE = AppState()

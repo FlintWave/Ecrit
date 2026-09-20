@@ -7,9 +7,9 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, Signal
 
-from ecrit.ui.styles import theme
 from ecrit.i18n import tr
 from ecrit.companion.device_sync import DeviceSync, PairedDevice, SyncStatus
+from ecrit.ui.icons import IconButton
 
 
 class CompanionDialog(QDialog):
@@ -25,8 +25,6 @@ class CompanionDialog(QDialog):
 
         self._device_sync = DeviceSync()
         self._device_sync.set_status_callback(self._on_sync_status_change)
-        t = theme.current()
-
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
 
@@ -36,9 +34,10 @@ class CompanionDialog(QDialog):
         title.setStyleSheet("font-size: 20px; font-weight: 500;")
         header.addWidget(title)
         header.addStretch()
-        close_btn = QPushButton("×")
+        close_btn = IconButton("x-mark")
         close_btn.setObjectName("iconBtn")
         close_btn.setFixedSize(28, 28)
+        close_btn.setAccessibleName("Close")
         close_btn.clicked.connect(self.close)
         header.addWidget(close_btn)
         layout.addLayout(header)
@@ -54,17 +53,20 @@ class CompanionDialog(QDialog):
         d_layout.addWidget(QLabel(tr("companion.paired_devices")))
         self.devices_list = QListWidget()
         self.devices_list.setFixedHeight(140)
+        self.devices_list.setAccessibleName("Paired Devices")
         d_layout.addWidget(self.devices_list)
 
         pair_row = QHBoxLayout()
         self.device_name_input = QLineEdit()
         self.device_name_input.setPlaceholderText(tr("companion.device_name"))
         self.device_name_input.setFixedHeight(34)
+        self.device_name_input.setAccessibleName("Device Name")
         pair_row.addWidget(self.device_name_input)
 
         pair_btn = QPushButton(tr("companion.pair_new"))
         pair_btn.setObjectName("primary")
         pair_btn.setFixedHeight(34)
+        pair_btn.setAccessibleName("Pair New Device")
         pair_btn.clicked.connect(self._pair_new_device)
         pair_row.addWidget(pair_btn)
         d_layout.addLayout(pair_row)
@@ -72,6 +74,7 @@ class CompanionDialog(QDialog):
         unpair_btn = QPushButton("Unpair Selected")
         unpair_btn.setObjectName("secondary")
         unpair_btn.setFixedHeight(30)
+        unpair_btn.setAccessibleName("Unpair Selected")
         unpair_btn.clicked.connect(self._unpair_selected)
         d_layout.addWidget(unpair_btn)
 
@@ -85,18 +88,20 @@ class CompanionDialog(QDialog):
         s_layout.setSpacing(12)
 
         self.sync_status_label = QLabel(tr("companion.never_synced"))
-        self.sync_status_label.setStyleSheet(f"color: {t.neutral_500}; font-size: 13px;")
+        self.sync_status_label.setObjectName("dashMuted")
         s_layout.addWidget(self.sync_status_label)
 
         sync_btn = QPushButton(tr("companion.full_sync"))
         sync_btn.setObjectName("primary")
         sync_btn.setFixedHeight(40)
+        sync_btn.setAccessibleName("Full Sync")
         sync_btn.clicked.connect(self.sync_bundle_requested.emit)
         s_layout.addWidget(sync_btn)
 
         reader_btn = QPushButton(tr("companion.reader_mode"))
         reader_btn.setObjectName("secondary")
         reader_btn.setFixedHeight(36)
+        reader_btn.setAccessibleName("Reader Mode Export")
         reader_btn.clicked.connect(self.reader_export_requested.emit)
         s_layout.addWidget(reader_btn)
 
@@ -106,10 +111,7 @@ class CompanionDialog(QDialog):
         s_layout.addWidget(transfer_label)
 
         self.transfer_url_label = QLabel("")
-        self.transfer_url_label.setStyleSheet(
-            f"font-family: ui-monospace, Menlo, monospace; font-size: 12px; "
-            f"color: {t.accent_300};"
-        )
+        self.transfer_url_label.setObjectName("dashMonoMuted")
         self.transfer_url_label.setWordWrap(True)
         self.transfer_url_label.setTextInteractionFlags(
             Qt.TextInteractionFlag.TextSelectableByMouse
@@ -119,6 +121,7 @@ class CompanionDialog(QDialog):
         wifi_btn = QPushButton(tr("companion.wifi_transfer"))
         wifi_btn.setObjectName("secondary")
         wifi_btn.setFixedHeight(36)
+        wifi_btn.setAccessibleName("Wi-Fi Transfer")
         wifi_btn.clicked.connect(self._start_wifi_transfer)
         s_layout.addWidget(wifi_btn)
 

@@ -5,6 +5,8 @@ from PySide6.QtWidgets import QApplication, QMainWindow, QStackedWidget, QVBoxLa
 from PySide6.QtCore import Qt, QTimer, Signal as QtSignal
 from PySide6.QtGui import QShortcut, QKeySequence
 
+from ecrit.ui.icons import IconButton
+
 from ecrit.ui.styles import theme
 from ecrit.ui.styles.stylesheet import generate
 from ecrit.ui.components.title_bar import TitleBar
@@ -28,7 +30,6 @@ from ecrit.ui.overlays.series_panel import SeriesPanel
 from ecrit.ui.overlays.sync_settings import SyncSettingsDialog
 from ecrit.ui.overlays.cloud_export import CloudExportDialog
 from ecrit.ui.overlays.share_review import ShareReviewDialog
-from ecrit.ui.overlays.marketplace import MarketplaceDialog
 from ecrit.ui.overlays.collaboration import CollaborationDialog
 from ecrit.ui.overlays.companion import CompanionDialog
 from ecrit.screenplay.series_projects import SeriesProject
@@ -61,7 +62,6 @@ class MainWindow(QMainWindow):
 
         self.title_bar = TitleBar(show_phases=False)
         self.title_bar.settings_clicked.connect(self._open_settings)
-        self.title_bar.home_clicked.connect(self._go_dashboard)
         self.title_bar.cmd_chip.clicked.connect(self._show_command_palette)
         self.title_bar.close_requested.connect(self.close)
         self.title_bar.minimize_requested.connect(self.showMinimized)
@@ -70,6 +70,15 @@ class MainWindow(QMainWindow):
 
         self.stack = QStackedWidget()
         root.addWidget(self.stack, 1)
+
+        self._home_btn = IconButton("home", icon_size=20, parent=self)
+        self._home_btn.setObjectName("homeBtn")
+        self._home_btn.setFixedSize(40, 40)
+        self._home_btn.setToolTip("Dashboard")
+        self._home_btn.setAccessibleName("Return to dashboard")
+        self._home_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._home_btn.clicked.connect(self._go_dashboard)
+        self._home_btn.hide()
 
         self.dashboard = Dashboard()
         self.dashboard.open_project.connect(self._open_project)
@@ -101,7 +110,6 @@ class MainWindow(QMainWindow):
 
         self._editor_title_bar = TitleBar(show_phases=True)
         self._editor_title_bar.settings_clicked.connect(self._open_settings)
-        self._editor_title_bar.home_clicked.connect(self._go_dashboard)
         self._editor_title_bar.phase_changed.connect(self._on_phase_changed)
         self._editor_title_bar.cmd_chip.clicked.connect(self._show_command_palette)
         self._editor_title_bar.close_requested.connect(self.close)
@@ -111,7 +119,7 @@ class MainWindow(QMainWindow):
         self._stats_dialog = StatsDialog(self)
         self._shortcuts_dialog = ShortcutsDialog(self)
         self._settings_dialog = SettingsDialog(self)
-        self._settings_dialog.theme_changed.connect(self._apply_theme)
+        self._settings_dialog.theme_changed.connect(self._on_theme_changed_from_settings)
         self._settings_dialog.language_changed.connect(self._on_language_changed)
         self._settings_dialog.project_folder_changed.connect(self._on_project_folder_changed)
         self._settings_dialog.settings_applied.connect(self._on_settings_applied)
@@ -153,9 +161,6 @@ class MainWindow(QMainWindow):
         self._share_dialog = ShareReviewDialog(self)
         self._share_dialog.share_created.connect(self._on_share_created)
 
-        self._marketplace_dialog = MarketplaceDialog(self)
-        self._marketplace_dialog.plugin_installed.connect(self._on_plugin_installed)
-        self._marketplace_dialog.plugin_uninstalled.connect(self._on_plugin_uninstalled)
 
         self._collab_session = CollabSession(user_name=STATE.author_name or "Writer")
         self._active_collab_session = None
@@ -196,6 +201,13 @@ class MainWindow(QMainWindow):
         self._fullscreen_shortcut = QShortcut(QKeySequence("F11"), self)
         self._fullscreen_shortcut.activated.connect(self._toggle_fullscreen)
 
+        self._zoom_in_shortcut = QShortcut(QKeySequence("Ctrl+="), self)
+        self._zoom_in_shortcut.activated.connect(lambda: self._zoom_manuscript(1))
+        self._zoom_out_shortcut = QShortcut(QKeySequence("Ctrl+-"), self)
+        self._zoom_out_shortcut.activated.connect(lambda: self._zoom_manuscript(-1))
+        self._zoom_reset_shortcut = QShortcut(QKeySequence("Ctrl+0"), self)
+        self._zoom_reset_shortcut.activated.connect(lambda: self._zoom_manuscript(0))
+
         self._next_bookmark_shortcut = QShortcut(QKeySequence("Ctrl+]"), self)
         self._next_bookmark_shortcut.activated.connect(self._next_bookmark)
 
@@ -216,9 +228,23 @@ class MainWindow(QMainWindow):
         self._sprint_status_timer.timeout.connect(self._update_sprint_label)
         self._sprint_status_timer.start()
 
+        self._setup_tab_order()
         self._load_saved_preferences()
         self._apply_theme()
         self._go_dashboard()
+
+    def _setup_tab_order(self):
+        """Set logical tab order for keyboard navigation within title bar and status bar."""
+        from PySide6.QtWidgets import QWidget
+        tb = self._editor_title_bar
+        sb = self.editor.status_bar
+        QWidget.setTabOrder(tb.settings_btn, tb.cmd_chip)
+        if tb.phase_tabs:
+            phases = list(tb.phase_tabs._buttons.values())
+            QWidget.setTabOrder(tb.cmd_chip, phases[0])
+            for i in range(len(phases) - 1):
+                QWidget.setTabOrder(phases[i], phases[i + 1])
+        QWidget.setTabOrder(sb.mode_label, sb.focus_label)
 
     def _load_saved_preferences(self):
         prefs = STATE.load_preferences()
@@ -226,6 +252,8 @@ class MainWindow(QMainWindow):
             return
         STATE.author_name = prefs.get("author_name", STATE.author_name)
         STATE.author_email = prefs.get("author_email", STATE.author_email)
+        if "theme" in prefs:
+            theme.set_theme(prefs["theme"])
         if "language" in prefs:
             STATE.language = prefs["language"]
             set_language(prefs["language"])
@@ -234,6 +262,10 @@ class MainWindow(QMainWindow):
             font = QFont("Courier Prime", prefs["font_size"])
             font.setStyleHint(QFont.StyleHint.Monospace)
             self.editor.manuscript.editor.setFont(font)
+        if "ui_font_size" in prefs:
+            app_font = QApplication.font()
+            app_font.setPointSize(prefs["ui_font_size"])
+            QApplication.setFont(app_font)
         if "auto_save" in prefs:
             if prefs["auto_save"]:
                 self.editor.manuscript.editor._save_timer.setInterval(1000)
@@ -253,15 +285,22 @@ class MainWindow(QMainWindow):
     def _apply_theme(self):
         t = theme.current()
         self.setStyleSheet(generate(t))
+        self._editor_title_bar.set_wordmark_accent()
+        self.editor.manuscript.editor.highlighter._update_formats()
+        self.editor.manuscript.editor.highlighter.rehighlight()
+        self.editor.manuscript.editor.completer._apply_theme()
 
     def _go_dashboard(self):
         if self.stack.currentWidget() is self.editor and STATE.current_project_path:
             STATE.script_content = self.editor.manuscript.editor.toPlainText()
             STATE.save_script()
+            STATE.save_outline(self.editor.outline.canvas._nodes)
+            STATE.save_plan_documents(self.editor.plan.get_documents())
         self._autosave_timer.stop()
         self._swap_title_bar(show_phases=False)
         self.title_bar.set_context("")
         self.stack.setCurrentWidget(self.dashboard)
+        self._home_btn.hide()
         self.dashboard.refresh()
         self._update_week_stats()
 
@@ -269,6 +308,7 @@ class MainWindow(QMainWindow):
         self._swap_title_bar(show_phases=False)
         self.title_bar.set_context("New Project")
         self.stack.setCurrentWidget(self.new_project_wizard)
+        self._home_btn.hide()
         self.new_project_wizard.reset()
 
     def _open_project(self, path: str):
@@ -280,6 +320,8 @@ class MainWindow(QMainWindow):
             title = data.get("meta", {}).get("title", "Untitled")
             self._editor_title_bar.set_context(title)
             self._editor_title_bar.set_wordmark_accent()
+            self._home_btn.show()
+            self._position_home_btn()
             dialect = data.get("meta", {}).get("format_id", "fountain/core")
             paper = data.get("meta", {}).get("paper", "US Letter")
             self.editor.status_bar.update_info(dialect=dialect)
@@ -314,6 +356,11 @@ class MainWindow(QMainWindow):
         saved = STATE.save_script()
         if saved:
             self._module_registry.call_hook(HOOK_AFTER_SAVE, STATE.script_content)
+            if self.editor.outline.canvas._nodes:
+                STATE.save_outline(self.editor.outline.canvas._nodes)
+            plan_docs = self.editor.plan.get_documents()
+            if plan_docs:
+                STATE.save_plan_documents(plan_docs)
         self._editor_title_bar.save_dot.set_saved(saved)
         if saved and STATE.current_project_path:
             self._auto_sync_if_enabled()
@@ -327,14 +374,20 @@ class MainWindow(QMainWindow):
         )
 
     def _auto_sync_if_enabled(self):
+        if hasattr(self, "_sync_pending") and self._sync_pending:
+            return
         import threading
         from ecrit.sync.remote_sync import load_remote_config, push_to_remote
         config, _result = load_remote_config(STATE.current_project_path)
         if config and config.auto_sync and config.remote_url:
+            self._sync_pending = True
             path = STATE.current_project_path
-            threading.Thread(
-                target=push_to_remote, args=(path, config), daemon=True
-            ).start()
+            def _do_sync():
+                try:
+                    push_to_remote(path, config)
+                finally:
+                    self._sync_pending = False
+            threading.Thread(target=_do_sync, daemon=True).start()
 
     def _auto_export_if_enabled(self):
         import tempfile
@@ -354,8 +407,9 @@ class MainWindow(QMainWindow):
                         tmp.write(content)
                         tmp_path = tmp.name
                     exporter.upload_file(tmp_path, cfg.folder_path)
-                except Exception:
-                    pass
+                except Exception as e:
+                    import logging
+                    logging.getLogger("ecrit.export").warning("Auto-export failed for %s: %s", cfg.provider, e)
                 finally:
                     if tmp_path:
                         try:
@@ -414,7 +468,6 @@ class MainWindow(QMainWindow):
             "Remote Sync": self._show_sync_settings,
             "Cloud Export": self._show_cloud_export,
             "Share for Review": self._show_share_review,
-            "Plugin Marketplace": self._show_marketplace,
             "Collaboration": self._show_collaboration,
             "Companion Sync": self._show_companion,
             "Change Language": self._show_language_settings,
@@ -722,43 +775,68 @@ class MainWindow(QMainWindow):
             "path": path,
         })
 
-    def _show_marketplace(self):
-        self._marketplace_dialog.exec()
 
     def _show_collaboration(self):
         if STATE.current_project_path:
             content = self.editor.manuscript.editor.toPlainText()
             title = self._editor_title_bar.context_label.text() or "Untitled"
             self._collab_session.project_title = title
+            self._collab_dialog._host_content = content
+            self._collab_dialog._host_title = title
         self._collab_dialog.exec()
 
     def _on_collab_started(self, session):
-        if STATE.current_project_path and session.role.value == "host":
-            content = self.editor.manuscript.editor.toPlainText()
-            session._crdt.set_text(content)
+        self._on_collab_left()
         self.editor.manuscript.presence_bar.setVisible(True)
         self._active_collab_session = session
+        self._collab_suppress_local = False
         self._collab_text_changed.connect(self._apply_collab_text)
         self._collab_participants_changed.connect(self._apply_collab_participants)
         self._collab_cursor_changed.connect(self._apply_collab_cursor)
+        self.editor.manuscript.editor.document().contentsChange.connect(
+            self._on_collab_local_edit
+        )
         session.set_callbacks(
             on_text_change=lambda text: self._collab_text_changed.emit(text),
             on_participant_change=lambda: self._collab_participants_changed.emit(),
             on_cursor_change=lambda uid, pos, length: self._collab_cursor_changed.emit(uid, pos, length),
         )
 
+    def _on_collab_local_edit(self, position: int, chars_removed: int, chars_added: int):
+        session = self._active_collab_session
+        if not session or self._collab_suppress_local:
+            return
+        if chars_removed > 0:
+            session.apply_local_delete(position, chars_removed)
+        if chars_added > 0:
+            doc = self.editor.manuscript.editor.document()
+            cursor = self.editor.manuscript.editor.textCursor()
+            cursor.setPosition(position)
+            cursor.movePosition(cursor.MoveOperation.Right, cursor.MoveMode.KeepAnchor, chars_added)
+            added_text = cursor.selectedText().replace(" ", "\n")
+            if added_text:
+                session.apply_local_insert(position, added_text)
+
     def _apply_collab_text(self, text: str):
         editor = self.editor.manuscript.editor
         if editor.toPlainText() != text:
             cursor_pos = editor.textCursor().position()
-            editor.blockSignals(True)
-            editor.setPlainText(text)
+            self._collab_suppress_local = True
             cursor = editor.textCursor()
+            cursor.beginEditBlock()
+            cursor.select(cursor.SelectionType.Document)
+            cursor.insertText(text)
+            cursor.endEditBlock()
             cursor.setPosition(min(cursor_pos, len(text)))
             editor.setTextCursor(cursor)
-            editor.blockSignals(False)
+            self._collab_suppress_local = False
             STATE.script_content = text
-            STATE.save_script()
+            if not hasattr(self, "_collab_save_timer"):
+                self._collab_save_timer = QTimer(self)
+                self._collab_save_timer.setSingleShot(True)
+                self._collab_save_timer.setInterval(2000)
+                self._collab_save_timer.timeout.connect(lambda: STATE.save_script())
+            self._collab_save_timer.start()
 
     def _apply_collab_participants(self):
         session = self._active_collab_session
@@ -787,6 +865,15 @@ class MainWindow(QMainWindow):
             self._collab_cursor_changed.disconnect(self._apply_collab_cursor)
         except RuntimeError:
             pass
+        try:
+            self.editor.manuscript.editor.document().contentsChange.disconnect(
+                self._on_collab_local_edit
+            )
+        except RuntimeError:
+            pass
+        if hasattr(self, "_collab_save_timer") and self._collab_save_timer.isActive():
+            self._collab_save_timer.stop()
+            STATE.save_script()
         self._active_collab_session = None
         self.editor.status_bar.sprint_label.setText("")
         self.editor.manuscript.presence_bar.clear_participants()
@@ -806,8 +893,6 @@ class MainWindow(QMainWindow):
         url = device_sync.start_transfer_server(path)
         self._companion_dialog.set_transfer_url(url)
         self._companion_dialog.set_sync_status(f"Bundle ready: {path}")
-        for device in device_sync._devices:
-            device_sync.mark_synced(device.device_id)
 
     def _on_wifi_transfer(self, path: str):
         if not STATE.current_project_path:
@@ -847,22 +932,24 @@ class MainWindow(QMainWindow):
         from ecrit.screenplay.module_system import HOOK_BEFORE_EXPORT, HOOK_AFTER_EXPORT
         self._module_registry.call_hook(HOOK_BEFORE_EXPORT, kind, content)
         export_opts = self.editor.deliver._export_opts
+        format_id = STATE.get_format_id()
         if kind == "pdf":
             from ecrit.export.pdf_export import export_pdf
             export_pdf(
                 content, title=title, parent=self,
                 include_title_page=export_opts.get("title_page", True),
                 scene_numbers=export_opts.get("scene_numbers", True),
+                format_id=format_id,
             )
         elif kind == "odt":
             from ecrit.export.odt_export import export_odt
-            export_odt(content, title=title, parent=self)
+            export_odt(content, title=title, parent=self, format_id=format_id)
         elif kind == "fountain":
             from ecrit.export.fountain_export import export_fountain
             export_fountain(content, title=title, parent=self)
         elif kind == "epub":
             from ecrit.export.epub_export import export_epub
-            export_epub(content, title=title, parent=self)
+            export_epub(content, title=title, parent=self, format_id=format_id)
         self._module_registry.call_hook(HOOK_AFTER_EXPORT, kind, content)
 
     def _import_script(self):
@@ -900,6 +987,18 @@ class MainWindow(QMainWindow):
             root.replaceWidget(old_bar, self.title_bar)
             old_bar.hide()
             self.title_bar.show()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._position_home_btn()
+
+    def _position_home_btn(self):
+        margin = 20
+        self._home_btn.move(
+            self.width() - self._home_btn.width() - margin,
+            self.height() - self._home_btn.height() - margin,
+        )
+        self._home_btn.raise_()
 
     def _toggle_maximize(self):
         if self.isMaximized():
@@ -1062,7 +1161,7 @@ class MainWindow(QMainWindow):
         content = editor.toPlainText()
         if content.startswith("Title:") or content.startswith("title:"):
             lines = content.split("\n")
-            end = 0
+            end = len(lines)
             for i, line in enumerate(lines):
                 if line.strip() == "" and i > 0:
                     end = i + 1
@@ -1125,6 +1224,28 @@ class MainWindow(QMainWindow):
     def _toggle_theme(self):
         theme.toggle()
         self._apply_theme()
+        self._save_theme_preference()
+
+    def _on_theme_changed_from_settings(self):
+        self._apply_theme()
+        self._save_theme_preference()
+
+    def _save_theme_preference(self):
+        prefs = STATE.load_preferences()
+        prefs["theme"] = theme.current().name
+        STATE.save_preferences(prefs)
+
+    def _zoom_manuscript(self, direction: int):
+        if self.stack.currentWidget() is not self.editor:
+            return
+        editor = self.editor.manuscript.editor
+        font = editor.font()
+        if direction == 0:
+            font.setPointSize(15)
+        else:
+            new_size = font.pointSize() + (2 * direction)
+            font.setPointSize(max(8, min(36, new_size)))
+        editor.setFont(font)
 
     def mousePressEvent(self, event):
         if event.position().y() < 44:
@@ -1160,6 +1281,11 @@ class MainWindow(QMainWindow):
         font = QFont("Courier Prime", font_size)
         font.setStyleHint(QFont.StyleHint.Monospace)
         self.editor.manuscript.editor.setFont(font)
+        ui_font_size = settings.get("ui_font_size", 14)
+        app_font = QApplication.font()
+        app_font.setPointSize(ui_font_size)
+        QApplication.setFont(app_font)
+        self._apply_theme()
         word_target = settings.get("word_target", 2500)
         self.editor.status_bar.words_label.setText(
             f"0 / {word_target:,} today"
@@ -1187,6 +1313,7 @@ class MainWindow(QMainWindow):
             "author_name": STATE.author_name,
             "author_email": STATE.author_email,
             "font_size": font_size,
+            "ui_font_size": ui_font_size,
             "word_target": word_target,
             "auto_save": auto_save,
             "typewriter": settings.get("typewriter", True),
@@ -1196,13 +1323,6 @@ class MainWindow(QMainWindow):
             "autosave_enabled": autosave_enabled,
         })
 
-    def _on_plugin_installed(self, plugin_id: str):
-        if hasattr(self._settings_dialog, '_module_registry') and self._settings_dialog._module_registry:
-            self._settings_dialog._refresh_modules_list()
-
-    def _on_plugin_uninstalled(self, plugin_id: str):
-        if hasattr(self._settings_dialog, '_module_registry') and self._settings_dialog._module_registry:
-            self._settings_dialog._refresh_modules_list()
 
     def _on_sync_config_saved(self, config: dict):
         if not STATE.current_project_path:
@@ -1230,12 +1350,25 @@ class MainWindow(QMainWindow):
         self.dashboard.week_stats.set_stats(
             words=stats.get("word_count", 0),
             pages=stats.get("page_count", 0),
+            scenes=stats.get("scene_count", 0),
+            characters=stats.get("character_count", 0),
         )
 
 
 def main():
+    QApplication.setHighDpiScaleFactorRoundingPolicy(
+        Qt.HighDpiScaleFactorRoundingPolicy.PassThrough,
+    )
     app = QApplication(sys.argv)
     app.setApplicationName("Écrit")
+
+    from PySide6.QtGui import QFont
+    font = QFont("Liberation Serif", 14)
+    font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
+    font.setStyleStrategy(
+        QFont.StyleStrategy.PreferAntialias
+    )
+    app.setFont(font)
 
     window = MainWindow()
     window.show()

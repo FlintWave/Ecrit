@@ -6,8 +6,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, Signal
 
-from ecrit.ui.styles import theme
-
+from ecrit.ui.icons import IconButton
 
 class FindReplaceBar(QFrame):
     find_next = Signal(str, bool, bool)
@@ -33,29 +32,33 @@ class FindReplaceBar(QFrame):
 
         self.find_input = QLineEdit()
         self.find_input.setPlaceholderText("Search text...")
+        self.find_input.setAccessibleName("Find")
         self.find_input.returnPressed.connect(self._on_find_next)
         find_row.addWidget(self.find_input, 1)
 
         self.match_label = QLabel("0 / 0")
-        self.match_label.setStyleSheet(f"color: {theme.current().neutral_500}; font-size: 12px;")
+        self.match_label.setObjectName("dashMuted")
         self.match_label.setFixedWidth(60)
         find_row.addWidget(self.match_label)
 
-        prev_btn = QPushButton("↑")
+        prev_btn = IconButton("chevron-up", icon_size=16)
         prev_btn.setObjectName("secondary")
         prev_btn.setFixedSize(28, 28)
+        prev_btn.setAccessibleName("Find Previous")
         prev_btn.clicked.connect(self._on_find_prev)
         find_row.addWidget(prev_btn)
 
-        next_btn = QPushButton("↓")
+        next_btn = IconButton("chevron-down", icon_size=16)
         next_btn.setObjectName("secondary")
         next_btn.setFixedSize(28, 28)
+        next_btn.setAccessibleName("Find Next")
         next_btn.clicked.connect(self._on_find_next)
         find_row.addWidget(next_btn)
 
-        close_btn = QPushButton("×")
+        close_btn = IconButton("x-mark")
         close_btn.setObjectName("iconBtn")
         close_btn.setFixedSize(24, 24)
+        close_btn.setAccessibleName("Close")
         close_btn.clicked.connect(self.toggle)
         find_row.addWidget(close_btn)
 
@@ -68,17 +71,20 @@ class FindReplaceBar(QFrame):
 
         self.replace_input = QLineEdit()
         self.replace_input.setPlaceholderText("Replace with...")
+        self.replace_input.setAccessibleName("Replace")
         replace_row.addWidget(self.replace_input, 1)
 
         r_one = QPushButton("Replace")
         r_one.setObjectName("secondary")
         r_one.setFixedHeight(28)
+        r_one.setAccessibleName("Replace")
         r_one.clicked.connect(self._on_replace_one)
         replace_row.addWidget(r_one)
 
         r_all = QPushButton("All")
         r_all.setObjectName("secondary")
         r_all.setFixedHeight(28)
+        r_all.setAccessibleName("Replace All")
         r_all.clicked.connect(self._on_replace_all)
         replace_row.addWidget(r_all)
 
@@ -86,8 +92,10 @@ class FindReplaceBar(QFrame):
 
         options = QHBoxLayout()
         self.case_check = QCheckBox("Match case")
+        self.case_check.setAccessibleName("Match case")
         options.addWidget(self.case_check)
         self.regex_check = QCheckBox("Regex")
+        self.regex_check.setAccessibleName("Regex")
         options.addWidget(self.regex_check)
         options.addStretch()
         layout.addLayout(options)

@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, Signal
 
 from ecrit.ui.styles import theme
+from ecrit.ui.icons import IconButton
 
 
 class CompareDrafts(QDialog):
@@ -17,7 +18,6 @@ class CompareDrafts(QDialog):
         self.setMinimumSize(820, 560)
         self.setModal(True)
 
-        t = theme.current()
         layout = QVBoxLayout(self)
         layout.setContentsMargins(20, 16, 20, 16)
         layout.setSpacing(12)
@@ -31,12 +31,14 @@ class CompareDrafts(QDialog):
         self.view_mode = QPushButton("Side by side")
         self.view_mode.setObjectName("secondary")
         self.view_mode.setFixedHeight(28)
+        self.view_mode.setAccessibleName("Toggle View Mode")
         self.view_mode.clicked.connect(self._toggle_view)
         header.addWidget(self.view_mode)
 
-        close_btn = QPushButton("×")
+        close_btn = IconButton("x-mark")
         close_btn.setObjectName("iconBtn")
         close_btn.setFixedSize(28, 28)
+        close_btn.setAccessibleName("Close")
         close_btn.clicked.connect(self.close)
         header.addWidget(close_btn)
         layout.addLayout(header)
@@ -45,14 +47,17 @@ class CompareDrafts(QDialog):
         selectors.addWidget(QLabel("From:"))
         self.from_select = QComboBox()
         self.from_select.setFixedHeight(30)
+        self.from_select.setAccessibleName("From Snapshot")
         selectors.addWidget(self.from_select, 1)
         selectors.addWidget(QLabel("To:"))
         self.to_select = QComboBox()
         self.to_select.setFixedHeight(30)
+        self.to_select.setAccessibleName("To Snapshot")
         selectors.addWidget(self.to_select, 1)
         compare_btn = QPushButton("Compare")
         compare_btn.setObjectName("primary")
         compare_btn.setFixedHeight(30)
+        compare_btn.setAccessibleName("Compare")
         compare_btn.clicked.connect(self._run_compare)
         selectors.addWidget(compare_btn)
         layout.addLayout(selectors)
@@ -63,26 +68,17 @@ class CompareDrafts(QDialog):
 
         self.left_view = QTextEdit()
         self.left_view.setReadOnly(True)
-        self.left_view.setStyleSheet(
-            f"font-family: 'Courier Prime', Courier, monospace; font-size: 13px; "
-            f"background: {t.surface}; border: 1px solid {t.divider}; border-radius: 6px;"
-        )
+        self.left_view.setObjectName("diffView")
         self.splitter.addWidget(self.left_view)
 
         self.right_view = QTextEdit()
         self.right_view.setReadOnly(True)
-        self.right_view.setStyleSheet(
-            f"font-family: 'Courier Prime', Courier, monospace; font-size: 13px; "
-            f"background: {t.surface}; border: 1px solid {t.divider}; border-radius: 6px;"
-        )
+        self.right_view.setObjectName("diffView")
         self.splitter.addWidget(self.right_view)
 
         self.inline_view = QTextEdit()
         self.inline_view.setReadOnly(True)
-        self.inline_view.setStyleSheet(
-            f"font-family: 'Courier Prime', Courier, monospace; font-size: 13px; "
-            f"background: {t.surface}; border: 1px solid {t.divider}; border-radius: 6px;"
-        )
+        self.inline_view.setObjectName("diffView")
         self.inline_view.hide()
 
         layout.addWidget(self.splitter, 1)
@@ -90,7 +86,7 @@ class CompareDrafts(QDialog):
 
         stats = QHBoxLayout()
         self.stats_label = QLabel()
-        self.stats_label.setStyleSheet(f"color: {t.neutral_500}; font-size: 12px;")
+        self.stats_label.setObjectName("dashMutedSmall")
         stats.addWidget(self.stats_label)
         stats.addStretch()
         layout.addLayout(stats)

@@ -28,13 +28,13 @@ impl ProjectManager {
         fs::create_dir_all(&project_dir).map_err(|e| e.to_string())?;
         fs::create_dir_all(project_dir.join("plan")).map_err(|e| e.to_string())?;
 
-        let sample_heading = match format_id {
-            "fountain+comic-full" | "fountain+comic-plot" | "fountain+comic-lean" | "fountain+comic-gn" => {
-                format!("Title: {}\nCredit: Written by\nAuthor: {}\n\n# PAGE ONE\n\n.PANEL 1\n\nEstablishing shot.\n", title, author)
-            }
-            _ => {
-                format!("Title: {}\nCredit: Written by\nAuthor: {}\n\nINT. LOCATION — DAY\n\nAction goes here.\n", title, author)
-            }
+        let sample_heading = if format_id.starts_with("fountain+comic") {
+            format!(
+                "Title: {}\nCredit: Written by\nAuthor: {}\n\n# PAGE ONE\n\nPANEL 1\n\nEstablishing shot. Wide angle on the city skyline.\n\nCAP: The city never sleeps.\n\nCHARACTER\n(burst)\nDialogue goes here!\n\nSFX: KRAAAK\n\n# PAGE TWO\n\nPANEL 1\n\nAction description for the next panel.\n",
+                title, author
+            )
+        } else {
+            format!("Title: {}\nCredit: Written by\nAuthor: {}\n\nINT. LOCATION — DAY\n\nAction goes here.\n", title, author)
         };
 
         fs::write(project_dir.join("script.fountain"), &sample_heading).map_err(|e| e.to_string())?;

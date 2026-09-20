@@ -7,30 +7,25 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, Signal
 
 from ecrit.ui.styles import theme
+from ecrit.ui.icons import IconButton
 
 
 class MoodboardTile(QFrame):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._image_path = ""
-        t = theme.current()
+        self.setObjectName("moodboardTile")
         self.setFixedSize(120, 120)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._default_style = (
-            f"background: {t.neutral_800 if t.name == 'nocturne' else t.neutral_200}; "
-            f"border: 2px dashed {t.neutral_700 if t.name == 'nocturne' else t.neutral_300}; "
-            f"border-radius: {t.radius_md}px;"
-        )
-        self.setStyleSheet(self._default_style)
         layout = QVBoxLayout(self)
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._icon = QLabel("+")
         self._icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._icon.setStyleSheet(f"color: {t.neutral_500}; font-size: 24px; background: transparent;")
+        self._icon.setStyleSheet("font-size: 24px;")
         layout.addWidget(self._icon)
         self._label = QLabel("Click to add")
         self._label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._label.setStyleSheet(f"color: {t.neutral_500}; font-size: 11px; background: transparent;")
+        self._label.setStyleSheet("font-size: 11px;")
         layout.addWidget(self._label)
 
     def mousePressEvent(self, event):
@@ -62,7 +57,6 @@ class CharacterSheet(QDialog):
         self.setModal(True)
         self._data = {}
 
-        t = theme.current()
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
 
@@ -79,9 +73,10 @@ class CharacterSheet(QDialog):
 
         header.addStretch()
 
-        close_btn = QPushButton("×")
+        close_btn = IconButton("x-mark")
         close_btn.setObjectName("iconBtn")
         close_btn.setFixedSize(28, 28)
+        close_btn.setAccessibleName("Close")
         close_btn.clicked.connect(self.close)
         header.addWidget(close_btn)
         layout.addLayout(header)
@@ -110,6 +105,7 @@ class CharacterSheet(QDialog):
             left.addWidget(lbl)
             inp = QLineEdit()
             inp.setFixedHeight(32)
+            inp.setAccessibleName(label_text)
             left.addWidget(inp)
             setattr(self, attr_name, inp)
 
@@ -124,11 +120,12 @@ class CharacterSheet(QDialog):
             left.addWidget(lbl)
             txt = QTextEdit()
             txt.setFixedHeight(60)
+            txt.setAccessibleName(label_text)
             left.addWidget(txt)
             setattr(self, attr_name, txt)
 
         self.scenes_label = QLabel()
-        self.scenes_label.setStyleSheet(f"color: {t.neutral_500}; font-size: 12px;")
+        self.scenes_label.setObjectName("dashMutedSmall")
         left.addWidget(self.scenes_label)
 
         left.addStretch()
@@ -154,6 +151,7 @@ class CharacterSheet(QDialog):
 
         self.notes_input = QTextEdit()
         self.notes_input.setPlaceholderText("Character notes...")
+        self.notes_input.setAccessibleName("Notes")
         right.addWidget(self.notes_input, 1)
 
         right_widget = QWidget()
@@ -170,6 +168,7 @@ class CharacterSheet(QDialog):
         done_btn = QPushButton("Done")
         done_btn.setObjectName("primary")
         done_btn.setFixedHeight(36)
+        done_btn.setAccessibleName("Done")
         done_btn.clicked.connect(self._on_done)
         footer.addWidget(done_btn)
         layout.addLayout(footer)

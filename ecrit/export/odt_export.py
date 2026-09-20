@@ -1,12 +1,15 @@
 """ODT export — generate Open Document Text from Fountain script."""
 
 import json
+import logging
 import os
 import zipfile
 from io import BytesIO
 from xml.sax.saxutils import escape
 
 from PySide6.QtWidgets import QFileDialog
+
+logger = logging.getLogger("ecrit.export.odt")
 
 
 CONTENT_XML_HEAD = """<?xml version="1.0" encoding="UTF-8"?>
@@ -49,6 +52,24 @@ CONTENT_XML_HEAD = """<?xml version="1.0" encoding="UTF-8"?>
   <style:style style:name="Note" style:family="paragraph">
     <style:text-properties fo:font-style="italic" style:font-name="Courier Prime" fo:font-size="12pt"/>
   </style:style>
+  <style:style style:name="PageHeader" style:family="paragraph">
+    <style:paragraph-properties fo:margin-top="0.25in" fo:margin-bottom="0in"/>
+    <style:text-properties fo:font-weight="bold" fo:text-transform="uppercase"
+      style:font-name="Courier Prime" fo:font-size="12pt"/>
+  </style:style>
+  <style:style style:name="PanelHeader" style:family="paragraph">
+    <style:paragraph-properties fo:margin-top="0.2in" fo:margin-left="0.5in"/>
+    <style:text-properties fo:font-weight="bold" style:font-name="Courier Prime" fo:font-size="12pt"/>
+  </style:style>
+  <style:style style:name="Sfx" style:family="paragraph">
+    <style:paragraph-properties fo:margin-top="0.06in" fo:margin-left="0.5in"/>
+    <style:text-properties fo:font-weight="bold" fo:text-transform="uppercase"
+      style:font-name="Courier Prime" fo:font-size="12pt"/>
+  </style:style>
+  <style:style style:name="Caption" style:family="paragraph">
+    <style:paragraph-properties fo:margin-top="0.06in" fo:margin-left="0.5in"/>
+    <style:text-properties style:font-name="Courier Prime" fo:font-size="12pt"/>
+  </style:style>
 </office:automatic-styles>
 <office:body>
 <office:text>
@@ -79,14 +100,19 @@ STYLE_MAP = {
     "Note": "Note",
     "Lyric": "Dialogue",
     "BlankLine": "Action",
+    "PageHeader": "PageHeader",
+    "PanelHeader": "PanelHeader",
+    "Sfx": "Sfx",
+    "Caption": "Caption",
 }
 
 
-def _build_content_xml(script_content: str) -> str:
+def _build_content_xml(script_content: str, format_id: str = "fountain/core") -> str:
     try:
         import ecrit_core
-        parsed = json.loads(ecrit_core.parse_fountain(script_content))
+        parsed = json.loads(ecrit_core.parse_fountain(script_content, format_id))
     except Exception:
+        logger.debug("Fountain parse unavailable, inserting raw text", exc_info=True)
         return CONTENT_XML_HEAD + f"<text:p>{escape(script_content)}</text:p>" + CONTENT_XML_TAIL
 
     parts = [CONTENT_XML_HEAD]
@@ -103,22 +129,35 @@ def _build_content_xml(script_content: str) -> str:
             parts.append(f'<text:p text:style-name="Action"/>')
             continue
 
-        parts.append(f'<text:p text:style-name="{style}">{escape(text)}</text:p>')
+        display = text
+        if kind == "Sfx":
+            num = elem.get("number", "")
+            display = f"{num}. SFX: {text}" if num else f"SFX: {text}"
+        elif kind == "Caption":
+            num = elem.get("number", "")
+            subtype = elem.get("subtype", "CAPTION")
+            display = f"{num}. {subtype}: {text}" if num else f"{subtype}: {text}"
+
+        parts.append(f'<text:p text:style-name="{style}">{escape(display)}</text:p>')
 
     parts.append(CONTENT_XML_TAIL)
     return "\n".join(parts)
 
 
-def _create_odt_bytes(script_content: str) -> bytes:
+def _create_odt_bytes(script_content: str, format_id: str = "fountain/core") -> bytes:
     buf = BytesIO()
     with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
-        zf.writestr("mimetype", "application/vnd.oasis.opendocument.text")
+        zf.writestr(
+            zipfile.ZipInfo("mimetype", date_time=(2020, 1, 1, 0, 0, 0)),
+            "application/vnd.oasis.opendocument.text",
+            compress_type=zipfile.ZIP_STORED,
+        )
         zf.writestr("META-INF/manifest.xml", MANIFEST_XML)
-        zf.writestr("content.xml", _build_content_xml(script_content))
+        zf.writestr("content.xml", _build_content_xml(script_content, format_id))
     return buf.getvalue()
 
 
-def export_odt(script_content: str, title: str = "Untitled", parent=None) -> str:
+def export_odt(script_content: str, title: str = "Untitled", parent=None, format_id: str = "fountain/core") -> str:
     default_name = f"{title}.odt"
     path, _ = QFileDialog.getSaveFileName(
         parent, "Export ODT",
@@ -131,14 +170,14 @@ def export_odt(script_content: str, title: str = "Untitled", parent=None) -> str
     if not path.endswith(".odt"):
         path += ".odt"
 
-    data = _create_odt_bytes(script_content)
+    data = _create_odt_bytes(script_content, format_id)
     with open(path, 'wb') as f:
         f.write(data)
     return path
 
 
-def export_odt_to_path(script_content: str, path: str):
+def export_odt_to_path(script_content: str, path: str, format_id: str = "fountain/core"):
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
-    data = _create_odt_bytes(script_content)
+    data = _create_odt_bytes(script_content, format_id)
     with open(path, 'wb') as f:
         f.write(data)

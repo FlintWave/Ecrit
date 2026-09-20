@@ -7,7 +7,6 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QFont, QShortcut, QKeySequence
 
-from ecrit.ui.styles import theme
 
 
 class ReadingMode(QWidget):
@@ -15,8 +14,7 @@ class ReadingMode(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        t = theme.current()
-        self.setStyleSheet(f"background: {t.bg};")
+        self.setObjectName("readingMode")
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -26,7 +24,7 @@ class ReadingMode(QWidget):
         top_bar.addStretch()
 
         self.page_label = QLabel()
-        self.page_label.setStyleSheet(f"color: {t.neutral_500}; font-size: 12px;")
+        self.page_label.setObjectName("dashMutedSmall")
         top_bar.addWidget(self.page_label)
 
         top_bar.addStretch()
@@ -34,6 +32,7 @@ class ReadingMode(QWidget):
         exit_btn = QPushButton("Exit Reading Mode")
         exit_btn.setObjectName("secondary")
         exit_btn.setFixedHeight(28)
+        exit_btn.setAccessibleName("Exit Reading Mode")
         exit_btn.clicked.connect(self.exit_requested.emit)
         top_bar.addWidget(exit_btn)
         layout.addLayout(top_bar)
@@ -50,16 +49,12 @@ class ReadingMode(QWidget):
         font.setStyleHint(QFont.StyleHint.Monospace)
         self.text_view.setFont(font)
         self.text_view.setMaximumWidth(680)
-        self.text_view.setStyleSheet(
-            f"background: {t.surface}; color: {t.text}; border: none; "
-            f"font-family: 'Courier Prime', Courier, monospace; font-size: 15px; padding: 40px;"
-        )
         center_layout.addWidget(self.text_view)
         layout.addWidget(center, 1)
 
         hint = QLabel("Press Esc to exit reading mode")
         hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        hint.setStyleSheet(f"color: {t.neutral_600}; font-size: 12px; padding: 8px;")
+        hint.setObjectName("dashMutedSmall")
         layout.addWidget(hint)
 
     def set_content(self, text: str, page: int = 1, total_pages: int = 1):

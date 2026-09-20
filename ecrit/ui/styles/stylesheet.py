@@ -14,10 +14,15 @@ QWidget {{
     background-color: {t.bg};
     color: {t.text};
     font-family: 'Liberation Serif', 'Tinos', 'Times New Roman', serif;
-    font-size: 13px;
+    font-size: 14px;
 }}
 QWidget:focus {{
     outline: none;
+}}
+QPushButton:focus, QComboBox:focus, QCheckBox:focus, QSpinBox:focus,
+QListWidget:focus, QTabBar:focus {{
+    border: 2px solid {t.accent};
+    border-radius: {t.radius_sm}px;
 }}
 
 /* ═══ Title Bar ═══ */
@@ -31,12 +36,12 @@ QWidget:focus {{
     background: transparent;
 }}
 #wordmark {{
-    font-size: 16px;
+    font-size: 18px;
     font-weight: 500;
     color: {t.text};
 }}
 #titleContext {{
-    font-size: 13px;
+    font-size: 14px;
     color: {t.neutral_500};
 }}
 
@@ -45,8 +50,8 @@ QWidget:focus {{
     background: transparent;
     border: none;
     color: {t.neutral_500};
-    font-size: 13px;
-    padding: 8px 12px;
+    font-size: 14px;
+    padding: 8px 14px;
     font-weight: 500;
 }}
 #phaseTabs QPushButton:hover {{
@@ -165,21 +170,21 @@ QFrame#card:hover {{
 QLabel#tagNeutral {{
     background: {t.neutral_800 if t.name == "nocturne" else t.neutral_100};
     color: {t.neutral_100 if t.name == "nocturne" else t.neutral_800};
-    font-size: 11px;
+    font-size: 12px;
     padding: 3px 10px;
     border-radius: {int(t.radius_md * 0.75)}px;
 }}
 QLabel#tagAccent {{
     background: {t.accent_800 if t.name == "nocturne" else t.accent_100};
     color: {t.accent_100 if t.name == "nocturne" else t.accent_800};
-    font-size: 11px;
+    font-size: 12px;
     padding: 3px 10px;
     border-radius: {int(t.radius_md * 0.75)}px;
 }}
 
 /* ═══ Kicker Labels ═══ */
 QLabel#kicker {{
-    font-size: 12px;
+    font-size: 13px;
     letter-spacing: 1px;
     color: {t.neutral_500};
     text-transform: uppercase;
@@ -192,13 +197,13 @@ QLabel#kicker {{
     border-top: 1px solid {t.divider};
     min-height: 28px;
     max-height: 28px;
-    font-size: 12px;
+    font-size: 13px;
     color: {t.neutral_500};
 }}
 #statusBar QLabel {{
     background: transparent;
     color: {t.neutral_500};
-    font-size: 12px;
+    font-size: 13px;
 }}
 
 /* ═══ Rails (side panels) ═══ */
@@ -218,7 +223,7 @@ QListWidget {{
     border: none;
     outline: none;
     font-family: 'Courier Prime', Courier, monospace;
-    font-size: 12px;
+    font-size: 13px;
 }}
 QListWidget::item {{
     padding: 6px 12px;
@@ -249,7 +254,7 @@ QTabBar::tab {{
     background: transparent;
     color: {t.neutral_500};
     padding: 10px 16px;
-    font-size: 13.5px;
+    font-size: 14px;
     border: none;
     border-radius: {t.radius_sm}px;
 }}
@@ -314,7 +319,7 @@ QToolTip {{
     border: 1px solid {t.neutral_700};
     border-radius: {t.radius_sm}px;
     padding: 4px 8px;
-    font-size: 12px;
+    font-size: 13px;
 }}
 
 /* ═══ Menu ═══ */
@@ -338,17 +343,17 @@ QMenu::separator {{
     margin: 4px 8px;
 }}
 
-/* ═══ Home Button ═══ */
+/* ═══ Home Button (floating, bottom-right) ═══ */
 #homeBtn {{
     background: {t.surface};
     border: 1px solid {t.neutral_800 if t.name == "nocturne" else t.divider};
-    border-radius: {t.radius_sm}px;
-    width: 34px;
-    height: 34px;
+    border-radius: {t.radius_md}px;
+    font-size: 18px;
     padding: 0;
 }}
 #homeBtn:hover {{
     border-color: {t.accent};
+    background: {t.accent_900 if t.name == "nocturne" else t.accent_100};
 }}
 
 /* ═══ Script Editor ═══ */
@@ -357,7 +362,7 @@ QMenu::separator {{
     color: {t.text};
     border: none;
     font-family: 'Courier Prime', Courier, monospace;
-    font-size: 15px;
+    font-size: 16px;
     line-height: 1.6;
     padding: 40px;
     selection-background-color: rgba({_hex_to_rgb_str(t.accent)},0.25);
@@ -369,9 +374,167 @@ QMenu::separator {{
     color: {t.text};
     border: none;
     font-family: 'Liberation Serif', 'Tinos', 'Times New Roman', serif;
-    font-size: 16px;
+    font-size: 17px;
     padding: 20px;
     selection-background-color: rgba({_hex_to_rgb_str(t.accent)},0.25);
+}}
+
+/* ═══ Dashboard ═══ */
+#dashMuted {{
+    color: {t.neutral_500};
+    font-size: 13px;
+    background: transparent;
+}}
+#dashHeroTitle {{
+    font-size: 26px;
+    font-weight: 500;
+    background: transparent;
+}}
+#dashExcerpt {{
+    font-family: 'Courier Prime', Courier, monospace;
+    font-size: 13px;
+    color: {t.neutral_400};
+    background: transparent;
+    padding: 12px 0;
+}}
+#dashStatValue {{
+    font-family: ui-monospace, Menlo, monospace;
+    font-size: 20px;
+    background: transparent;
+}}
+#dashMonoMuted {{
+    font-family: ui-monospace, Menlo, monospace;
+    font-size: 11px;
+    color: {t.neutral_500};
+    background: transparent;
+}}
+#dashCardTitle {{
+    font-size: 15px;
+    font-weight: 500;
+    background: transparent;
+}}
+#dashMutedSmall {{
+    color: {t.neutral_500};
+    font-size: 12.5px;
+    background: transparent;
+}}
+
+/* ═══ Command Palette ═══ */
+#cmdPalette {{
+    background: {t.surface};
+    border: 1px solid {t.neutral_700};
+    border-radius: {t.radius_lg}px;
+}}
+#cmdPaletteHint {{
+    color: {t.neutral_500};
+    font-size: 11px;
+    background: transparent;
+}}
+
+/* ═══ Marketplace Details ═══ */
+#detailsPane {{
+    background: {t.surface};
+    border-top: 1px solid {t.neutral_700};
+}}
+
+/* ═══ Editor Frames ═══ */
+#pageFrame {{
+    background: {t.surface};
+    border-radius: 4px;
+}}
+#deliverPreview {{
+    background: {t.surface};
+    border-radius: 8px;
+    min-height: 400px;
+    color: {t.text};
+    padding: 24px;
+    border: none;
+}}
+
+/* ═══ Collaboration ═══ */
+#collabFrame {{
+    background: {t.surface};
+    border-radius: 8px;
+    padding: 12px;
+}}
+#collabTokenDisplay {{
+    font-family: ui-monospace, Menlo, monospace;
+    font-size: 11px;
+    background: {t.bg};
+    border: 1px solid {t.neutral_700};
+    border-radius: 4px;
+}}
+
+/* ═══ Form Groups (Settings) ═══ */
+#formGroup {{
+    background: {t.neutral_100 if t.name == "organic" else t.neutral_900};
+    border-radius: 8px;
+}}
+#formGroup QLabel {{
+    background: transparent;
+}}
+
+/* ═══ Keyboard Shortcut Keys ═══ */
+#kbdKey {{
+    font-family: ui-monospace, Menlo, monospace;
+    font-size: 12px;
+    background: {t.neutral_200 if t.name == "organic" else t.neutral_800};
+    padding: 3px 8px;
+    border-radius: 4px;
+}}
+
+/* ═══ Count Badge ═══ */
+#countBadge {{
+    color: {t.neutral_400};
+    font-size: 13px;
+    background: transparent;
+}}
+
+/* ═══ Logline Builder ═══ */
+#loglinePreview {{
+    background: {t.neutral_200 if t.name == "organic" else t.neutral_800};
+    border: 1px solid {t.neutral_300 if t.name == "organic" else t.neutral_700};
+    border-radius: {t.radius_sm}px;
+    padding: 8px;
+    font-size: 13px;
+}}
+
+/* ═══ Scratchpad ═══ */
+#scratchpadEditor {{
+    font-family: 'Courier Prime', Courier, monospace;
+    font-size: 13px;
+    background: transparent;
+    border: 1px solid {t.divider};
+    border-radius: 6px;
+    padding: 8px;
+}}
+
+/* ═══ Draft Comparison ═══ */
+#diffView {{
+    font-family: 'Courier Prime', Courier, monospace;
+    font-size: 13px;
+    background: {t.surface};
+    border: 1px solid {t.divider};
+    border-radius: 6px;
+}}
+
+/* ═══ Moodboard Tiles ═══ */
+#moodboardTile {{
+    background: {t.neutral_200 if t.name == "organic" else t.neutral_800};
+    border: 2px dashed {t.neutral_300 if t.name == "organic" else t.neutral_700};
+    border-radius: {t.radius_md}px;
+}}
+#moodboardTile QLabel {{
+    color: {t.neutral_500};
+    background: transparent;
+}}
+
+/* ═══ Reading Mode ═══ */
+#readingMode {{
+    background: {t.bg};
+}}
+#readingMode QLabel {{
+    background: transparent;
 }}
 """
 
